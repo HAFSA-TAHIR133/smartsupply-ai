@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: smartsupply-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      POSTGRES_DB: ${POSTGRES_DB:-smartsupply}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d smartsupply"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: smartsupply-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: smartsupply-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP protocol
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../services/inventory-service
+      dockerfile: Dockerfile
+    container_name: smartsupply-backend
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      NODE_ENV: production
+      PORT: 4001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-smartsupply}
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      AGENT_SERVICE_URL: http://python-agents:8000
+      JWT_SECRET: ${JWT_SECRET:-smartsupply_secret_jwt_key_2026_super_secure}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  python-agents:
+    build:
+      context: ../agents
+      dockerfile: Dockerfile
+    container_name: smartsupply-agents
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      LLM_MODEL: groq/compound
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/smartsupply
+      PORT: 8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    container_name: smartsupply-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:4001/api/v1
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

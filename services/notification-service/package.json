@@ -1,0 +1,22 @@
+{
+  "name": "notification-service",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SmartSupply AI Notification Service",
+  "main": "src/app.js",
+  "scripts": {
+  "start": "node -r dotenv/config --import newrelic/esm-loader.mjs -r newrelic src/app.js",
+  "dev": "nodemon -r dotenv/config --import newrelic/esm-loader.mjs -r newrelic src/app.js",
+  "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
+},
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "newrelic": "^14.3.10"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.0"
+  }
+}
