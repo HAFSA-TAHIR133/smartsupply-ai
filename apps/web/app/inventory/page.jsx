@@ -131,6 +131,19 @@ export default function InventoryPage() {
 
   useEffect(() => {
     loadProducts();
+
+    const handleDataUpdated = () => {
+      loadProducts();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("smartsupply:data-updated", handleDataUpdated);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("smartsupply:data-updated", handleDataUpdated);
+      }
+    };
   }, []);
 
   const handleOpenAdjust = (prod) => {

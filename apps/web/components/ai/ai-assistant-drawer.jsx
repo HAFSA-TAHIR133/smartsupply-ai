@@ -69,6 +69,13 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
             : m
         )
       );
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("smartsupply:data-updated", {
+            detail: { actionId, result },
+          })
+        );
+      }
     } catch (err) {
       console.error("Approval failed:", err);
       setMessages((prev) => [

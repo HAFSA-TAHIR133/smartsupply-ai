@@ -128,6 +128,19 @@ export default function CRMPage() {
 
   useEffect(() => {
     loadCRMData();
+
+    const handleDataUpdated = () => {
+      loadCRMData();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("smartsupply:data-updated", handleDataUpdated);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("smartsupply:data-updated", handleDataUpdated);
+      }
+    };
   }, []);
 
   const handleStageMove = async (leadId, targetStage) => {

@@ -15,19 +15,27 @@ import {
   ShieldCheck,
   AlertCircle,
   Loader2,
+  Eye,
+  EyeOff,
+  User,
+  Building,
 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, startDemo } = useAuth();
+  const { login, signup, startDemo } = useAuth();
 
+  const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState("");
 
   // Form states
+  const [fullName, setFullName] = useState("");
+  const [orgName, setOrgName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Forgot password modal
   const [forgotOpen, setForgotOpen] = useState(false);
@@ -35,6 +43,7 @@ export default function LoginPage() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [otpToken, setOtpToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMsg, setForgotMsg] = useState("");
 
@@ -51,10 +60,15 @@ export default function LoginPage() {
     }
   };
 
-  const handleSignIn = async (e) => {
+  const handleAuthSubmit = async (e) => {
     e?.preventDefault();
     if (!email || !password) {
-      setError("Please fill in all fields.");
+      setError("Please fill in all required fields.");
+      return;
+    }
+
+    if (isSignUp && !fullName) {
+      setError("Please enter your full name.");
       return;
     }
 
@@ -62,11 +76,15 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      if (isSignUp) {
+        await signup(email, password, fullName, orgName);
+      } else {
+        await login(email, password);
+      }
       router.push("/");
     } catch (err) {
       setError(
-        err.message || "Invalid credentials. Please verify your email and password."
+        err.message || "Authentication failed. Please verify your credentials."
       );
     } finally {
       setLoading(false);
@@ -80,7 +98,10 @@ export default function LoginPage() {
     try {
       const res = await authAPI.forgotPassword(forgotEmail);
       setForgotStep(2);
-      setForgotMsg(res.message || "Reset token generated. Check your email or enter OTP.");
+      if (res.token) {
+        setOtpToken(res.token);
+      }
+      setForgotMsg(res.message || "Reset token generated. Enter the OTP code below.");
     } catch (err) {
       setForgotMsg(err.message || "Failed to initiate password reset.");
     } finally {
@@ -92,14 +113,18 @@ export default function LoginPage() {
     e.preventDefault();
     setForgotLoading(true);
     try {
-      await authAPI.resetPassword({ token: otpToken, new_password: newPassword });
-      setForgotMsg("Password reset successfully! Redirecting...");
-      setTimeout(() => {
+      await authAPI.resetPassword({ token: otpToken, new_password: newPassword, email: forgotEmail });
+      setForgotMsg("Password reset successfully! Logging you in...");
+      setTimeout(async () => {
         setForgotOpen(false);
         setForgotStep(1);
         setEmail(forgotEmail);
         setPassword(newPassword);
-      }, 1200);
+        try {
+          await login(forgotEmail, newPassword);
+          router.push("/");
+        } catch (e) {}
+      }, 1000);
     } catch (err) {
       setForgotMsg(err.message || "Failed to reset password. Invalid or expired OTP.");
     } finally {
@@ -139,6 +164,32 @@ export default function LoginPage() {
         {/* Translucent Glass Card with Glowing Border */}
         <div className="bg-neutral-900/40 border border-indigo-500/30 rounded-2xl p-7 backdrop-blur-xl shadow-[0_0_30px_rgba(99,102,241,0.15)] relative group transition-all duration-300 hover:border-indigo-400/50 hover:shadow-[0_0_40px_rgba(99,102,241,0.25)]">
           
+          {/* Auth Mode Switcher */}
+          <div className="flex rounded-xl bg-neutral-950/70 p-1 border border-white/10 mb-5">
+            <button
+              type="button"
+              onClick={() => { setIsSignUp(false); setError(""); }}
+              className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                !isSignUp
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => { setIsSignUp(true); setError(""); }}
+              className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                isSignUp
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Create Account
+            </button>
+          </div>
+
           {/* Error Banner */}
           {error && (
             <div className="mb-5 p-3 rounded-xl bg-red-950/60 border border-red-800/60 text-red-300 text-xs flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200 backdrop-blur-md">
@@ -148,7 +199,44 @@ export default function LoginPage() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSignIn} className="space-y-4">
+          <form onSubmit={handleAuthSubmit} className="space-y-4">
+            {isSignUp && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-neutral-300 block">
+                    Full Name
+                  </label>
+                  <div className="relative group">
+                    <User className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-indigo-400" />
+                    <input
+                      type="text"
+                      required={isSignUp}
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Jane Doe"
+                      className="w-full bg-neutral-950/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-neutral-500 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500/80 focus:bg-neutral-950/70 focus:outline-none transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-neutral-300 block">
+                    Organization / Company Name (Optional)
+                  </label>
+                  <div className="relative group">
+                    <Building className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-indigo-400" />
+                    <input
+                      type="text"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      placeholder="Apex Logistics Ltd"
+                      className="w-full bg-neutral-950/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-neutral-500 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500/80 focus:bg-neutral-950/70 focus:outline-none transition-all"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-neutral-300 block">
                 Work Email
@@ -171,27 +259,42 @@ export default function LoginPage() {
                 <label className="text-xs font-medium text-neutral-300">
                   Password
                 </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotEmail(email);
-                    setForgotOpen(true);
-                  }}
-                  className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
-                >
-                  Forgot password?
-                </button>
+                {!isSignUp && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotEmail(email);
+                      setForgotOpen(true);
+                    }}
+                    className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                )}
               </div>
               <div className="relative group">
                 <Lock className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-indigo-400" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full bg-neutral-950/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-neutral-500 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500/80 focus:bg-neutral-950/70 focus:outline-none transition-all"
+                  className="w-full bg-neutral-950/50 border border-white/10 rounded-xl py-2.5 pl-10 pr-10 text-xs text-white placeholder-neutral-500 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500/80 focus:bg-neutral-950/70 focus:outline-none transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-200 transition-colors focus:outline-none p-1 cursor-pointer"
+                  title={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4 text-neutral-400 hover:text-neutral-200" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-neutral-400 hover:text-neutral-200" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -203,11 +306,11 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Signing in...</span>
+                  <span>{isSignUp ? "Creating Account..." : "Signing in..."}</span>
                 </>
               ) : (
                 <>
-                  <span>Sign In to Enterprise</span>
+                  <span>{isSignUp ? "Create Enterprise Account" : "Sign In to Enterprise"}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -246,6 +349,17 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
+                  setIsSignUp(false);
+                  setEmail("heerc838@gmail.com");
+                }}
+                className="px-2.5 py-1 rounded-md bg-indigo-950/50 hover:bg-indigo-900/60 text-indigo-300 hover:text-white border border-indigo-700/60 transition-colors font-mono text-[10px]"
+              >
+                Account: heerc838@gmail.com
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignUp(false);
                   setEmail("admin@smartsupply.ai");
                   setPassword("admin123");
                 }}
@@ -336,14 +450,28 @@ export default function LoginPage() {
               <label className="text-xs font-medium text-neutral-300 block">
                 New Password
               </label>
-              <input
-                type="password"
-                required
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Minimum 6 characters"
-                className="w-full px-3 py-2 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
-              />
+              <div className="relative">
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 6 characters"
+                  className="w-full px-3 py-2 pr-10 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-200 transition-colors focus:outline-none p-0.5 cursor-pointer"
+                  title={showNewPassword ? "Hide password" : "Show password"}
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="w-3.5 h-3.5 text-neutral-400" />
+                  ) : (
+                    <Eye className="w-3.5 h-3.5 text-neutral-400" />
+                  )}
+                </button>
+              </div>
             </div>
             {forgotMsg && (
               <div className="p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-800/60 text-xs text-indigo-300">

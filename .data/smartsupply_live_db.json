@@ -10,17 +10,6 @@
       "isDemo": false,
       "isActive": true,
       "createdAt": "2026-09-19T09:00:06.372Z"
-    },
-    {
-      "id": "user-1789815325277",
-      "email": "heerc838@gmail.com",
-      "name": "Heerc838",
-      "passwordHash": "$2b$10$8x88UEfU61lT4AP08xI0uuHM0K.6f2UzkI.fCm7We3GUXjhJuQZlC",
-      "role": "ADMIN",
-      "tenantId": "tenant-1789815325141",
-      "isActive": true,
-      "isDemo": false,
-      "createdAt": "2026-09-19T10:55:25.277Z"
     }
   ],
   "tenants": [
@@ -31,14 +20,6 @@
       "isActive": true,
       "isDemo": false,
       "createdAt": "2026-09-19T09:00:06.372Z"
-    },
-    {
-      "id": "tenant-1789815325141",
-      "name": "Heerc838's Enterprise",
-      "slug": "heerc838",
-      "isActive": true,
-      "isDemo": false,
-      "createdAt": "2026-09-19T10:55:25.141Z"
     }
   ],
   "products": [
@@ -158,12 +139,5 @@
   "charts": [],
   "conversations": [],
   "pendingActions": [],
-  "memories": {},
-  "passwordResets": {
-    "794361": {
-      "email": "heerc838@gmail.com",
-      "createdAt": 1789815330435,
-      "expiresAt": 1789816230435
-    }
-  }
+  "memories": {}
 }

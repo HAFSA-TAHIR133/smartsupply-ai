@@ -164,11 +164,52 @@ function isQuestionOrInquiry(lowerMsg) {
 function matchLeadFromText(text, leads) {
   if (!leads || leads.length === 0) return null;
   const lower = text.toLowerCase();
+
+  // 1. Check title, name, companyName, contactName exact containment
   for (const l of leads) {
-    if (l.title && lower.includes(l.title.toLowerCase())) return l;
-    if (l.companyName && lower.includes(l.companyName.toLowerCase())) return l;
+    const title = (l.title || l.name || "").toLowerCase().trim();
+    if (title && lower.includes(title)) return l;
+    const company = (l.companyName || l.company || "").toLowerCase().trim();
+    if (company && lower.includes(company)) return l;
+    const contact = (l.contactName || "").toLowerCase().trim();
+    if (contact && lower.includes(contact)) return l;
   }
-  return leads[0];
+
+  // 2. Check quoted strings e.g. "gdgu bsjd"
+  const quoted = text.match(/["']([^"']+)["']/);
+  if (quoted) {
+    const q = quoted[1].toLowerCase().trim();
+    const found = leads.find((l) => 
+      (l.title && l.title.toLowerCase().includes(q)) ||
+      (l.name && l.name.toLowerCase().includes(q)) ||
+      (l.companyName && l.companyName.toLowerCase().includes(q))
+    );
+    if (found) return found;
+  }
+
+  // 3. Check pattern: lead [name] from / lead of [name]
+  const patternMatch = text.match(/(?:lead\s+amount\s+of|lead\s+value\s+of|lead\s+of|lead\s+named|lead)\s+([a-zA-Z0-9_\-\s]+?)(?:\s+from|\s+to|\s+value|\s+amount|\s+stage|$)/i);
+  if (patternMatch && patternMatch[1]) {
+    const cand = patternMatch[1].trim().toLowerCase();
+    if (cand && cand !== "the" && cand !== "a") {
+      const found = leads.find((l) =>
+        (l.title && l.title.toLowerCase().includes(cand)) ||
+        (l.name && l.name.toLowerCase().includes(cand)) ||
+        (l.companyName && l.companyName.toLowerCase().includes(cand))
+      );
+      if (found) return found;
+    }
+  }
+
+  // 4. Token matches (multi-word match)
+  for (const l of leads) {
+    const tokens = (l.title || l.name || "").toLowerCase().split(/\s+/).filter(t => t.length > 2);
+    if (tokens.length > 0 && tokens.every(t => lower.includes(t))) {
+      return l;
+    }
+  }
+
+  return null;
 }
 
 // Helper: match task from message text
@@ -385,38 +426,117 @@ export async function executeAgentChat(context, { agentId, message, conversation
     )
   ) {
     // Sub-check A: Lead edit
-    if (lowerMsg.includes("lead") || lowerMsg.includes("deal") || lowerMsg.includes("stage")) {
+    if (lowerMsg.includes("lead") || lowerMsg.includes("deal") || lowerMsg.includes("stage") || lowerMsg.includes("pipeline")) {
       toolsUsed.push("crm_lead_updater");
       const matchedLead = matchLeadFromText(message, leads);
+      
       if (matchedLead) {
         const updates = {};
+        
+        // 1. Stage update
         const stageMatch = lowerMsg.match(/\b(won|lost|qualified|negotiation|proposal|contacted|new)\b/i);
-        if (stageMatch) {
+        if (stageMatch && (lowerMsg.includes("stage") || lowerMsg.includes("status") || lowerMsg.includes("to "))) {
           updates.stage = stageMatch[1].charAt(0).toUpperCase() + stageMatch[1].slice(1).toLowerCase();
         }
-        const valMatch = message.match(/(?:value|price|amount)?\s*\$?(\d+(?:\.\d{2})?)/i);
-        if (valMatch && (lowerMsg.includes("value") || lowerMsg.includes("$"))) {
-          updates.value = parseFloat(valMatch[1]);
+
+        // 2. Value / Amount / Deal size update
+        // Check "from X to Y" (e.g., from 50,000 to 30,000 or from $50,000 to $30,000)
+        const fromToMatch = message.match(/from\s*\$?([0-9,]+(?:\.[0-9]+)?k?)\s*(?:to|\->)\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i);
+        if (fromToMatch) {
+          let rawVal = fromToMatch[2].replace(/,/g, "").toLowerCase();
+          let mult = 1;
+          if (rawVal.endsWith("k")) {
+            mult = 1000;
+            rawVal = rawVal.replace("k", "");
+          }
+          const parsed = parseFloat(rawVal) * mult;
+          if (!isNaN(parsed)) {
+            updates.value = parsed;
+          }
         }
 
-        const changesSummary = Object.entries(updates)
-          .map(([k, v]) => `${k} to "${v}"`)
-          .join(", ") || "requested fields";
+        // Check "to X" or "set to X" (e.g., to 30,000 or to $30,000)
+        if (updates.value === undefined) {
+          const toMatch = message.match(/(?:to|set\s+to|become|=)\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i);
+          if (toMatch) {
+            let rawVal = toMatch[1].replace(/,/g, "").toLowerCase();
+            let mult = 1;
+            if (rawVal.endsWith("k")) {
+              mult = 1000;
+              rawVal = rawVal.replace("k", "");
+            }
+            const parsed = parseFloat(rawVal) * mult;
+            if (!isNaN(parsed)) {
+              updates.value = parsed;
+            }
+          }
+        }
 
-        requiresConfirmation = true;
-        pendingAction = await storeAdapter.createPendingAction(context, {
-          actionType: "EDIT_LEAD",
-          title: `Edit Lead: ${matchedLead.title}`,
-          summary: `Update lead "${matchedLead.title}": Set ${changesSummary}.`,
-          payload: {
-            leadId: matchedLead.id,
-            leadTitle: matchedLead.title,
-            updates,
-          },
-        });
-        answer = `I have prepared the update for lead **${matchedLead.title}** (${changesSummary}).\n\nPlease confirm below before I apply these changes.`;
+        // Check "(amount|value|price) of X" or "(amount|value) X"
+        if (updates.value === undefined) {
+          const valMatch = message.match(/(?:amount|value|price|deal|budget)\s*(?:of|is|to|=)?\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i);
+          if (valMatch) {
+            let rawVal = valMatch[1].replace(/,/g, "").toLowerCase();
+            let mult = 1;
+            if (rawVal.endsWith("k")) {
+              mult = 1000;
+              rawVal = rawVal.replace("k", "");
+            }
+            const parsed = parseFloat(rawVal) * mult;
+            if (!isNaN(parsed)) {
+              updates.value = parsed;
+            }
+          }
+        }
+
+        // Check standalone currency e.g. $30,000
+        if (updates.value === undefined) {
+          const dollarMatch = message.match(/\$([0-9,]+(?:\.[0-9]+)?)/);
+          if (dollarMatch) {
+            updates.value = parseFloat(dollarMatch[1].replace(/,/g, ""));
+          }
+        }
+
+        const changesList = [];
+        if (updates.value !== undefined) {
+          changesList.push(`Amount to $${updates.value.toLocaleString()}`);
+        }
+        if (updates.stage) {
+          changesList.push(`Stage to "${updates.stage}"`);
+        }
+
+        if (changesList.length === 0) {
+          answer = `I located lead **${matchedLead.title || matchedLead.name}** in your pipeline (Current amount: $${Number(matchedLead.value || 0).toLocaleString()}, Stage: ${matchedLead.stage}).\n\nWhat would you like to update? For example: *"Update amount to 30,000"* or *"Change stage to Negotiation"*.\n\nPlease provide the details and I will stage the update for your confirmation.`;
+        } else {
+          const changesSummary = changesList.join(", ");
+          requiresConfirmation = true;
+          pendingAction = await storeAdapter.createPendingAction(context, {
+            actionType: "EDIT_LEAD",
+            title: `Edit Lead: ${matchedLead.title || matchedLead.name}`,
+            summary: `Update lead "${matchedLead.title || matchedLead.name}": Set ${changesSummary}.`,
+            payload: {
+              leadId: matchedLead.id,
+              leadTitle: matchedLead.title || matchedLead.name,
+              updates,
+            },
+          });
+          answer = `I have prepared the update for lead **${matchedLead.title || matchedLead.name}** (${changesSummary}).\n\nPlease confirm below and I will immediately save this to the database and update your CRM view.`;
+        }
       } else {
-        answer = "Which lead would you like to edit? Please specify the lead title and what to change.";
+        // Lead was not matched from text - extract any requested lead name and list available leads
+        const candMatch = message.match(/(?:lead\s+amount\s+of|lead\s+value\s+of|amount\s+of\s+lead|lead\s+of|lead\s+named|lead)\s+([a-zA-Z0-9_\-\s]+?)(?:\s+from|\s+to|\s+value|\s+amount|\s+stage|$)/i);
+        const candidateName = candMatch ? candMatch[1].trim() : "";
+        
+        let leadListText = (leads || [])
+          .slice(0, 5)
+          .map((l) => `• **${l.title || l.name}** ($${Number(l.value || 0).toLocaleString()}, Stage: ${l.stage})`)
+          .join("\n");
+
+        if (candidateName && candidateName.length > 1) {
+          answer = `I could not find an existing lead matching **"${candidateName}"** in your pipeline.\n\nHere are your current active leads:\n${leadListText}\n\nCould you please confirm the exact lead title, or would you like me to create a new lead named **"${candidateName}"**?`;
+        } else {
+          answer = `Which lead would you like to update? Here are your current active leads:\n${leadListText}\n\nPlease specify the lead name and the new amount or stage, and I will prepare it for you.`;
+        }
       }
     }
     // Sub-check B: Task edit
