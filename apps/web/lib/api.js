@@ -1,6 +1,7 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api/v1";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export async function apiRequest(endpoint, options = {}) {
+
   const token = typeof window !== "undefined" ? localStorage.getItem("smartsupply_token") : null;
   const tenantId = typeof window !== "undefined" ? localStorage.getItem("smartsupply_tenantId") : null;
 
@@ -37,6 +38,9 @@ export async function apiRequest(endpoint, options = {}) {
     const data = await res.json();
 
     if (!res.ok) {
+      if (res.status === 401 && typeof window !== "undefined") {
+        localStorage.removeItem("smartsupply_token");
+      }
       throw new Error(data.message || data.error?.message || `HTTP Error ${res.status}`);
     }
 
@@ -91,11 +95,14 @@ export const inventoryAPI = {
 export const crmAPI = {
   getLeads: () => apiRequest("/crm/leads"),
   createLead: (payload) => apiRequest("/crm/leads", { method: "POST", body: payload }),
+  updateLead: (id, payload) => apiRequest(`/crm/leads/${id}`, { method: "PUT", body: payload }),
   updateLeadStage: (id, stage) => apiRequest(`/crm/leads/${id}/stage`, { method: "PUT", body: { stage } }),
+  deleteLead: (id) => apiRequest(`/crm/leads/${id}`, { method: "DELETE" }),
   getCustomers: () => apiRequest("/crm/customers"),
   getTasks: () => apiRequest("/crm/tasks"),
   createTask: (payload) => apiRequest("/crm/tasks", { method: "POST", body: payload }),
   updateTask: (id, payload) => apiRequest(`/crm/tasks/${id}`, { method: "PUT", body: payload }),
+  deleteTask: (id) => apiRequest(`/crm/tasks/${id}`, { method: "DELETE" }),
 };
 
 export const documentAPI = {
@@ -114,6 +121,24 @@ export const agentAPI = {
       method: "POST",
       body: { message, conversationId },
     }),
+  approveAction: (actionId) =>
+    apiRequest(`/agents/actions/${actionId}/approve`, {
+      method: "POST",
+    }),
+  rejectAction: (actionId) =>
+    apiRequest(`/agents/actions/${actionId}/reject`, {
+      method: "POST",
+    }),
+};
+
+export const conversationsAPI = {
+  getAll: () => apiRequest("/conversations"),
+  getMessages: (id) => apiRequest(`/conversations/${id}/messages`),
+  delete: (id) => apiRequest(`/conversations/${id}`, { method: "DELETE" }),
+};
+
+export const demoAPI = {
+  reset: () => apiRequest("/demo/reset", { method: "POST" }),
 };
 
 export const chartsAPI = {
@@ -121,4 +146,5 @@ export const chartsAPI = {
   create: (payload) => apiRequest("/charts", { method: "POST", body: payload }),
   delete: (id) => apiRequest(`/charts/${id}`, { method: "DELETE" }),
 };
+
 

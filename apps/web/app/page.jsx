@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { apiRequest } from "@/lib/api";
+import { useAuthContext } from "@/context/authContext";
 import {
   AreaChart,
   Area,
@@ -16,13 +17,14 @@ import {
 } from "recharts";
 
 export default function DashboardPage() {
+  const { user, isDemo } = useAuthContext();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("valuation"); // "valuation" | "pipeline"
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [user, isDemo]);
 
   const loadDashboardData = async () => {
     try {

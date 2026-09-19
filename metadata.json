@@ -1,0 +1,6 @@
+{
+  "name": "SmartSupply AI",
+  "description": "Autonomous Supply Chain, Inventory & CRM OS with isolated Demo Sandbox and real-user backend persistence",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

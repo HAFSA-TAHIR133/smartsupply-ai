@@ -21,6 +21,16 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { useAuthContext } from "@/context/authContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const AGENT_OPTIONS = [
   { id: "supply-chain-agent", name: "Supply Chain Master", icon: Sparkles, desc: "Autonomous cross-domain strategist" },
@@ -30,7 +40,7 @@ const AGENT_OPTIONS = [
 ];
 
 export function AIAssistantDrawer({ isOpen, onClose }) {
-  const { user } = useAuthContext();
+  const { user, isDemo } = useAuthContext();
   const [selectedAgent, setSelectedAgent] = useState("supply-chain-agent");
   const [conversations, setConversations] = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
@@ -39,6 +49,7 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [expandedSources, setExpandedSources] = useState({});
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const messagesEndRef = useRef(null);
 
   const handleApproveAction = async (actionId, msgIndex) => {
@@ -229,33 +240,51 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
               className="w-screen max-w-md border-l border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl flex flex-col"
             >
               {/* Drawer Header */}
-              <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-900">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
-                    <Bot className="h-4 w-4" />
+              <div className="p-4 border-b border-zinc-800 bg-zinc-900 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+                      <Bot className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h2 className="text-xs font-semibold text-zinc-100 flex items-center gap-1.5">
+                        SmartSupply AI Assistant
+                      </h2>
+                      <p className="text-[11px] text-zinc-400">Autonomous Assistant Engine</p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-xs font-semibold text-zinc-100 flex items-center gap-1.5">
-                      SmartSupply AI Assistant
-                    </h2>
-                    <p className="text-[11px] text-zinc-400">Autonomous Assistant Engine</p>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setResetDialogOpen(true)}
+                      title="Reset Conversation"
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={onClose}
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={startNewConversation}
-                    title="New Session"
-                    className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+                {/* Subheader: Mode & Model badges */}
+                <div className="flex items-center justify-between text-[10px] pt-1">
+                  <span
+                    className={`px-2 py-0.5 rounded-full font-mono font-medium border ${
+                      isDemo
+                        ? "bg-amber-950/60 text-amber-300 border-amber-500/30"
+                        : "bg-emerald-950/60 text-emerald-300 border-emerald-500/30"
+                    }`}
                   >
-                    <RotateCcw className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={onClose}
-                    className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                    {isDemo ? "● DEMO SANDBOX" : "● LIVE ENTERPRISE"}
+                  </span>
+                  <span className="text-zinc-500 font-mono">
+                    Model: <strong className="text-zinc-300">groq/compound</strong>
+                  </span>
                 </div>
               </div>
 
@@ -453,6 +482,33 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
               </form>
             </motion.div>
           </div>
+
+          {/* Shadcn UI AlertDialog for Session Reset */}
+          <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-zinc-100">
+                  <RotateCcw className="w-4 h-4 text-amber-400" />
+                  Reset AI Assistant Session?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will clear the current dialogue history and start a fresh agent session.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    startNewConversation();
+                    setResetDialogOpen(false);
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  Start New Session
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       )}
     </AnimatePresence>

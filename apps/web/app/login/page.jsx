@@ -19,9 +19,10 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, startDemo } = useAuth();
 
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState("");
 
   // Form states
@@ -36,6 +37,19 @@ export default function LoginPage() {
   const [newPassword, setNewPassword] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMsg, setForgotMsg] = useState("");
+
+  const handleDemoAccess = async () => {
+    setError("");
+    setDemoLoading(true);
+    try {
+      await startDemo();
+      router.push("/");
+    } catch (err) {
+      router.push("/");
+    } finally {
+      setDemoLoading(false);
+    }
+  };
 
   const handleSignIn = async (e) => {
     e?.preventDefault();
@@ -183,7 +197,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || demoLoading}
               className="w-full py-2.5 px-4 rounded-xl font-medium bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white transition-all shadow-lg shadow-indigo-600/30 text-xs flex items-center justify-center gap-2 mt-2 active:scale-[0.99] disabled:opacity-60"
             >
               {loading ? (
@@ -193,12 +207,61 @@ export default function LoginPage() {
                 </>
               ) : (
                 <>
-                  <span>Sign In</span>
+                  <span>Sign In to Enterprise</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
+
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-zinc-800"></div>
+              <span className="flex-shrink mx-3 text-[10px] uppercase font-mono tracking-wider text-zinc-500">or</span>
+              <div className="flex-grow border-t border-zinc-800"></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDemoAccess}
+              disabled={loading || demoLoading}
+              className="w-full py-2.5 px-4 rounded-xl font-medium bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 hover:text-white transition-all text-xs flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-60"
+            >
+              {demoLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Launching Sandbox...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>Explore Demo Sandbox (Instant Access)</span>
+                </>
+              )}
+            </button>
           </form>
+
+          {/* Quick Credential Fillers */}
+          <div className="mt-5 pt-4 border-t border-zinc-800/80 text-[11px] text-zinc-400 flex flex-col gap-1.5">
+            <span className="text-zinc-500 font-medium">Quick Credentials:</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("admin@smartsupply.ai");
+                  setPassword("admin123");
+                }}
+                className="px-2.5 py-1 rounded-md bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/60 transition-colors font-mono text-[10px]"
+              >
+                Live Enterprise: admin@smartsupply.ai
+              </button>
+              <button
+                type="button"
+                onClick={handleDemoAccess}
+                className="px-2.5 py-1 rounded-md bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 hover:text-amber-200 border border-amber-500/30 transition-colors font-mono text-[10px]"
+              >
+                Demo: Alex Reynolds (1-Click)
+              </button>
+            </div>
+          </div>
         </div>
 
        

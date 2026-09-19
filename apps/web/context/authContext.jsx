@@ -33,11 +33,17 @@ export function AuthProvider({ children }) {
         setUser(parsed);
         setToken(savedToken);
         setIsDemo(savedDemo);
+        setLoading(false);
+        return;
       } catch (e) {
         localStorage.clear();
       }
     }
-    setLoading(false);
+
+    // Default to interactive Demo Sandbox on initial visit so the workspace is immediately operational
+    startDemo().finally(() => {
+      setLoading(false);
+    });
   }, []);
 
   const login = async (email, password) => {
@@ -88,13 +94,12 @@ export function AuthProvider({ children }) {
     } catch (err) {
       // Offline / immediate demo fallback
       const fallbackUser = {
-        id: "demo-user-1",
-        name: "Demo Manager",
+        id: "demo-user-alex",
+        name: "Alex Reynolds (Demo)",
         email: "demo@smartsupply.ai",
         role: "ADMIN",
-        tenantId: "3e6c5a8e-f131-4902-8d80-1c9056f858d4",
+        tenantId: "demo-tenant-id",
         tenantName: "Acme Logistics Global (Demo)",
-        avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop",
       };
       setUser(fallbackUser);
       setIsDemo(true);

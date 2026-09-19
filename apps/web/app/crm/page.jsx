@@ -1,12 +1,23 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { crmAPI } from "@/lib/api";
+import { crmAPI, demoAPI } from "@/lib/api";
+import { useAuthContext } from "@/context/authContext";
 import Card from "@/components/ui/card";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
 import Badge from "@/components/ui/badge";
 import Modal from "@/components/ui/modal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Users,
   Plus,
@@ -18,21 +29,39 @@ import {
   Layers,
   CheckSquare,
   RefreshCw,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  RotateCcw,
+  Sparkles,
 } from "lucide-react";
 
 const STAGES = ["New", "Contacted", "Qualified", "Proposal", "Won"];
 
 export default function CRMPage() {
+  const { isDemo } = useAuthContext();
   const [activeTab, setActiveTab] = useState("kanban"); // "kanban" | "customers" | "tasks"
   const [leads, setLeads] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Modals
+  // Modals state
   const [addLeadOpen, setAddLeadOpen] = useState(false);
+  const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [editTaskOpen, setEditTaskOpen] = useState(false);
   const [formError, setFormError] = useState("");
+  const [resettingDemo, setResettingDemo] = useState(false);
+
+  // Shadcn Delete Alert Dialogs
+  const [deleteLeadDialogOpen, setDeleteLeadDialogOpen] = useState(false);
+  const [leadToDelete, setLeadToDelete] = useState(null);
+  const [deleteLeadLoading, setDeleteLeadLoading] = useState(false);
+
+  const [deleteTaskDialogOpen, setDeleteTaskDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [deleteTaskLoading, setDeleteTaskLoading] = useState(false);
 
   // New Lead Form State
   const [newLead, setNewLead] = useState({
@@ -47,10 +76,33 @@ export default function CRMPage() {
     notes: "",
   });
 
+  // Edit Lead Form State
+  const [editLeadData, setEditLeadData] = useState({
+    id: "",
+    title: "",
+    company_name: "",
+    contact_name: "",
+    contact_email: "",
+    contact_phone: "",
+    value: 0,
+    stage: "New",
+    priority: "MEDIUM",
+    notes: "",
+  });
+
   // New Task Form State
   const [newTask, setNewTask] = useState({
     title: "",
     due_date: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
+    priority: "MEDIUM",
+    status: "PENDING",
+  });
+
+  // Edit Task Form State
+  const [editTaskData, setEditTaskData] = useState({
+    id: "",
+    title: "",
+    due_date: "",
     priority: "MEDIUM",
     status: "PENDING",
   });
@@ -92,11 +144,12 @@ export default function CRMPage() {
     }
   };
 
+  // --- Lead Handlers ---
   const handleCreateLead = async (e) => {
     e.preventDefault();
     setFormError("");
     try {
-      await crmAPI.createLead(newLead);
+      const created = await crmAPI.createLead(newLead);
       setAddLeadOpen(false);
       setNewLead({
         title: "",
@@ -109,17 +162,75 @@ export default function CRMPage() {
         priority: "HIGH",
         notes: "",
       });
-      loadCRMData();
+      // Append directly to state
+      setLeads((prev) => [created, ...prev]);
     } catch (err) {
       setFormError(err.message || "Failed to create deal");
     }
   };
 
+  const handleOpenEditLead = (lead) => {
+    setLeadToEdit(lead);
+    setEditLeadData({
+      id: lead.id,
+      title: lead.title,
+      company_name: lead.company_name || lead.companyName || "",
+      contact_name: lead.contact_name || lead.contactName || "",
+      contact_email: lead.contact_email || lead.contactEmail || "",
+      contact_phone: lead.contact_phone || lead.contactPhone || "",
+      value: lead.value || 0,
+      stage: lead.stage || "New",
+      priority: lead.priority || "MEDIUM",
+      notes: lead.notes || "",
+    });
+    setFormError("");
+    setEditLeadOpen(true);
+  };
+
+  const [leadToEdit, setLeadToEdit] = useState(null);
+
+  const handleSaveEditLead = async (e) => {
+    e.preventDefault();
+    setFormError("");
+    try {
+      const updated = await crmAPI.updateLead(editLeadData.id, editLeadData);
+      setEditLeadOpen(false);
+      // Immediately reflect changes in UI
+      setLeads((prev) =>
+        prev.map((l) => (l.id === editLeadData.id ? { ...l, ...updated } : l))
+      );
+    } catch (err) {
+      setFormError(err.message || "Failed to update lead");
+    }
+  };
+
+  const handleOpenDeleteLead = (lead) => {
+    setLeadToDelete(lead);
+    setDeleteLeadDialogOpen(true);
+  };
+
+  const handleConfirmDeleteLead = async () => {
+    if (!leadToDelete) return;
+    setDeleteLeadLoading(true);
+    try {
+      await crmAPI.deleteLead(leadToDelete.id);
+      // Immediately remove from state
+      setLeads((prev) => prev.filter((l) => l.id !== leadToDelete.id));
+      setDeleteLeadDialogOpen(false);
+      setLeadToDelete(null);
+    } catch (err) {
+      alert(`Failed to delete lead: ${err.message}`);
+    } finally {
+      setDeleteLeadLoading(false);
+    }
+  };
+
+  // --- Task Handlers ---
   const handleCreateTask = async (e) => {
     e.preventDefault();
     setFormError("");
     try {
-      await crmAPI.createTask(newTask);
+      const created = await crmAPI.createTask(newTask);
       setAddTaskOpen(false);
       setNewTask({
         title: "",
@@ -127,9 +238,58 @@ export default function CRMPage() {
         priority: "MEDIUM",
         status: "PENDING",
       });
-      loadCRMData();
+      // Append directly to state
+      setTasks((prev) => [created, ...prev]);
     } catch (err) {
       setFormError(err.message || "Failed to create task");
+    }
+  };
+
+  const handleOpenEditTask = (task) => {
+    setEditTaskData({
+      id: task.id,
+      title: task.title,
+      due_date: task.due_date || task.dueDate || "",
+      priority: task.priority || "MEDIUM",
+      status: task.status || "PENDING",
+    });
+    setFormError("");
+    setEditTaskOpen(true);
+  };
+
+  const handleSaveEditTask = async (e) => {
+    e.preventDefault();
+    setFormError("");
+    try {
+      const updated = await crmAPI.updateTask(editTaskData.id, editTaskData);
+      setEditTaskOpen(false);
+      // Immediately reflect in state
+      setTasks((prev) =>
+        prev.map((t) => (t.id === editTaskData.id ? { ...t, ...updated } : t))
+      );
+    } catch (err) {
+      setFormError(err.message || "Failed to update task");
+    }
+  };
+
+  const handleOpenDeleteTask = (task) => {
+    setTaskToDelete(task);
+    setDeleteTaskDialogOpen(true);
+  };
+
+  const handleConfirmDeleteTask = async () => {
+    if (!taskToDelete) return;
+    setDeleteTaskLoading(true);
+    try {
+      await crmAPI.deleteTask(taskToDelete.id);
+      // Immediately remove from state
+      setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
+      setDeleteTaskDialogOpen(false);
+      setTaskToDelete(null);
+    } catch (err) {
+      alert(`Failed to delete task: ${err.message}`);
+    } finally {
+      setDeleteTaskLoading(false);
     }
   };
 
@@ -145,11 +305,47 @@ export default function CRMPage() {
     }
   };
 
+  const handleResetDemoSandbox = async () => {
+    if (confirm("Reset demo CRM deals and tasks to default initial state?")) {
+      setResettingDemo(true);
+      try {
+        await demoAPI.reset();
+        await loadCRMData();
+      } catch (err) {
+        console.error("Failed to reset demo:", err);
+      } finally {
+        setResettingDemo(false);
+      }
+    }
+  };
+
   // Compute Total Pipeline
   const totalPipeline = leads.reduce((sum, l) => sum + Number(l.value || 0), 0);
 
   return (
     <div className="space-y-6">
+      {/* Execution Mode Banner */}
+      {isDemo && (
+        <div className="p-3 rounded-2xl bg-amber-950/30 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-amber-300">
+            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Demo Sandbox Mode:</strong> Real-time operations (create, edit, delete deals & tasks) update the interactive sandbox. Real user records remain 100% isolated.
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetDemoSandbox}
+            disabled={resettingDemo}
+            className="text-[11px] h-7 border-amber-500/40 text-amber-300 hover:bg-amber-950/50"
+          >
+            <RotateCcw className={`w-3 h-3 mr-1 ${resettingDemo ? "animate-spin" : ""}`} />
+            Reset Sandbox Data
+          </Button>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-violet-900/30">
         <div>
@@ -158,7 +354,7 @@ export default function CRMPage() {
             CRM & Enterprise Deal Pipeline
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Visual Kanban negotiation funnel, account management and AI customer interaction tracking
+            Visual Kanban negotiation funnel, account management, and AI customer interaction tracking
           </p>
         </div>
 
@@ -275,7 +471,7 @@ export default function CRMPage() {
                     stageLeads.map((lead) => (
                       <div
                         key={lead.id}
-                        className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-violet-500/50 hover:shadow-lg hover:shadow-violet-950/40 transition-all duration-200 block relative"
+                        className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-violet-500/50 hover:shadow-lg hover:shadow-violet-950/40 transition-all duration-200 block relative group"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <h4 className="text-xs font-bold text-slate-100 leading-snug line-clamp-2">
@@ -292,21 +488,46 @@ export default function CRMPage() {
                         <div className="text-[11px] text-slate-400 mt-2 flex items-center gap-1.5">
                           <Building2 className="w-3.5 h-3.5 text-violet-400/70 shrink-0" />
                           <span className="truncate font-medium">
-                            {lead.company_name || lead.customer?.name || "Enterprise Client"}
+                            {lead.company_name || lead.companyName || "Enterprise Client"}
                           </span>
                         </div>
+
+                        {lead.contact_name && (
+                          <div className="text-[10px] text-slate-500 mt-1">
+                            Contact: {lead.contact_name} {lead.contact_phone ? `(${lead.contact_phone})` : ""}
+                          </div>
+                        )}
 
                         <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between">
                           <div className="text-xs font-bold font-mono text-emerald-400">
                             ${Number(lead.value || 0).toLocaleString()}
                           </div>
 
-                          {/* Stage Navigation Controls */}
+                          {/* Actions: Edit, Delete, Stage Move */}
                           <div className="flex items-center gap-1">
+                            {/* Edit Lead Button */}
+                            <button
+                              onClick={() => handleOpenEditLead(lead)}
+                              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                              title="Edit Deal"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+
+                            {/* Delete Lead Button (Shadcn AlertDialog) */}
+                            <button
+                              onClick={() => handleOpenDeleteLead(lead)}
+                              className="p-1 rounded-md text-rose-400 hover:text-rose-200 hover:bg-rose-950/40 transition-colors"
+                              title="Delete Deal"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+
+                            {/* Stage Navigation Controls */}
                             {stageIdx > 0 && (
                               <button
                                 onClick={() => handleStageMove(lead.id, STAGES[stageIdx - 1])}
-                                className="p-1.2 rounded-md bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                                className="p-1 rounded-md bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                                 title={`Move back to ${STAGES[stageIdx - 1]}`}
                               >
                                 <ArrowLeft className="w-3 h-3" />
@@ -315,7 +536,7 @@ export default function CRMPage() {
                             {stageIdx < STAGES.length - 1 && (
                               <button
                                 onClick={() => handleStageMove(lead.id, STAGES[stageIdx + 1])}
-                                className="p-1.2 rounded-md bg-violet-900/40 text-violet-300 hover:bg-violet-600 hover:text-white transition-colors"
+                                className="p-1 rounded-md bg-violet-900/40 text-violet-300 hover:bg-violet-600 hover:text-white transition-colors"
                                 title={`Advance to ${STAGES[stageIdx + 1]}`}
                               >
                                 <ArrowRight className="w-3 h-3" />
@@ -443,15 +664,33 @@ export default function CRMPage() {
                         </p>
                         <div className="flex items-center gap-2 text-[11px] text-slate-400">
                           <Calendar className="w-3 h-3 text-slate-500" />
-                          <span>Due: {task.due_date || "No deadline"}</span>
+                          <span>Due: {task.due_date || task.dueDate || "No deadline"}</span>
                           <span>•</span>
                           <Badge
                             variant={task.priority === "HIGH" ? "danger" : "purple"}
+                            className="text-[9px] px-1.5 py-0.2 uppercase"
                           >
-                            {task.priority}
+                            {task.priority || "MED"}
                           </Badge>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleOpenEditTask(task)}
+                        className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                        title="Edit Task"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleOpenDeleteTask(task)}
+                        className="p-1 rounded-md text-rose-400 hover:text-rose-200 hover:bg-rose-950/40 transition-colors"
+                        title="Delete Task"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </Card>
                 );
@@ -461,11 +700,71 @@ export default function CRMPage() {
         </div>
       )}
 
+      {/* Shadcn UI AlertDialog for Deleting a Lead */}
+      <AlertDialog
+        open={deleteLeadDialogOpen}
+        onOpenChange={setDeleteLeadDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-rose-400">
+              <AlertTriangle className="w-5 h-5 text-rose-500" />
+              Confirm Deal Deletion
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete lead{" "}
+              <strong className="text-white">"{leadToDelete?.title}"</strong> ($
+              {Number(leadToDelete?.value || 0).toLocaleString()})? This operation will remove the opportunity from your{" "}
+              {isDemo ? "demo sandbox" : "pipeline records"}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLeadLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeleteLead}
+              disabled={deleteLeadLoading}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+            >
+              {deleteLeadLoading ? "Deleting..." : "Delete Deal"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Shadcn UI AlertDialog for Deleting a Task */}
+      <AlertDialog
+        open={deleteTaskDialogOpen}
+        onOpenChange={setDeleteTaskDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-rose-400">
+              <AlertTriangle className="w-5 h-5 text-rose-500" />
+              Confirm Task Deletion
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the follow-up task{" "}
+              <strong className="text-white">"{taskToDelete?.title}"</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteTaskLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeleteTask}
+              disabled={deleteTaskLoading}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+            >
+              {deleteTaskLoading ? "Deleting..." : "Delete Task"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Add Lead Modal */}
       <Modal
         isOpen={addLeadOpen}
         onClose={() => setAddLeadOpen(false)}
-        title="Create New CRM Deal / Opportunity"
+        title="Create New Enterprise Lead / Deal"
         maxWidth="max-w-lg"
       >
         <form onSubmit={handleCreateLead} className="space-y-4">
@@ -476,20 +775,22 @@ export default function CRMPage() {
           )}
 
           <Input
-            label="Deal / Opportunity Title"
+            label="Deal Title"
             required
             value={newLead.title}
             onChange={(e) => setNewLead({ ...newLead, title: e.target.value })}
-            placeholder="e.g. Q4 Autonomous Fleet Expansion"
+            placeholder="e.g. Q4 Automated Warehouse Expansion"
           />
 
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Company / Client"
+              label="Company Name"
               required
               value={newLead.company_name}
-              onChange={(e) => setNewLead({ ...newLead, company_name: e.target.value })}
-              placeholder="e.g. Atlas Robotics Inc."
+              onChange={(e) =>
+                setNewLead({ ...newLead, company_name: e.target.value })
+              }
+              placeholder="e.g. AeroTech Automations"
             />
             <Input
               label="Deal Value ($)"
@@ -501,25 +802,9 @@ export default function CRMPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Contact Email"
-              type="email"
-              value={newLead.contact_email}
-              onChange={(e) => setNewLead({ ...newLead, contact_email: e.target.value })}
-              placeholder="lead@atlas.com"
-            />
-            <Input
-              label="Contact Phone"
-              value={newLead.contact_phone}
-              onChange={(e) => setNewLead({ ...newLead, contact_phone: e.target.value })}
-              placeholder="+1 (555) 123-4567"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-300 block mb-1">
-                Initial Stage
+                Pipeline Stage
               </label>
               <select
                 value={newLead.stage}
@@ -539,14 +824,57 @@ export default function CRMPage() {
               </label>
               <select
                 value={newLead.priority}
-                onChange={(e) => setNewLead({ ...newLead, priority: e.target.value })}
+                onChange={(e) =>
+                  setNewLead({ ...newLead, priority: e.target.value })
+                }
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500"
               >
-                <option value="HIGH">High Priority</option>
-                <option value="MEDIUM">Medium</option>
                 <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
               </select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <Input
+              label="Contact Person"
+              value={newLead.contact_name}
+              onChange={(e) =>
+                setNewLead({ ...newLead, contact_name: e.target.value })
+              }
+              placeholder="Full Name"
+            />
+            <Input
+              label="Contact Email"
+              type="email"
+              value={newLead.contact_email}
+              onChange={(e) =>
+                setNewLead({ ...newLead, contact_email: e.target.value })
+              }
+              placeholder="email@domain.com"
+            />
+            <Input
+              label="Contact Phone"
+              value={newLead.contact_phone}
+              onChange={(e) =>
+                setNewLead({ ...newLead, contact_phone: e.target.value })
+              }
+              placeholder="+1 555..."
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-300 block mb-1">
+              Deal Notes & Requirements
+            </label>
+            <textarea
+              rows={3}
+              value={newLead.notes}
+              onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })}
+              placeholder="Customer requirements, estimated delivery timeframe, procurement contacts..."
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+            />
           </div>
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
@@ -559,7 +887,142 @@ export default function CRMPage() {
               Cancel
             </Button>
             <Button type="submit" variant="gradient" size="sm">
-              Create Deal in Pipeline
+              Create Deal
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Lead Modal */}
+      <Modal
+        isOpen={editLeadOpen}
+        onClose={() => setEditLeadOpen(false)}
+        title={`Edit Lead — ${editLeadData.title}`}
+        maxWidth="max-w-lg"
+      >
+        <form onSubmit={handleSaveEditLead} className="space-y-4">
+          {formError && (
+            <div className="p-2.5 rounded-lg bg-red-950/60 border border-red-800 text-xs text-red-200">
+              {formError}
+            </div>
+          )}
+
+          <Input
+            label="Deal Title"
+            required
+            value={editLeadData.title}
+            onChange={(e) =>
+              setEditLeadData({ ...editLeadData, title: e.target.value })
+            }
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Company Name"
+              required
+              value={editLeadData.company_name}
+              onChange={(e) =>
+                setEditLeadData({ ...editLeadData, company_name: e.target.value })
+              }
+            />
+            <Input
+              label="Deal Value ($)"
+              type="number"
+              required
+              value={editLeadData.value}
+              onChange={(e) =>
+                setEditLeadData({ ...editLeadData, value: e.target.value })
+              }
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1">
+                Pipeline Stage
+              </label>
+              <select
+                value={editLeadData.stage}
+                onChange={(e) =>
+                  setEditLeadData({ ...editLeadData, stage: e.target.value })
+                }
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500"
+              >
+                {STAGES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1">
+                Priority
+              </label>
+              <select
+                value={editLeadData.priority}
+                onChange={(e) =>
+                  setEditLeadData({ ...editLeadData, priority: e.target.value })
+                }
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500"
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <Input
+              label="Contact Person"
+              value={editLeadData.contact_name}
+              onChange={(e) =>
+                setEditLeadData({ ...editLeadData, contact_name: e.target.value })
+              }
+            />
+            <Input
+              label="Contact Email"
+              type="email"
+              value={editLeadData.contact_email}
+              onChange={(e) =>
+                setEditLeadData({ ...editLeadData, contact_email: e.target.value })
+              }
+            />
+            <Input
+              label="Contact Phone"
+              value={editLeadData.contact_phone}
+              onChange={(e) =>
+                setEditLeadData({ ...editLeadData, contact_phone: e.target.value })
+              }
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-300 block mb-1">
+              Deal Notes & Requirements
+            </label>
+            <textarea
+              rows={3}
+              value={editLeadData.notes}
+              onChange={(e) =>
+                setEditLeadData({ ...editLeadData, notes: e.target.value })
+              }
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setEditLeadOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="gradient" size="sm">
+              Save Changes
             </Button>
           </div>
         </form>
@@ -578,15 +1041,13 @@ export default function CRMPage() {
               {formError}
             </div>
           )}
-
           <Input
-            label="Task Description"
+            label="Action Description"
             required
             value={newTask.title}
             onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-            placeholder="e.g. Send revised logistics SLA agreement"
+            placeholder="e.g. Schedule warehouse site visit"
           />
-
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Due Date"
@@ -601,16 +1062,17 @@ export default function CRMPage() {
               </label>
               <select
                 value={newTask.priority}
-                onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+                onChange={(e) =>
+                  setNewTask({ ...newTask, priority: e.target.value })
+                }
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500"
               >
-                <option value="HIGH">High</option>
-                <option value="MEDIUM">Medium</option>
                 <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
               </select>
             </div>
           </div>
-
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
             <Button
               type="button"
@@ -620,8 +1082,72 @@ export default function CRMPage() {
             >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" size="sm">
-              Save Follow-up Task
+            <Button type="submit" variant="gradient" size="sm">
+              Schedule Task
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Task Modal */}
+      <Modal
+        isOpen={editTaskOpen}
+        onClose={() => setEditTaskOpen(false)}
+        title="Edit Follow-up Task"
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handleSaveEditTask} className="space-y-4">
+          {formError && (
+            <div className="p-2.5 rounded-lg bg-red-950/60 border border-red-800 text-xs text-red-200">
+              {formError}
+            </div>
+          )}
+          <Input
+            label="Action Description"
+            required
+            value={editTaskData.title}
+            onChange={(e) =>
+              setEditTaskData({ ...editTaskData, title: e.target.value })
+            }
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Due Date"
+              type="date"
+              required
+              value={editTaskData.due_date}
+              onChange={(e) =>
+                setEditTaskData({ ...editTaskData, due_date: e.target.value })
+              }
+            />
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1">
+                Priority
+              </label>
+              <select
+                value={editTaskData.priority}
+                onChange={(e) =>
+                  setEditTaskData({ ...editTaskData, priority: e.target.value })
+                }
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500"
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setEditTaskOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="gradient" size="sm">
+              Save Task
             </Button>
           </div>
         </form>
