@@ -1,28 +1,51 @@
+import "./env.js";
 import { Pool } from "pg";
 import crypto from "crypto";
 
 let pool = null;
 
-export function getNeonPool() {
-  if (!pool && process.env.DATABASE_URL) {
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 8000,
-    });
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    pool.on("error", (err) => {
-      console.error("Neon PostgreSQL client error:", err.message);
-    });
+export function isValidUuid(str) {
+  return typeof str === "string" && UUID_REGEX.test(str.trim());
+}
+
+export function isNeonConfigured() {
+  return Boolean(process.env.DATABASE_URL || (process.env.DB_HOST && process.env.DB_USER));
+}
+
+export function getNeonPool() {
+  if (!pool) {
+    let connectionString = process.env.DATABASE_URL;
+    if (!connectionString && process.env.DB_HOST && process.env.DB_USER) {
+      const user = encodeURIComponent(process.env.DB_USER);
+      const password = encodeURIComponent(process.env.DB_PASSWORD || "");
+      const host = process.env.DB_HOST;
+      const port = process.env.DB_PORT || 5432;
+      const dbName = process.env.DB_NAME || "smartsupply";
+      connectionString = `postgresql://${user}:${password}@${host}:${port}/${dbName}?sslmode=require`;
+    }
+
+    if (connectionString) {
+      pool = new Pool({
+        connectionString,
+        ssl: { rejectUnauthorized: false },
+        max: 10,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 8000,
+      });
+
+      pool.on("error", (err) => {
+        console.error("Neon PostgreSQL client error:", err.message);
+      });
+    }
   }
   return pool;
 }
 
 export async function testNeonConnection() {
   const p = getNeonPool();
-  if (!p) return { ok: false, error: "DATABASE_URL not configured" };
+  if (!p) return { ok: false, error: "Neon database is not configured in environment" };
   try {
     const res = await p.query("SELECT current_database(), current_user, version();");
     return { ok: true, data: res.rows[0] };
@@ -46,7 +69,7 @@ export async function findUserByEmail(email) {
 
 export async function findUserById(id) {
   const p = getNeonPool();
-  if (!p || !id) return null;
+  if (!p || !id || !isValidUuid(id)) return null;
   const res = await p.query(
     'SELECT * FROM users WHERE id = $1 AND "isActive" = true LIMIT 1;',
     [id]
@@ -56,14 +79,14 @@ export async function findUserById(id) {
 
 export async function findTenantById(id) {
   const p = getNeonPool();
-  if (!p || !id) return null;
+  if (!p || !id || !isValidUuid(id)) return null;
   const res = await p.query('SELECT * FROM tenants WHERE id = $1 LIMIT 1;', [id]);
   return res.rows[0] || null;
 }
 
 export async function createTenantInDb({ id, name, slug }) {
   const p = getNeonPool();
-  const tenantId = id || crypto.randomUUID();
+  const tenantId = id && isValidUuid(id) ? id : crypto.randomUUID();
   const tenantSlug = (slug || name).toLowerCase().replace(/[^a-z0-9]/g, "-") + `-${Date.now().toString().slice(-4)}`;
   const res = await p.query(
     'INSERT INTO tenants (id, name, slug, "isActive", "isDemo", "createdAt", "updatedAt") VALUES ($1, $2, $3, true, false, NOW(), NOW()) RETURNING *;',
@@ -74,7 +97,7 @@ export async function createTenantInDb({ id, name, slug }) {
 
 export async function createUserInDb({ id, tenantId, email, passwordHash, name, role }) {
   const p = getNeonPool();
-  const userId = id || crypto.randomUUID();
+  const userId = id && isValidUuid(id) ? id : crypto.randomUUID();
   const res = await p.query(
     'INSERT INTO users (id, "tenantId", email, "passwordHash", name, role, "isActive", "isDemo", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5, $6, true, false, NOW(), NOW()) RETURNING id, "tenantId", email, name, role, "isActive", "createdAt";',
     [userId, tenantId, email.toLowerCase().trim(), passwordHash, name, role || "ADMIN"]
@@ -107,25 +130,22 @@ function normalizeProduct(p) {
 
 export async function getProductsFromDb(tenantId) {
   const p = getNeonPool();
-  if (!p) return [];
-  const res = tenantId
-    ? await p.query('SELECT * FROM products WHERE "tenantId" = $1 ORDER BY "createdAt" DESC;', [tenantId])
-    : await p.query('SELECT * FROM products ORDER BY "createdAt" DESC;');
+  if (!p || !isValidUuid(tenantId)) return [];
+  const res = await p.query('SELECT * FROM products WHERE "tenantId" = $1 ORDER BY "createdAt" DESC;', [tenantId]);
   return res.rows.map(normalizeProduct);
 }
 
 export async function getProductByIdFromDb(id, tenantId) {
   const p = getNeonPool();
-  if (!p || !id) return null;
-  const res = tenantId
-    ? await p.query('SELECT * FROM products WHERE id = $1 AND "tenantId" = $2 LIMIT 1;', [id, tenantId])
-    : await p.query('SELECT * FROM products WHERE id = $1 LIMIT 1;', [id]);
+  if (!p || !isValidUuid(id) || !isValidUuid(tenantId)) return null;
+  const res = await p.query('SELECT * FROM products WHERE id = $1 AND "tenantId" = $2 LIMIT 1;', [id, tenantId]);
   return normalizeProduct(res.rows[0]);
 }
 
 export async function createProductInDb(tenantId, data) {
   const p = getNeonPool();
-  const id = crypto.randomUUID();
+  if (!p || !isValidUuid(tenantId)) throw new Error("Valid tenantId is required");
+  const id = data.id && isValidUuid(data.id) ? data.id : crypto.randomUUID();
   const name = data.name || "New Product";
   const sku = data.sku || `SKU-${Date.now().toString().slice(-6)}`;
   const description = data.description || "";
@@ -146,6 +166,7 @@ export async function createProductInDb(tenantId, data) {
 
 export async function updateProductInDb(id, tenantId, data) {
   const p = getNeonPool();
+  if (!p || !isValidUuid(id) || !isValidUuid(tenantId)) return null;
   const existing = await getProductByIdFromDb(id, tenantId);
   if (!existing) return null;
 
@@ -175,14 +196,16 @@ export async function updateProductInDb(id, tenantId, data) {
 
 export async function deleteProductFromDb(id, tenantId) {
   const p = getNeonPool();
+  if (!p || !isValidUuid(id) || !isValidUuid(tenantId)) return false;
   // delete related stock logs first to avoid FK error
-  await p.query('DELETE FROM stock_logs WHERE "productId" = $1;', [id]);
+  await p.query('DELETE FROM stock_logs WHERE "productId" = $1 AND "tenantId" = $2;', [id, tenantId]);
   const res = await p.query('DELETE FROM products WHERE id = $1 AND "tenantId" = $2 RETURNING id;', [id, tenantId]);
   return res.rowCount > 0;
 }
 
 export async function adjustStockInDb(id, tenantId, { type, quantity, reason, executedBy }) {
   const p = getNeonPool();
+  if (!p || !isValidUuid(id) || !isValidUuid(tenantId)) throw new Error("Product not found");
   const product = await getProductByIdFromDb(id, tenantId);
   if (!product) throw new Error("Product not found");
 
@@ -216,7 +239,7 @@ export async function adjustStockInDb(id, tenantId, { type, quantity, reason, ex
 
 export async function getStockLogsFromDb(productId, tenantId) {
   const p = getNeonPool();
-  if (!p) return [];
+  if (!p || !isValidUuid(productId) || !isValidUuid(tenantId)) return [];
   const res = await p.query(
     `SELECT sl.*, p.name as "productName", p.sku
      FROM stock_logs sl
@@ -267,16 +290,15 @@ function normalizeLead(l) {
 
 export async function getLeadsFromDb(tenantId) {
   const p = getNeonPool();
-  if (!p) return [];
-  const res = tenantId
-    ? await p.query('SELECT * FROM leads WHERE "tenantId" = $1 ORDER BY "createdAt" DESC;', [tenantId])
-    : await p.query('SELECT * FROM leads ORDER BY "createdAt" DESC;');
+  if (!p || !isValidUuid(tenantId)) return [];
+  const res = await p.query('SELECT * FROM leads WHERE "tenantId" = $1 ORDER BY "createdAt" DESC;', [tenantId]);
   return res.rows.map(normalizeLead);
 }
 
 export async function createLeadInDb(tenantId, data) {
   const p = getNeonPool();
-  const id = crypto.randomUUID();
+  if (!p || !isValidUuid(tenantId)) throw new Error("Valid tenantId is required");
+  const id = data.id && isValidUuid(data.id) ? data.id : crypto.randomUUID();
   const name = data.name || data.title || data.contactName || "New Lead";
   const email = data.email || data.contactEmail || "contact@example.com";
   const company = data.company || data.companyName || "Prospective Client";
@@ -296,6 +318,7 @@ export async function createLeadInDb(tenantId, data) {
 
 export async function updateLeadInDb(id, tenantId, data) {
   const p = getNeonPool();
+  if (!p || !isValidUuid(id) || !isValidUuid(tenantId)) return null;
   const existingRes = await p.query('SELECT * FROM leads WHERE id = $1 AND "tenantId" = $2 LIMIT 1;', [id, tenantId]);
   if (!existingRes.rows.length) return null;
   const existing = existingRes.rows[0];
@@ -318,6 +341,7 @@ export async function updateLeadInDb(id, tenantId, data) {
 
 export async function deleteLeadFromDb(id, tenantId) {
   const p = getNeonPool();
+  if (!p || !isValidUuid(id) || !isValidUuid(tenantId)) return false;
   const res = await p.query('DELETE FROM leads WHERE id = $1 AND "tenantId" = $2 RETURNING id;', [id, tenantId]);
   return res.rowCount > 0;
 }
@@ -333,28 +357,28 @@ function normalizeTask(t) {
     due_date: due,
     dueDate: due,
     title: t.title || "Untitled Task",
-    status: t.status || "TODO",
+    status: t.status || "PENDING",
     priority: t.priority || "MEDIUM",
   };
 }
 
 export async function getTasksFromDb(tenantId) {
   const p = getNeonPool();
-  if (!p) return [];
-  const res = tenantId
-    ? await p.query('SELECT * FROM tasks WHERE "tenantId" = $1 ORDER BY "createdAt" DESC;', [tenantId])
-    : await p.query('SELECT * FROM tasks ORDER BY "createdAt" DESC;');
+  if (!p || !isValidUuid(tenantId)) return [];
+  const res = await p.query('SELECT * FROM tasks WHERE "tenantId" = $1 ORDER BY "createdAt" DESC;', [tenantId]);
   return res.rows.map(normalizeTask);
 }
 
 export async function createTaskInDb(tenantId, data) {
   const p = getNeonPool();
-  const id = crypto.randomUUID();
+  if (!p || !isValidUuid(tenantId)) throw new Error("Valid tenantId is required");
+  const id = data.id && isValidUuid(data.id) ? data.id : crypto.randomUUID();
   const title = data.title || "New Task";
   const description = data.description || "";
-  const status = (data.status || "TODO").toUpperCase();
+  const status = (data.status || "PENDING").toUpperCase();
   const priority = (data.priority || "MEDIUM").toUpperCase();
-  const dueDate = data.dueDate || data.due_date || new Date(Date.now() + 86400000 * 3).toISOString();
+  const rawDue = (data.dueDate || data.due_date || "").toString().trim();
+  const dueDate = rawDue ? new Date(rawDue).toISOString() : new Date(Date.now() + 86400000 * 3).toISOString();
   const assignedTo = data.assignedTo || "Team Member";
 
   const res = await p.query(
@@ -368,6 +392,7 @@ export async function createTaskInDb(tenantId, data) {
 
 export async function updateTaskInDb(id, tenantId, data) {
   const p = getNeonPool();
+  if (!p || !isValidUuid(id) || !isValidUuid(tenantId)) return null;
   const existingRes = await p.query('SELECT * FROM tasks WHERE id = $1 AND "tenantId" = $2 LIMIT 1;', [id, tenantId]);
   if (!existingRes.rows.length) return null;
   const existing = existingRes.rows[0];
@@ -376,7 +401,8 @@ export async function updateTaskInDb(id, tenantId, data) {
   const description = data.description !== undefined ? data.description : existing.description;
   const status = data.status !== undefined ? data.status.toUpperCase() : existing.status;
   const priority = data.priority !== undefined ? data.priority.toUpperCase() : existing.priority;
-  const dueDate = data.dueDate || data.due_date || existing.dueDate;
+  const rawDue = (data.dueDate || data.due_date || "").toString().trim();
+  const dueDate = rawDue ? new Date(rawDue).toISOString() : existing.dueDate;
 
   const res = await p.query(
     `UPDATE tasks 
@@ -390,6 +416,7 @@ export async function updateTaskInDb(id, tenantId, data) {
 
 export async function deleteTaskFromDb(id, tenantId) {
   const p = getNeonPool();
+  if (!p || !isValidUuid(id) || !isValidUuid(tenantId)) return false;
   const res = await p.query('DELETE FROM tasks WHERE id = $1 AND "tenantId" = $2 RETURNING id;', [id, tenantId]);
   return res.rowCount > 0;
 }
@@ -399,32 +426,201 @@ export async function deleteTaskFromDb(id, tenantId) {
 // -------------------------------------------------------------
 export async function getChartsFromDb(tenantId) {
   const p = getNeonPool();
-  if (!p) return [];
-  const res = tenantId
-    ? await p.query('SELECT * FROM charts WHERE "tenantId" = $1 ORDER BY "createdAt" DESC;', [tenantId])
-    : await p.query('SELECT * FROM charts ORDER BY "createdAt" DESC;');
+  if (!p || !isValidUuid(tenantId)) return [];
+  const res = await p.query('SELECT * FROM charts WHERE "tenantId" = $1 ORDER BY "createdAt" DESC;', [tenantId]);
   return res.rows;
 }
 
 export async function createChartInDb(tenantId, userId, data) {
   const p = getNeonPool();
-  const id = crypto.randomUUID();
+  if (!p || !isValidUuid(tenantId)) throw new Error("Valid tenantId is required");
+  const id = data.id && isValidUuid(data.id) ? data.id : crypto.randomUUID();
   const title = data.title || "Custom Chart";
   const type = data.type || "bar";
   const config = data.config || {};
   const thumbnail = data.thumbnail || null;
+  const userFk = isValidUuid(userId) ? userId : null;
 
   const res = await p.query(
     `INSERT INTO charts (id, "tenantId", "userId", title, type, config, thumbnail, "createdAt", "updatedAt")
      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
      RETURNING *;`,
-    [id, tenantId, userId, title, type, JSON.stringify(config), thumbnail]
+    [id, tenantId, userFk, title, type, JSON.stringify(config), thumbnail]
   );
   return res.rows[0];
 }
 
 export async function deleteChartFromDb(id, tenantId) {
   const p = getNeonPool();
+  if (!p || !isValidUuid(id) || !isValidUuid(tenantId)) return false;
   const res = await p.query('DELETE FROM charts WHERE id = $1 AND "tenantId" = $2 RETURNING id;', [id, tenantId]);
   return res.rowCount > 0;
+}
+
+// -------------------------------------------------------------
+// CONVERSATIONS & MESSAGES QUERIES
+// -------------------------------------------------------------
+export async function getConversationsFromDb(tenantId) {
+  const p = getNeonPool();
+  if (!p || !isValidUuid(tenantId)) return [];
+  const res = await p.query(
+    `SELECT c.*, COUNT(m.id)::int as "messageCount"
+     FROM conversations c
+     LEFT JOIN messages m ON c.id = m."conversationId"
+     WHERE c."tenantId" = $1
+     GROUP BY c.id
+     ORDER BY c."createdAt" DESC;`,
+    [tenantId]
+  );
+  return res.rows.map((c) => ({
+    id: c.id,
+    title: c.title,
+    agentId: c.agentId,
+    createdAt: c.createdAt,
+    messageCount: c.messageCount || 0,
+    _executionMode: "LIVE",
+  }));
+}
+
+export async function getConversationMessagesFromDb(convId, tenantId) {
+  const p = getNeonPool();
+  if (!p || !isValidUuid(convId) || !isValidUuid(tenantId)) return { id: convId, messages: [] };
+  const convRes = await p.query(
+    'SELECT * FROM conversations WHERE id = $1 AND "tenantId" = $2 LIMIT 1;',
+    [convId, tenantId]
+  );
+  if (!convRes.rows.length) return { id: convId, messages: [] };
+  const conv = convRes.rows[0];
+
+  const msgRes = await p.query(
+    'SELECT * FROM messages WHERE "conversationId" = $1 AND "tenantId" = $2 ORDER BY "createdAt" ASC;',
+    [convId, tenantId]
+  );
+  return {
+    id: conv.id,
+    title: conv.title,
+    agentId: conv.agentId,
+    messages: msgRes.rows.map((m) => ({
+      id: m.id,
+      sender: m.sender,
+      content: m.content,
+      sources: m.sources || [],
+      metadata: m.metadata || {},
+      createdAt: m.createdAt,
+    })),
+    _executionMode: "LIVE",
+  };
+}
+
+export async function createConversationInDb(tenantId, userId, { id, title, agentId }) {
+  const p = getNeonPool();
+  if (!p || !isValidUuid(tenantId)) return null;
+  const convId = id && isValidUuid(id) ? id : crypto.randomUUID();
+  const userFk = isValidUuid(userId) ? userId : null;
+  const res = await p.query(
+    `INSERT INTO conversations (id, "tenantId", "userId", title, "agentId", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+     ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, "updatedAt" = NOW()
+     RETURNING *;`,
+    [convId, tenantId, userFk, title || "New Conversation", agentId || "supply-chain-agent"]
+  );
+  return res.rows[0];
+}
+
+export async function addMessageToDb(tenantId, conversationId, { sender, content, sources, metadata }) {
+  const p = getNeonPool();
+  if (!p || !isValidUuid(tenantId) || !isValidUuid(conversationId)) return null;
+  const msgId = crypto.randomUUID();
+  const res = await p.query(
+    `INSERT INTO messages (id, "tenantId", "conversationId", sender, content, sources, metadata, "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+     RETURNING *;`,
+    [
+      msgId,
+      tenantId,
+      conversationId,
+      sender,
+      content,
+      JSON.stringify(sources || []),
+      JSON.stringify(metadata || {}),
+    ]
+  );
+  return res.rows[0];
+}
+
+export async function deleteConversationFromDb(convId, tenantId) {
+  const p = getNeonPool();
+  if (!p || !isValidUuid(convId) || !isValidUuid(tenantId)) return false;
+  await p.query('DELETE FROM messages WHERE "conversationId" = $1 AND "tenantId" = $2;', [convId, tenantId]);
+  const res = await p.query('DELETE FROM conversations WHERE id = $1 AND "tenantId" = $2 RETURNING id;', [convId, tenantId]);
+  return res.rowCount > 0;
+}
+
+// -------------------------------------------------------------
+// PENDING ACTIONS QUERIES (HITL)
+// -------------------------------------------------------------
+export async function createPendingActionInDb(tenantId, userId, action) {
+  const p = getNeonPool();
+  if (!p || !isValidUuid(tenantId)) return null;
+  const actionId = action.id && isValidUuid(action.id) ? action.id : crypto.randomUUID();
+  const userFk = isValidUuid(userId) ? userId : null;
+  const res = await p.query(
+    `INSERT INTO pending_actions (id, "tenantId", "userId", "actionType", "targetEntity", params, summary, status, "expiresAt", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+     RETURNING *;`,
+    [
+      actionId,
+      tenantId,
+      userFk,
+      action.actionType || "RESTOCK_PRODUCT",
+      JSON.stringify(action.targetEntity || {}),
+      JSON.stringify(action.payload || {}),
+      action.summary || action.title || "Pending HITL Action",
+      "PENDING_CONFIRMATION",
+      action.expiresAt || new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    ]
+  );
+  return {
+    ...action,
+    id: actionId,
+    status: "PENDING_CONFIRMATION",
+    createdAt: res.rows[0].createdAt,
+    executionMode: "LIVE",
+  };
+}
+
+export async function getPendingActionByIdFromDb(id, tenantId) {
+  const p = getNeonPool();
+  if (!p || !isValidUuid(id) || !isValidUuid(tenantId)) return null;
+  const res = await p.query(
+    'SELECT * FROM pending_actions WHERE id = $1 AND "tenantId" = $2 LIMIT 1;',
+    [id, tenantId]
+  );
+  if (!res.rows.length) return null;
+  const row = res.rows[0];
+  return {
+    id: row.id,
+    actionType: row.actionType,
+    summary: row.summary,
+    status: row.status,
+    payload: row.params || {},
+    targetEntity: row.targetEntity || {},
+    executionResult: row.executionResult,
+    createdAt: row.createdAt,
+    executedAt: row.executedAt,
+    executionMode: "LIVE",
+  };
+}
+
+export async function updatePendingActionInDb(id, tenantId, status, executionResult) {
+  const p = getNeonPool();
+  if (!p || !isValidUuid(id) || !isValidUuid(tenantId)) return null;
+  const res = await p.query(
+    `UPDATE pending_actions
+     SET status = $1, "executedAt" = NOW(), "executionResult" = $2, "updatedAt" = NOW()
+     WHERE id = $3 AND "tenantId" = $4
+     RETURNING *;`,
+    [status, JSON.stringify(executionResult || {}), id, tenantId]
+  );
+  return res.rows[0];
 }

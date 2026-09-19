@@ -104,10 +104,10 @@ export async function GET(req, { params }) {
     // 6. Conversations & Messages
     if (slug[0] === "conversations") {
       if (slug[1] && slug[2] === "messages") {
-        const data = storeAdapter.getConversationMessages(context, slug[1]);
+        const data = await storeAdapter.getConversationMessages(context, slug[1]);
         return jsonSuccess(data);
       }
-      const convs = storeAdapter.getConversations(context);
+      const convs = await storeAdapter.getConversations(context);
       return jsonSuccess(convs);
     }
 
@@ -427,14 +427,14 @@ export async function POST(req, { params }) {
     // 11. AI Agent: Approve HITL Action
     if (slug[0] === "agents" && slug[1] === "actions" && slug[3] === "approve") {
       const actionId = slug[2];
-      const result = storeAdapter.approvePendingAction(context, actionId);
+      const result = await storeAdapter.approvePendingAction(context, actionId);
       return jsonSuccess(result, "Action successfully approved and executed.");
     }
 
     // 12. AI Agent: Reject HITL Action
     if (slug[0] === "agents" && slug[1] === "actions" && slug[3] === "reject") {
       const actionId = slug[2];
-      const result = storeAdapter.rejectPendingAction(context, actionId);
+      const result = await storeAdapter.rejectPendingAction(context, actionId);
       return jsonSuccess(result, "Action rejected.");
     }
 
@@ -534,7 +534,7 @@ export async function DELETE(req, { params }) {
 
     // 5. Conversations: Delete Conversation
     if (slug[0] === "conversations" && slug[1]) {
-      const result = storeAdapter.deleteConversation(context, slug[1]);
+      const result = await storeAdapter.deleteConversation(context, slug[1]);
       return jsonSuccess(result, "Conversation deleted successfully");
     }
 

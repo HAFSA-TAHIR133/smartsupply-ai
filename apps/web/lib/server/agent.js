@@ -1,4 +1,6 @@
-import { storeAdapter, getDemoDb, getLiveDb, saveDemoDb, saveLiveDb } from "./store.js";
+import "./env.js";
+import { storeAdapter, getDemoDb, saveDemoDb } from "./store.js";
+import * as neonDb from "./neonDb.js";
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const LLM_MODEL = process.env.LLM_MODEL || "groq/compound";
@@ -99,6 +101,86 @@ async function callLLM(systemPrompt, userMessage) {
   return null;
 }
 
+// Helper: match product from message text
+function matchProductFromText(text, products) {
+  if (!products || products.length === 0) return null;
+  const lower = text.toLowerCase();
+
+  // 1. Try exact or partial SKU match
+  for (const p of products) {
+    if (p.sku && lower.includes(p.sku.toLowerCase())) return p;
+  }
+
+  // 2. Try product name match
+  for (const p of products) {
+    if (p.name && lower.includes(p.name.toLowerCase())) return p;
+  }
+
+  // 3. Try name tokens (e.g. "gateway", "iot", "sensor", "bolts", "motor", "plate")
+  for (const p of products) {
+    const tokens = p.name.toLowerCase().split(/\s+/).filter((t) => t.length > 3);
+    for (const token of tokens) {
+      if (lower.includes(token)) return p;
+    }
+  }
+
+  // 4. Only match generic references if user explicitly says "it" or "this product"
+  if (
+    lower.includes(" it ") ||
+    lower.endsWith(" it") ||
+    lower.includes("this product") ||
+    lower.includes("this item")
+  ) {
+    return products[0];
+  }
+
+  // Do NOT randomly fall back to other products
+  return null;
+}
+
+// Helper: check if message is a question or inquiry (read-only)
+function isQuestionOrInquiry(lowerMsg) {
+  return (
+    lowerMsg.includes("which") ||
+    lowerMsg.includes("what") ||
+    lowerMsg.includes("how many") ||
+    lowerMsg.includes("how much") ||
+    lowerMsg.includes("show") ||
+    lowerMsg.includes("list") ||
+    lowerMsg.includes("tell me") ||
+    lowerMsg.includes("check") ||
+    lowerMsg.includes("status") ||
+    lowerMsg.includes("is there") ||
+    lowerMsg.includes("are there") ||
+    lowerMsg.includes("overview") ||
+    lowerMsg.includes("report") ||
+    lowerMsg.endsWith("?") ||
+    lowerMsg.startsWith("can you show") ||
+    lowerMsg.startsWith("can you tell")
+  );
+}
+
+// Helper: match lead from message text
+function matchLeadFromText(text, leads) {
+  if (!leads || leads.length === 0) return null;
+  const lower = text.toLowerCase();
+  for (const l of leads) {
+    if (l.title && lower.includes(l.title.toLowerCase())) return l;
+    if (l.companyName && lower.includes(l.companyName.toLowerCase())) return l;
+  }
+  return leads[0];
+}
+
+// Helper: match task from message text
+function matchTaskFromText(text, tasks) {
+  if (!tasks || tasks.length === 0) return null;
+  const lower = text.toLowerCase();
+  for (const t of tasks) {
+    if (t.title && lower.includes(t.title.toLowerCase())) return t;
+  }
+  return tasks[0];
+}
+
 /**
  * Core agent chat orchestrator with mode-aware execution & HITL detection
  */
@@ -107,147 +189,371 @@ export async function executeAgentChat(context, { agentId, message, conversation
   const lowerMsg = message.toLowerCase();
 
   // Load current mode's data
-  const products = storeAdapter.getProducts(context);
-  const leads = storeAdapter.getLeads(context);
-  const tasks = storeAdapter.getTasks(context);
+  const products = await storeAdapter.getProducts(context);
+  const leads = await storeAdapter.getLeads(context);
+  const tasks = await storeAdapter.getTasks(context);
 
   let requiresConfirmation = false;
   let pendingAction = null;
   let toolsUsed = [];
   let answer = "";
-  let sources = ["Enterprise Logistics Knowledge Graph", "Warehouse Inventory Master"];
+  let sources = [];
+
+  const isQuery = isQuestionOrInquiry(lowerMsg);
 
   // -------------------------------------------------------------
-  // Tool 1: RESTOCK / INVENTORY WRITE (Requires HITL Confirmation)
+  // QUERY A: LOW STOCK & OUT OF STOCK STATUS (Read Only)
   // -------------------------------------------------------------
-  if (
-    lowerMsg.includes("restock") ||
-    lowerMsg.includes("reorder") ||
-    lowerMsg.includes("replenish") ||
-    (lowerMsg.includes("order") && lowerMsg.includes("unit")) ||
-    (lowerMsg.includes("add") && lowerMsg.includes("stock"))
-  ) {
-    toolsUsed.push("inventory_restock_evaluator");
-
-    // Match product from inventory
-    let matchedProduct = null;
-    for (const p of products) {
-      if (
-        lowerMsg.includes(p.name.toLowerCase()) ||
-        lowerMsg.includes(p.sku.toLowerCase()) ||
-        (p.category && lowerMsg.includes(p.category.toLowerCase()))
-      ) {
-        matchedProduct = p;
-        break;
-      }
-    }
-
-    if (!matchedProduct) {
-      // Pick first low stock or out of stock product as sensible target
-      matchedProduct =
-        products.find((p) => Number(p.quantity) === 0) ||
-        products.find((p) => Number(p.quantity) <= Number(p.reorderPoint)) ||
-        products[0];
-    }
-
-    // Extract quantity delta if mentioned (e.g. "by 25", "50 units")
-    const qtyMatch = message.match(/\b(\d+)\b/);
-    const quantityDelta = qtyMatch ? parseInt(qtyMatch[1], 10) : 25;
-
-    if (matchedProduct) {
-      requiresConfirmation = true;
-      pendingAction = storeAdapter.createPendingAction(context, {
-        actionType: "RESTOCK_PRODUCT",
-        title: `Restock ${matchedProduct.name}`,
-        summary: `Autonomous replenishment recommendation: Add +${quantityDelta} units to SKU ${matchedProduct.sku} (Current: ${matchedProduct.quantity} units, Min: ${matchedProduct.reorderPoint}).`,
-        payload: {
-          productId: matchedProduct.id,
-          sku: matchedProduct.sku,
-          productName: matchedProduct.name,
-          changeType: "IN",
-          quantityDelta,
-          reason: `AI autonomous recommendation restock (${context.mode} mode)`,
-        },
-      });
-
-      answer = `I have formulated a replenishment plan for **${matchedProduct.name}** (**${matchedProduct.sku}**).\n\n- **Current Stock:** ${matchedProduct.quantity} units (Reorder Threshold: ${matchedProduct.reorderPoint})\n- **Proposed Restock:** +${quantityDelta} units\n- **Execution Mode:** \`${context.mode}\`\n\nBecause this operation mutates warehouse records, **Human-In-The-Loop (HITL) authorization is required**. Please review the pending action card below and select **Approve** to execute or **Reject** to cancel.`;
-      sources.push("Safety Stock Policy v2.4", `SKU ${matchedProduct.sku} Master Record`);
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Tool 2: DELETE INVENTORY ITEM (Requires HITL Confirmation)
-  // -------------------------------------------------------------
-  else if (
-    lowerMsg.includes("delete product") ||
-    lowerMsg.includes("remove sku") ||
-    lowerMsg.includes("delete item")
-  ) {
-    toolsUsed.push("inventory_sku_deleter");
-    let matchedProduct = products.find(
-      (p) => lowerMsg.includes(p.name.toLowerCase()) || lowerMsg.includes(p.sku.toLowerCase())
-    );
-
-    if (matchedProduct) {
-      requiresConfirmation = true;
-      pendingAction = storeAdapter.createPendingAction(context, {
-        actionType: "DELETE_PRODUCT",
-        title: `Delete SKU: ${matchedProduct.sku}`,
-        summary: `Request to permanently delete product "${matchedProduct.name}" (${matchedProduct.sku}) from inventory.`,
-        payload: {
-          productId: matchedProduct.id,
-          sku: matchedProduct.sku,
-          name: matchedProduct.name,
-        },
-      });
-
-      answer = `⚠️ **Critical Action Notice**: You requested to delete product **${matchedProduct.name}** (**${matchedProduct.sku}**).\n\nThis action requires Human-In-The-Loop confirmation. Click **Approve** below to proceed with deletion in \`${context.mode}\` mode.`;
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Tool 3: QUERY INVENTORY / LOW STOCK STATUS (Read Only)
-  // -------------------------------------------------------------
-  else if (
-    lowerMsg.includes("stock") ||
-    lowerMsg.includes("inventory") ||
+  const isLowStockQuery =
     lowerMsg.includes("low stock") ||
     lowerMsg.includes("out of stock") ||
-    lowerMsg.includes("sku")
-  ) {
+    (lowerMsg.includes("low") && lowerMsg.includes("stock")) ||
+    (isQuery && lowerMsg.includes("stock")) ||
+    (lowerMsg.includes("which") && lowerMsg.includes("product")) ||
+    (isQuery && (lowerMsg.includes("reorder") || lowerMsg.includes("restock")));
+
+  if (isLowStockQuery && (lowerMsg.includes("low") || lowerMsg.includes("out") || lowerMsg.includes("which") || lowerMsg.includes("need"))) {
     toolsUsed.push("warehouse_inventory_scanner");
+
     const lowStock = products.filter(
       (p) => Number(p.quantity) > 0 && Number(p.quantity) <= Number(p.reorderPoint)
     );
     const outOfStock = products.filter((p) => Number(p.quantity) === 0);
 
-    let stockSummary = `Here is the current warehouse status (${context.mode} mode):\n\n`;
-    stockSummary += `- **Total Inventory SKUs:** ${products.length}\n`;
-    stockSummary += `- **Healthy Stock:** ${products.length - lowStock.length - outOfStock.length} items\n`;
-    stockSummary += `- **Low Stock Alerts:** ${lowStock.length} items\n`;
-    stockSummary += `- **Out of Stock:** ${outOfStock.length} items\n\n`;
-
-    if (outOfStock.length > 0) {
-      stockSummary += `**Urgent Out-of-Stock Items:**\n`;
-      outOfStock.forEach((p) => {
-        stockSummary += `• **${p.name}** (\`${p.sku}\`) — 0 / min ${p.reorderPoint}\n`;
-      });
-      stockSummary += `\n`;
+    if (outOfStock.length === 0 && lowStock.length === 0) {
+      answer = "All products currently have healthy stock levels above their minimum reorder thresholds.";
+    } else {
+      let text = "Here are the products currently on low or out of stock:\n\n";
+      if (outOfStock.length > 0) {
+        text += "**Out of Stock (0 units):**\n";
+        outOfStock.forEach((p) => {
+          text += `• **${p.name}** (\`${p.sku}\`) — 0 in stock (Min threshold: ${p.reorderPoint})\n`;
+        });
+        text += "\n";
+      }
+      if (lowStock.length > 0) {
+        text += "**Low Stock Items:**\n";
+        lowStock.forEach((p) => {
+          text += `• **${p.name}** (\`${p.sku}\`) — ${p.quantity} units left (Min threshold: ${p.reorderPoint})\n`;
+        });
+      }
+      answer = text.trim();
     }
-
-    if (lowStock.length > 0) {
-      stockSummary += `**Low Stock Alerts:**\n`;
-      lowStock.forEach((p) => {
-        stockSummary += `• **${p.name}** (\`${p.sku}\`) — ${p.quantity} left (min ${p.reorderPoint})\n`;
-      });
-    }
-
-    answer = stockSummary;
-    sources.push("Warehouse Live Inventory Scanner");
   }
 
   // -------------------------------------------------------------
-  // Tool 4: CRM / PIPELINE STATUS (Read Only)
+  // OPERATION 1: RENEW STOCK / RESTOCK / REPLENISH (Requires Human Confirmation)
+  // Only triggers on explicit command, NOT on questions/inquiries
+  // -------------------------------------------------------------
+  else if (
+    !isQuery &&
+    (
+      lowerMsg.includes("renew stock") ||
+      lowerMsg.includes("renew the stock") ||
+      lowerMsg.startsWith("restock") ||
+      lowerMsg.includes("restock ") ||
+      lowerMsg.includes("replenish") ||
+      lowerMsg.includes("reorder") ||
+      lowerMsg.startsWith("order ") ||
+      lowerMsg.includes("order +") ||
+      (lowerMsg.includes("order") && (lowerMsg.includes("unit") || lowerMsg.includes("item") || lowerMsg.includes("more") || lowerMsg.includes("stock"))) ||
+      (lowerMsg.includes("add") && (lowerMsg.includes("stock") || lowerMsg.includes("unit") || lowerMsg.includes("qty")))
+    )
+  ) {
+    toolsUsed.push("inventory_restock_evaluator");
+
+    const matchedProduct = matchProductFromText(message, products);
+
+    if (!matchedProduct) {
+      answer = "Which product would you like to restock? Please specify the product name or SKU.";
+    } else {
+      // Extract quantity delta cleanly from user message
+      const specificQty =
+        message.match(/(?:by|add|with|order|\+)\s*(\d+)/i) ||
+        message.match(/(\d+)\s*(?:units?|pcs?|pieces?|items?|qty|more|new)/i) ||
+        message.replace(/\bv\d+\b/gi, "").match(/\b(\d+)\b/);
+
+      if (!specificQty) {
+        answer = `How many units of **${matchedProduct.name}** would you like to restock? Please specify the quantity you want to add.`;
+      } else {
+        const quantityDelta = parseInt(specificQty[1], 10);
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "RESTOCK_PRODUCT",
+          title: `Renew Stock: ${matchedProduct.name}`,
+          summary: `Add +${quantityDelta} units to ${matchedProduct.name} (${matchedProduct.sku}). Current stock: ${matchedProduct.quantity} units (Min threshold: ${matchedProduct.reorderPoint}).`,
+          payload: {
+            productId: matchedProduct.id,
+            sku: matchedProduct.sku,
+            productName: matchedProduct.name,
+            changeType: "IN",
+            quantityDelta,
+            reason: `Restock operation requested via AI Assistant`,
+          },
+        });
+
+        answer = `I have prepared the request to renew the stock of **${matchedProduct.name}** (**${matchedProduct.sku}**) by **+${quantityDelta} units** (current stock: ${matchedProduct.quantity} units).\n\nPlease confirm below before I proceed.`;
+      }
+    }
+  }
+
+  // -------------------------------------------------------------
+  // OPERATION 2: DELETE ITEM / LEAD / TASK (Requires Human Confirmation)
+  // -------------------------------------------------------------
+  else if (
+    !isQuery &&
+    (
+      lowerMsg.includes("delete") ||
+      lowerMsg.includes("remove") ||
+      lowerMsg.includes("erase") ||
+      lowerMsg.includes("drop")
+    )
+  ) {
+    // Check if targeting a CRM Lead
+    if (lowerMsg.includes("lead") || lowerMsg.includes("deal")) {
+      toolsUsed.push("crm_lead_deleter");
+      const matchedLead = matchLeadFromText(message, leads);
+      if (matchedLead) {
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "DELETE_LEAD",
+          title: `Delete Lead: ${matchedLead.title}`,
+          summary: `Permanently delete lead "${matchedLead.title}" (Value: $${Number(matchedLead.value || 0).toLocaleString()}).`,
+          payload: {
+            leadId: matchedLead.id,
+            leadTitle: matchedLead.title,
+          },
+        });
+        answer = `I have prepared the request to delete lead **${matchedLead.title}**.\n\nPlease confirm below before I permanently remove it.`;
+      } else {
+        answer = "Which lead would you like to delete? Please specify the lead title.";
+      }
+    }
+    // Check if targeting a Task
+    else if (lowerMsg.includes("task")) {
+      toolsUsed.push("crm_task_deleter");
+      const matchedTask = matchTaskFromText(message, tasks);
+      if (matchedTask) {
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "DELETE_TASK",
+          title: `Delete Task: ${matchedTask.title}`,
+          summary: `Permanently delete task "${matchedTask.title}".`,
+          payload: {
+            taskId: matchedTask.id,
+            taskTitle: matchedTask.title,
+          },
+        });
+        answer = `I have prepared the request to delete task **${matchedTask.title}**.\n\nPlease confirm below before I permanently remove it.`;
+      } else {
+        answer = "Which task would you like to delete? Please specify the task title.";
+      }
+    }
+    // Targeting Product / SKU / Item
+    else {
+      toolsUsed.push("inventory_sku_deleter");
+      const matchedProduct = matchProductFromText(message, products);
+      if (matchedProduct) {
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "DELETE_PRODUCT",
+          title: `Delete Product: ${matchedProduct.name}`,
+          summary: `Permanently delete product "${matchedProduct.name}" (${matchedProduct.sku}) from inventory.`,
+          payload: {
+            productId: matchedProduct.id,
+            productName: matchedProduct.name,
+            sku: matchedProduct.sku,
+          },
+        });
+        answer = `I have prepared the request to delete product **${matchedProduct.name}** (**${matchedProduct.sku}**).\n\nBecause this will permanently remove it from inventory, please confirm below before I proceed.`;
+      } else {
+        answer = "Which item would you like to delete? Please specify the product name or SKU.";
+      }
+    }
+  }
+
+  // -------------------------------------------------------------
+  // OPERATION 3: EDIT / UPDATE SOMETHING (Requires Human Confirmation)
+  // -------------------------------------------------------------
+  else if (
+    !isQuery &&
+    (
+      lowerMsg.includes("edit") ||
+      lowerMsg.includes("update") ||
+      lowerMsg.includes("modify") ||
+      lowerMsg.includes("change")
+    )
+  ) {
+    // Sub-check A: Lead edit
+    if (lowerMsg.includes("lead") || lowerMsg.includes("deal") || lowerMsg.includes("stage")) {
+      toolsUsed.push("crm_lead_updater");
+      const matchedLead = matchLeadFromText(message, leads);
+      if (matchedLead) {
+        const updates = {};
+        const stageMatch = lowerMsg.match(/\b(won|lost|qualified|negotiation|proposal|contacted|new)\b/i);
+        if (stageMatch) {
+          updates.stage = stageMatch[1].charAt(0).toUpperCase() + stageMatch[1].slice(1).toLowerCase();
+        }
+        const valMatch = message.match(/(?:value|price|amount)?\s*\$?(\d+(?:\.\d{2})?)/i);
+        if (valMatch && (lowerMsg.includes("value") || lowerMsg.includes("$"))) {
+          updates.value = parseFloat(valMatch[1]);
+        }
+
+        const changesSummary = Object.entries(updates)
+          .map(([k, v]) => `${k} to "${v}"`)
+          .join(", ") || "requested fields";
+
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "EDIT_LEAD",
+          title: `Edit Lead: ${matchedLead.title}`,
+          summary: `Update lead "${matchedLead.title}": Set ${changesSummary}.`,
+          payload: {
+            leadId: matchedLead.id,
+            leadTitle: matchedLead.title,
+            updates,
+          },
+        });
+        answer = `I have prepared the update for lead **${matchedLead.title}** (${changesSummary}).\n\nPlease confirm below before I apply these changes.`;
+      } else {
+        answer = "Which lead would you like to edit? Please specify the lead title and what to change.";
+      }
+    }
+    // Sub-check B: Task edit
+    else if (lowerMsg.includes("task") || lowerMsg.includes("mark as completed") || lowerMsg.includes("done")) {
+      toolsUsed.push("crm_task_updater");
+      const matchedTask = matchTaskFromText(message, tasks);
+      if (matchedTask) {
+        const updates = {};
+        if (lowerMsg.includes("complet") || lowerMsg.includes("done")) {
+          updates.status = "COMPLETED";
+        } else if (lowerMsg.includes("pending")) {
+          updates.status = "PENDING";
+        } else if (lowerMsg.includes("progress")) {
+          updates.status = "IN_PROGRESS";
+        }
+
+        if (lowerMsg.includes("high priority") || lowerMsg.includes("priority high")) {
+          updates.priority = "HIGH";
+        } else if (lowerMsg.includes("medium priority") || lowerMsg.includes("priority medium")) {
+          updates.priority = "MEDIUM";
+        } else if (lowerMsg.includes("low priority") || lowerMsg.includes("priority low")) {
+          updates.priority = "LOW";
+        }
+
+        const changesSummary = Object.entries(updates)
+          .map(([k, v]) => `${k} to "${v}"`)
+          .join(", ") || "status updated";
+
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "EDIT_TASK",
+          title: `Edit Task: ${matchedTask.title}`,
+          summary: `Update task "${matchedTask.title}": Set ${changesSummary}.`,
+          payload: {
+            taskId: matchedTask.id,
+            taskTitle: matchedTask.title,
+            updates,
+          },
+        });
+        answer = `I have prepared the update for task **${matchedTask.title}** (${changesSummary}).\n\nPlease confirm below before I apply these changes.`;
+      } else {
+        answer = "Which task would you like to edit? Please specify the task title.";
+      }
+    }
+    // Sub-check C: Product edit
+    else {
+      toolsUsed.push("inventory_product_updater");
+      const matchedProduct = matchProductFromText(message, products);
+      if (matchedProduct) {
+        const updates = {};
+        // Check price update
+        const priceMatch = message.match(/(?:price|cost)?\s*\$?(\d+(?:\.\d{2})?)/i);
+        if (lowerMsg.includes("price") && priceMatch) {
+          updates.unitPrice = parseFloat(priceMatch[1]);
+        }
+        // Check reorder point
+        const reorderMatch = message.match(/(?:reorder point|min stock|threshold)?\s*to\s*(\d+)/i) || message.match(/(?:reorder point|threshold)\s*(\d+)/i);
+        if ((lowerMsg.includes("reorder") || lowerMsg.includes("threshold") || lowerMsg.includes("min")) && reorderMatch) {
+          updates.reorderPoint = parseInt(reorderMatch[1], 10);
+        }
+        // Check name update: e.g. "name to [X]"
+        const nameMatch = message.match(/name to (?:["']?)([^"'\n,]+)(?:["']?)/i);
+        if (nameMatch) {
+          updates.name = nameMatch[1].trim();
+        }
+
+        const changesSummary = Object.entries(updates)
+          .map(([k, v]) => `${k} to ${v}`)
+          .join(", ") || "requested properties";
+
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "EDIT_PRODUCT",
+          title: `Edit Product: ${matchedProduct.name}`,
+          summary: `Update ${matchedProduct.name} (${matchedProduct.sku}): Set ${changesSummary}.`,
+          payload: {
+            productId: matchedProduct.id,
+            sku: matchedProduct.sku,
+            productName: matchedProduct.name,
+            updates,
+          },
+        });
+        answer = `I have prepared the update for **${matchedProduct.name}** (**${matchedProduct.sku}**): ${changesSummary}.\n\nPlease confirm below before I apply the changes.`;
+      } else {
+        answer = "Which item would you like to edit? Please specify the product name or SKU and the new values.";
+      }
+    }
+  }
+
+  // -------------------------------------------------------------
+  // QUERY 1: GENERAL INVENTORY & STOCK STATUS (Read Only)
+  // -------------------------------------------------------------
+  else if (
+    lowerMsg.includes("stock") ||
+    lowerMsg.includes("inventory") ||
+    lowerMsg.includes("sku") ||
+    lowerMsg.includes("product")
+  ) {
+    toolsUsed.push("warehouse_inventory_scanner");
+
+    const lowStock = products.filter(
+      (p) => Number(p.quantity) > 0 && Number(p.quantity) <= Number(p.reorderPoint)
+    );
+    const outOfStock = products.filter((p) => Number(p.quantity) === 0);
+    const healthyCount = products.length - lowStock.length - outOfStock.length;
+
+    // If user asked about a specific product
+    const specificProduct = products.find(
+      (p) =>
+        lowerMsg.includes(p.name.toLowerCase()) ||
+        (p.sku && lowerMsg.includes(p.sku.toLowerCase()))
+    );
+
+    if (specificProduct) {
+      answer = `You currently have **${specificProduct.quantity} units** of **${specificProduct.name}** (\`${specificProduct.sku}\`) in stock.\n\n- **Minimum Threshold:** ${specificProduct.reorderPoint} units\n- **Unit Price:** $${Number(specificProduct.unitPrice || 0).toFixed(2)}\n- **Status:** ${Number(specificProduct.quantity) === 0 ? "⚠️ Out of Stock" : Number(specificProduct.quantity) <= Number(specificProduct.reorderPoint) ? "⚠️ Low Stock" : "✅ Healthy"}`;
+    } else {
+      let summary = `Here is your current inventory overview:\n\n`;
+      summary += `- **Total Inventory SKUs:** ${products.length}\n`;
+      summary += `- **Healthy Stock:** ${healthyCount} items\n`;
+      summary += `- **Low Stock Alerts:** ${lowStock.length} items\n`;
+      if (outOfStock.length > 0) {
+        summary += `- **Out of Stock:** ${outOfStock.length} items\n`;
+      }
+
+      if (products.length > 0) {
+        summary += `\n**Inventory SKUs:**\n`;
+        products.slice(0, 8).forEach((p) => {
+          summary += `• **${p.name}** (\`${p.sku}\`) — ${p.quantity} in stock\n`;
+        });
+      }
+
+      answer = summary;
+    }
+  }
+
+  // -------------------------------------------------------------
+  // QUERY 2: CRM & SALES LEADS (Read Only)
   // -------------------------------------------------------------
   else if (
     lowerMsg.includes("lead") ||
@@ -258,85 +564,119 @@ export async function executeAgentChat(context, { agentId, message, conversation
   ) {
     toolsUsed.push("crm_pipeline_aggregator");
     const pipelineTotal = leads.reduce((sum, l) => sum + Number(l.value || 0), 0);
-    const wonTotal = leads
-      .filter((l) => l.stage === "Won")
-      .reduce((sum, l) => sum + Number(l.value || 0), 0);
+    const wonCount = leads.filter((l) => l.stage === "Won").length;
+    const pendingTasksCount = tasks.filter((t) => t.status === "PENDING").length;
 
-    answer = `**CRM Deal Pipeline Summary (${context.mode} mode)**:\n\n- **Total Active Leads:** ${leads.length}\n- **Total Pipeline Value:** $${pipelineTotal.toLocaleString()}\n- **Deals Won:** $${wonTotal.toLocaleString()}\n- **Open Follow-up Tasks:** ${tasks.filter((t) => t.status === "PENDING").length}\n\nTop deals in negotiation include: ${leads
-      .slice(0, 3)
-      .map((l) => `**${l.title}** ($${Number(l.value).toLocaleString()} - ${l.stage})`)
-      .join(", ")}.`;
-    sources.push("CRM Negotiation Funnel v1");
+    answer = `You currently have **${leads.length} active lead(s)** totaling **$${pipelineTotal.toLocaleString()}** in pipeline value (${wonCount} won).\n\nThere are **${pendingTasksCount} pending follow-up task(s)**.\n\n` +
+      leads.slice(0, 3).map((l) => `• **${l.title}** ($${Number(l.value || 0).toLocaleString()} — *${l.stage}*)`).join("\n");
   }
 
   // -------------------------------------------------------------
-  // General AI Reasoning with Groq / Compound LLM
+  // QUERY 3: TASKS (Read Only)
+  // -------------------------------------------------------------
+  else if (lowerMsg.includes("task")) {
+    toolsUsed.push("crm_task_tracker");
+    const pending = tasks.filter((t) => t.status === "PENDING");
+    const completed = tasks.filter((t) => t.status === "COMPLETED");
+
+    answer = `You have **${tasks.length} task(s)** (${pending.length} pending, ${completed.length} completed):\n\n` +
+      tasks.slice(0, 5).map((t) => `• **${t.title}** [${t.status}] — Priority: ${t.priority}`).join("\n");
+  }
+
+  // -------------------------------------------------------------
+  // General AI Reasoning with LLM (Simple, direct, concise style)
   // -------------------------------------------------------------
   if (!answer) {
-    const systemPrompt = `You are SmartSupply AI Assistant, an autonomous supply chain and logistics expert.
-Current Environment:
-- Execution Mode: ${context.mode}
-- User: ${context.user.name} (${context.user.email})
-- Tenant: ${context.user.tenantName}
-- Available Products Count: ${products.length}
-- Low Stock Items: ${products.filter((p) => Number(p.quantity) <= Number(p.reorderPoint)).map((p) => p.name).join(", ") || "None"}
-- CRM Pipeline: $${leads.reduce((s, l) => s + Number(l.value || 0), 0).toLocaleString()}
+    const systemPrompt = `You are a helpful, direct supply chain assistant for ${context.user.tenantName}.
+User: ${context.user.name}
+Execution Mode: ${context.mode}
+Available Products: ${products.length} items
+Active Leads: ${leads.length} leads
 
-Provide concise, highly authoritative supply chain guidance. If proposing changes that write data, clarify that HITL approval will be staged.`;
+Instructions:
+1. Answer simply, directly, and politely in 1 to 3 short sentences or concise bullet points.
+2. Avoid unnecessary jargon, long introductory fluff, or oversized markdown sections.
+3. If the user asks to perform an operation (like renewing stock, editing, or deleting an item), confirm what needs to be changed and remind them that you will ask for human confirmation before proceeding.
+4. Never include resources, references, citations, or sources at the end of your response.`;
 
     const llmResponse = await callLLM(systemPrompt, message);
 
     if (llmResponse) {
       answer = llmResponse;
-      toolsUsed.push("groq_compound_llm_reasoning");
+      toolsUsed.push("llm_reasoning");
     } else {
-      answer = `I have received your request: "${message}".\n\nAll systems are operating in **${context.mode} mode** for **${context.user.tenantName}**. I can analyze warehouse stock levels, recommend restock orders, review customer deal funnels, or draft purchase orders. How can I assist you further?`;
+      answer = `Hello ${context.user.name}! I am your supply chain assistant. You can ask me simple questions about your stock, leads, or tasks, or instruct me to renew stock, edit items, or delete records. I will always ask for your confirmation before making any changes. How can I help you today?`;
     }
   }
 
   const executionTimeMs = Date.now() - startTime;
+  let finalConvId = conversationId;
 
-  // Persist conversation messages in the current mode's store
-  const db = context.isDemo ? getDemoDb() : getLiveDb();
-  if (!db.conversations) db.conversations = [];
+  if (!context.isDemo && process.env.DATABASE_URL && context.user?.tenantId && neonDb.isValidUuid(context.user.tenantId)) {
+    try {
+      if (!finalConvId || !neonDb.isValidUuid(finalConvId)) {
+        const newConv = await neonDb.createConversationInDb(context.user.tenantId, context.user.id, {
+          title: message.slice(0, 40) + (message.length > 40 ? "..." : ""),
+          agentId: agentId || "supply-chain-agent",
+        });
+        finalConvId = newConv.id;
+      }
 
-  let conv = db.conversations.find((c) => c.id === conversationId);
-  if (!conv) {
-    conv = {
-      id: conversationId || `conv-${Date.now()}`,
-      title: message.slice(0, 40) + (message.length > 40 ? "..." : ""),
-      agentId: agentId || "supply-chain-agent",
-      createdAt: new Date().toISOString(),
-      messages: [],
-    };
-    db.conversations.unshift(conv);
-  }
+      await neonDb.addMessageToDb(finalConvId, {
+        sender: "USER",
+        content: message,
+      });
 
-  // Push user message
-  conv.messages.push({
-    id: `msg-user-${Date.now()}`,
-    sender: "USER",
-    content: message,
-    createdAt: new Date().toISOString(),
-  });
-
-  // Push agent message
-  conv.messages.push({
-    id: `msg-bot-${Date.now()}`,
-    sender: "AGENT",
-    content: answer,
-    sources,
-    toolsUsed,
-    executionTimeMs,
-    requiresConfirmation,
-    pendingAction,
-    createdAt: new Date().toISOString(),
-  });
-
-  if (context.isDemo) {
-    saveDemoDb();
+      await neonDb.addMessageToDb(finalConvId, {
+        sender: "AGENT",
+        content: answer,
+        sources,
+        toolsUsed,
+        executionTimeMs,
+        requiresConfirmation,
+        pendingActionId: pendingAction?.id || null,
+      });
+    } catch (dbErr) {
+      console.error("Neon conversation persistence error:", dbErr.message);
+    }
   } else {
-    saveLiveDb();
+    // Persist conversation messages in Demo sandbox
+    const db = getDemoDb();
+    if (!db.conversations) db.conversations = [];
+
+    let conv = db.conversations.find((c) => c.id === conversationId);
+    if (!conv) {
+      conv = {
+        id: conversationId || `conv-demo-${Date.now()}`,
+        title: message.slice(0, 40) + (message.length > 40 ? "..." : ""),
+        agentId: agentId || "supply-chain-agent",
+        createdAt: new Date().toISOString(),
+        messages: [],
+      };
+      db.conversations.unshift(conv);
+    }
+    finalConvId = conv.id;
+
+    conv.messages.push({
+      id: `msg-user-${Date.now()}`,
+      sender: "USER",
+      content: message,
+      createdAt: new Date().toISOString(),
+    });
+
+    conv.messages.push({
+      id: `msg-bot-${Date.now()}`,
+      sender: "AGENT",
+      content: answer,
+      sources,
+      toolsUsed,
+      executionTimeMs,
+      requiresConfirmation,
+      pendingAction,
+      createdAt: new Date().toISOString(),
+    });
+
+    saveDemoDb();
   }
 
   return {
@@ -346,7 +686,7 @@ Provide concise, highly authoritative supply chain guidance. If proposing change
     executionTimeMs,
     requiresConfirmation,
     pendingAction,
-    conversationId: conv.id,
+    conversationId: finalConvId,
     executionMode: context.mode,
   };
 }

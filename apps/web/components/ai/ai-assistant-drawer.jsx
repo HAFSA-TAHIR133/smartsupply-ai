@@ -70,7 +70,16 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
         )
       );
     } catch (err) {
-      alert(`Approval failed: ${err.message}`);
+      console.error("Approval failed:", err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          sender: "AGENT",
+          content: `⚠️ Approval failed: ${err.message}`,
+          sources: [],
+        },
+      ]);
     } finally {
       setActionLoading(null);
     }
@@ -93,7 +102,16 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
         )
       );
     } catch (err) {
-      alert(`Rejection failed: ${err.message}`);
+      console.error("Rejection failed:", err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          sender: "AGENT",
+          content: `⚠️ Rejection failed: ${err.message}`,
+          sources: [],
+        },
+      ]);
     } finally {
       setActionLoading(null);
     }
@@ -312,72 +330,124 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
 
                         {/* Human-in-the-loop Pending Action Card */}
                         {msg.pendingAction && (
-                          <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-950/20 p-3 text-zinc-100">
+                          <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-950/20 p-3 text-zinc-100 shadow-sm">
                             <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
-                              <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-[11px]">
-                                <ShieldAlert className="h-3.5 w-3.5" />
-                                <span>Confirmation Required</span>
+                              <div className="flex items-center gap-1.5 text-amber-400 font-semibold text-xs">
+                                <ShieldAlert className="h-4 w-4" />
+                                <span>Human Confirmation Required</span>
                               </div>
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-medium ${
-                                msg.pendingAction.status === "APPROVED"
-                                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded font-medium ${
+                                  msg.pendingAction.status === "APPROVED"
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : msg.pendingAction.status === "REJECTED"
+                                    ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                    : "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse"
+                                }`}
+                              >
+                                {msg.pendingAction.status === "APPROVED"
+                                  ? "APPROVED"
                                   : msg.pendingAction.status === "REJECTED"
-                                  ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                                  : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                              }`}>
-                                {msg.pendingAction.status}
+                                  ? "REJECTED"
+                                  : "AWAITING CONFIRMATION"}
                               </span>
                             </div>
 
-                            <div className="py-2 text-[11px] space-y-1">
-                              <p className="font-medium text-zinc-200">{msg.pendingAction.summary}</p>
-                              {msg.pendingAction.targetEntity && (
-                                <div className="text-[10px] text-zinc-400 flex flex-wrap gap-x-3">
-                                  {msg.pendingAction.targetEntity.sku && <span>SKU: <strong className="text-zinc-300">{msg.pendingAction.targetEntity.sku}</strong></span>}
-                                  {msg.pendingAction.params?.quantity && <span>Qty: <strong className="text-zinc-300">{msg.pendingAction.params.quantity}</strong></span>}
-                                  {msg.pendingAction.params?.changeType && <span>Type: <strong className="text-zinc-300">{msg.pendingAction.params.changeType}</strong></span>}
+                            <div className="py-2.5 text-xs space-y-1.5">
+                              <p className="font-semibold text-zinc-100">
+                                {msg.pendingAction.title || "Staged Operation"}
+                              </p>
+                              <p className="text-zinc-300 text-[11px] leading-relaxed">
+                                {msg.pendingAction.summary}
+                              </p>
+
+                              {/* Details breakdown */}
+                              {msg.pendingAction.payload && (
+                                <div className="mt-2 p-2 rounded bg-zinc-900/80 border border-zinc-800 text-[11px] space-y-1 font-mono">
+                                  {msg.pendingAction.payload.productName && (
+                                    <div className="text-zinc-300 flex justify-between">
+                                      <span className="text-zinc-500 font-sans">Item:</span>
+                                      <span className="font-medium text-white">
+                                        {msg.pendingAction.payload.productName}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {msg.pendingAction.payload.sku && (
+                                    <div className="text-zinc-300 flex justify-between">
+                                      <span className="text-zinc-500 font-sans">SKU:</span>
+                                      <span className="text-amber-300">
+                                        {msg.pendingAction.payload.sku}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {msg.pendingAction.payload.quantityDelta && (
+                                    <div className="text-zinc-300 flex justify-between">
+                                      <span className="text-zinc-500 font-sans">Adjustment:</span>
+                                      <span className="text-emerald-400 font-bold">
+                                        +{msg.pendingAction.payload.quantityDelta} units
+                                      </span>
+                                    </div>
+                                  )}
+                                  {msg.pendingAction.payload.updates && (
+                                    <div className="text-zinc-300">
+                                      <span className="text-zinc-500 font-sans block mb-0.5">
+                                        Requested Updates:
+                                      </span>
+                                      <div className="pl-2 border-l border-zinc-700 space-y-0.5">
+                                        {Object.entries(msg.pendingAction.payload.updates).map(
+                                          ([k, v]) => (
+                                            <div key={k} className="flex justify-between">
+                                              <span className="text-zinc-400">{k}:</span>
+                                              <span className="text-indigo-300">{String(v)}</span>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
 
-                            {msg.pendingAction.status === "PENDING" && (
+                            {(msg.pendingAction.status === "PENDING" ||
+                              msg.pendingAction.status === "PENDING_CONFIRMATION") && (
                               <div className="mt-2 pt-2 border-t border-amber-500/20 flex gap-2">
                                 <button
                                   onClick={() => handleApproveAction(msg.pendingAction.id, index)}
                                   disabled={actionLoading === msg.pendingAction.id}
-                                  className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium text-[11px] transition-colors shadow-sm"
+                                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer"
                                 >
                                   {actionLoading === msg.pendingAction.id ? (
-                                    <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                   ) : (
                                     <>
-                                      <Check className="h-3.5 w-3.5" />
-                                      <span>Approve & Execute</span>
+                                      <Check className="h-4 w-4" />
+                                      <span>Confirm & Proceed</span>
                                     </>
                                   )}
                                 </button>
                                 <button
                                   onClick={() => handleRejectAction(msg.pendingAction.id, index)}
                                   disabled={actionLoading === msg.pendingAction.id}
-                                  className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 rounded-md bg-zinc-800 hover:bg-rose-900/60 hover:text-rose-300 disabled:opacity-50 text-zinc-300 font-medium text-[11px] transition-colors border border-zinc-700"
+                                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-md bg-zinc-800 hover:bg-rose-950 hover:border-rose-700/50 hover:text-rose-300 disabled:opacity-50 text-zinc-300 font-medium text-xs transition-colors border border-zinc-700 cursor-pointer"
                                 >
-                                  <X className="h-3.5 w-3.5" />
-                                  <span>Reject</span>
+                                  <X className="h-4 w-4" />
+                                  <span>Decline</span>
                                 </button>
                               </div>
                             )}
 
                             {msg.pendingAction.status === "APPROVED" && (
-                              <div className="mt-1 text-[10px] text-emerald-400 flex items-center gap-1">
-                                <Check className="h-3 w-3" />
-                                <span>Action verified and executed successfully.</span>
+                              <div className="mt-2 pt-2 border-t border-emerald-500/20 text-xs text-emerald-400 flex items-center gap-1.5 font-medium">
+                                <Check className="h-4 w-4 text-emerald-400" />
+                                <span>Confirmed & executed successfully!</span>
                               </div>
                             )}
 
                             {msg.pendingAction.status === "REJECTED" && (
-                              <div className="mt-1 text-[10px] text-rose-400 flex items-center gap-1">
-                                <X className="h-3 w-3" />
-                                <span>Action cancelled. No changes were made.</span>
+                              <div className="mt-2 pt-2 border-t border-rose-500/20 text-xs text-rose-400 flex items-center gap-1.5 font-medium">
+                                <X className="h-4 w-4 text-rose-400" />
+                                <span>Operation declined. No changes were made.</span>
                               </div>
                             )}
                           </div>
@@ -392,43 +462,6 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
                                 {tool}()
                               </span>
                             ))}
-                          </div>
-                        )}
-
-                        {/* Sources Citations */}
-                        {msg.sources && msg.sources.length > 0 && (
-                          <div className="mt-2.5 pt-2 border-t border-zinc-800/80">
-                            <p className="text-[10px] font-semibold text-zinc-400 mb-1 flex items-center gap-1">
-                              <BookOpen className="h-3 w-3 text-indigo-400" />
-                              Sources ({msg.sources.length})
-                            </p>
-                            <div className="space-y-1">
-                              {msg.sources.map((src, sIdx) => {
-                                const isExp = expandedSources[`${index}-${sIdx}`];
-                                return (
-                                  <div
-                                    key={sIdx}
-                                    className="rounded bg-zinc-950 border border-zinc-800 p-1.5 text-[11px]"
-                                  >
-                                    <div
-                                      onClick={() => toggleSourceExpand(index, sIdx)}
-                                      className="flex items-center justify-between cursor-pointer font-medium text-zinc-300 hover:text-indigo-400"
-                                    >
-                                      <span className="truncate flex items-center gap-1">
-                                        <FileText className="h-3 w-3 text-zinc-400 shrink-0" />
-                                        {src.document} (p. {src.page})
-                                      </span>
-                                      {isExp ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                    </div>
-                                    {isExp && src.snippet && (
-                                      <p className="mt-1 pt-1 border-t border-zinc-800 text-[10px] text-zinc-400 italic">
-                                        "{src.snippet}"
-                                      </p>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
                           </div>
                         )}
                       </div>

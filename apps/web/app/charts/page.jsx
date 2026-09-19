@@ -163,7 +163,8 @@ export default function ChartsPage() {
       setCharts((prev) => [created, ...prev]);
       setBuilderOpen(false);
     } catch (err) {
-      alert(`Could not create chart: ${err.message}`);
+      console.error("Could not create chart:", err);
+      setError(`Could not create chart: ${err.message}`);
     } finally {
       setCreating(false);
     }
@@ -184,7 +185,8 @@ export default function ChartsPage() {
       setDeleteModalOpen(false);
       setChartToDelete(null);
     } catch (err) {
-      alert(`Could not delete chart: ${err.message}`);
+      console.error("Could not delete chart:", err);
+      setError(`Could not delete chart: ${err.message}`);
     } finally {
       setDeleting(false);
     }
@@ -577,7 +579,7 @@ export default function ChartsPage() {
                 </div>
 
                 <p className="text-xs text-zinc-300 leading-relaxed">
-                  Are you sure you want to delete <strong className="text-white">"{chartToDelete.title}"</strong>? This visual will be removed from your dashboard.
+                  Are you sure you want to delete <strong className="text-white">&ldquo;{chartToDelete.title}&rdquo;</strong>? This visual will be removed from your dashboard.
                 </p>
 
                 <div className="flex justify-end gap-2 pt-2">

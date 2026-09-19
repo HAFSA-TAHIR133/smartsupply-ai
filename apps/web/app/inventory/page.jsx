@@ -175,7 +175,8 @@ export default function InventoryPage() {
       setDeleteDialogOpen(false);
       setProductToDelete(null);
     } catch (err) {
-      alert(`Delete failed: ${err.message}`);
+      console.error("Delete failed:", err);
+      setFormError(`Delete failed: ${err.message}`);
     } finally {
       setDeleteLoading(false);
     }

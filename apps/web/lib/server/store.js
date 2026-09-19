@@ -1,3 +1,4 @@
+import "./env.js";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -531,19 +532,18 @@ export const storeAdapter = {
   async getProducts(context, filters = {}) {
     let list = [];
     if (!context.isDemo && process.env.DATABASE_URL) {
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        return [];
+      }
       try {
-        list = await neonDb.getProductsFromDb(context.user?.tenantId);
+        list = await neonDb.getProductsFromDb(context.user.tenantId);
       } catch (err) {
-        console.error("Neon getProducts error, falling back to local:", err.message);
-        const db = getLiveDb();
-        list = (db.products || []).filter((p) => p.tenantId === context.user?.tenantId);
+        console.error("Neon getProducts error:", err.message);
+        throw err;
       }
     } else {
-      const db = context.isDemo ? getDemoDb() : getLiveDb();
+      const db = getDemoDb();
       list = db.products || [];
-      if (!context.isDemo && context.user?.tenantId) {
-        list = list.filter((p) => p.tenantId === context.user.tenantId);
-      }
     }
 
     if (filters.category && filters.category !== "ALL") {
@@ -598,12 +598,10 @@ export const storeAdapter = {
 
   async getProductById(context, id) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const item = await neonDb.getProductByIdFromDb(id, context.user?.tenantId);
-        if (item) return { ...item, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon getProductById error:", err.message);
-      }
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) return null;
+      const item = await neonDb.getProductByIdFromDb(id, context.user.tenantId);
+      if (item) return { ...item, _executionMode: "LIVE" };
+      return null;
     }
     const products = await this.getProducts(context);
     return products.find((p) => p.id === id) || null;
@@ -611,20 +609,19 @@ export const storeAdapter = {
 
   async createProduct(context, payload) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const item = await neonDb.createProductInDb(context.user?.tenantId, payload);
-        return { ...item, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon createProduct error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required for live product creation");
       }
+      const item = await neonDb.createProductInDb(context.user.tenantId, payload);
+      return { ...item, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+    const db = getDemoDb();
     const newProduct = {
-      id: `prod-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      tenantId: context.user?.tenantId || "demo-tenant-id",
+      id: `prod-demo-${Date.now()}`,
+      tenantId: "demo-tenant-id",
       name: payload.name,
-      sku: payload.sku,
+      sku: payload.sku || `SKU-${Date.now().toString().slice(-6)}`,
       category: payload.category || "General",
       unitPrice: Number(payload.unitPrice ?? payload.unit_price ?? 0),
       quantity: Number(payload.quantity ?? payload.current_stock ?? 0),
@@ -648,44 +645,37 @@ export const storeAdapter = {
         quantityDelta: newProduct.quantity,
         previousQuantity: 0,
         newQuantity: newProduct.quantity,
-        reason: "Initial inventory setup",
-        executedBy: context.user?.name || "User",
+        reason: "Initial stock intake (Demo)",
+        executedBy: "Alex Reynolds",
         createdAt: new Date().toISOString(),
       });
     }
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
+    saveDemoDb();
 
     return {
       ...newProduct,
       unit_price: newProduct.unitPrice,
       current_stock: newProduct.quantity,
       min_stock_threshold: newProduct.reorderPoint,
-      _executionMode: context.mode,
+      _executionMode: "DEMO",
     };
   },
 
   async updateProduct(context, id, payload) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const updated = await neonDb.updateProductInDb(id, context.user?.tenantId, payload);
-        if (updated) return { ...updated, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon updateProduct error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
       }
+      const updated = await neonDb.updateProductInDb(id, context.user.tenantId, payload);
+      if (!updated) throw new Error(`Product ${id} not found.`);
+      return { ...updated, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
-    const item = (db.products || []).find(
-      (p) => p.id === id && (context.isDemo || p.tenantId === context.user?.tenantId)
-    );
-
+    const db = getDemoDb();
+    const item = (db.products || []).find((p) => p.id === id);
     if (!item) {
-      throw new Error(`Product ${id} not found in ${context.mode} mode.`);
+      throw new Error(`Product ${id} not found in Demo sandbox.`);
     }
 
     if (payload.name !== undefined) item.name = payload.name;
@@ -703,78 +693,61 @@ export const storeAdapter = {
     if (payload.description !== undefined) item.description = payload.description;
     item.updatedAt = new Date().toISOString();
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
+    saveDemoDb();
 
     return {
       ...item,
       unit_price: item.unitPrice,
       current_stock: item.quantity,
       min_stock_threshold: item.reorderPoint,
-      _executionMode: context.mode,
+      _executionMode: "DEMO",
     };
   },
 
   async deleteProduct(context, id) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const ok = await neonDb.deleteProductFromDb(id, context.user?.tenantId);
-        return { success: ok, deletedId: id, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon deleteProduct error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
       }
+      const ok = await neonDb.deleteProductFromDb(id, context.user.tenantId);
+      return { success: ok, deletedId: id, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
-    const index = (db.products || []).findIndex(
-      (p) => p.id === id && (context.isDemo || p.tenantId === context.user?.tenantId)
-    );
-
+    const db = getDemoDb();
+    const index = (db.products || []).findIndex((p) => p.id === id);
     if (index === -1) {
-      throw new Error(`Product ${id} not found in ${context.mode} mode.`);
+      throw new Error(`Product ${id} not found in Demo sandbox.`);
     }
 
     const removed = db.products.splice(index, 1)[0];
-
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
+    saveDemoDb();
 
     return {
       success: true,
       deletedId: id,
       deletedProduct: removed,
-      _executionMode: context.mode,
+      _executionMode: "DEMO",
     };
   },
 
   async adjustStock(context, id, { changeType, quantityDelta, reason }) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const updated = await neonDb.adjustStockInDb(id, context.user?.tenantId, {
-          type: changeType,
-          quantity: quantityDelta,
-          reason,
-          executedBy: context.user?.name || "Admin User",
-        });
-        return { product: updated, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon adjustStock error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
       }
+      const updated = await neonDb.adjustStockInDb(id, context.user.tenantId, {
+        type: changeType,
+        quantity: quantityDelta,
+        reason,
+        executedBy: context.user?.name || "Admin User",
+      });
+      return { product: updated, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
-    const item = (db.products || []).find(
-      (p) => p.id === id && (context.isDemo || p.tenantId === context.user?.tenantId)
-    );
-
+    const db = getDemoDb();
+    const item = (db.products || []).find((p) => p.id === id);
     if (!item) {
-      throw new Error(`Product ${id} not found in ${context.mode} mode.`);
+      throw new Error(`Product ${id} not found in Demo sandbox.`);
     }
 
     const prevQty = Number(item.quantity || 0);
@@ -806,11 +779,7 @@ export const storeAdapter = {
     };
     db.stockLogs.unshift(logEntry);
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
+    saveDemoDb();
 
     return {
       product: {
@@ -818,21 +787,19 @@ export const storeAdapter = {
         unit_price: item.unitPrice,
         current_stock: item.quantity,
         min_stock_threshold: item.reorderPoint,
+        _executionMode: "DEMO",
       },
       log: logEntry,
-      _executionMode: context.mode,
+      _executionMode: "DEMO",
     };
   },
 
   async getStockHistory(context, productId) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        return await neonDb.getStockLogsFromDb(productId, context.user?.tenantId);
-      } catch (err) {
-        console.error("Neon getStockHistory error:", err.message);
-      }
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) return [];
+      return await neonDb.getStockLogsFromDb(productId, context.user.tenantId);
     }
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+    const db = getDemoDb();
     const logs = db.stockLogs || [];
     if (!productId) return logs;
     return logs.filter((l) => l.productId === productId);
@@ -841,42 +808,35 @@ export const storeAdapter = {
   // --- CRM LEADS ---
   async getLeads(context) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const list = await neonDb.getLeadsFromDb(context.user?.tenantId);
-        return list.map((l) => ({ ...l, _executionMode: "LIVE" }));
-      } catch (err) {
-        console.error("Neon getLeads error, falling back to local:", err.message);
-      }
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) return [];
+      const list = await neonDb.getLeadsFromDb(context.user.tenantId);
+      return list.map((l) => ({ ...l, _executionMode: "LIVE" }));
     }
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+    const db = getDemoDb();
     let leads = db.leads || [];
-    if (!context.isDemo && context.user?.tenantId) {
-      leads = leads.filter((l) => l.tenantId === context.user.tenantId);
-    }
-    return leads.map((l) => ({ ...l, _executionMode: context.mode }));
+    return leads.map((l) => ({ ...l, _executionMode: "DEMO" }));
   },
 
   async createLead(context, payload) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const lead = await neonDb.createLeadInDb(context.user?.tenantId, payload);
-        return { ...lead, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon createLead error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required for live lead creation");
       }
+      const lead = await neonDb.createLeadInDb(context.user.tenantId, payload);
+      return { ...lead, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+    const db = getDemoDb();
     const newLead = {
-      id: `lead-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      tenantId: context.user?.tenantId || "demo-tenant-id",
-      title: payload.title,
-      companyName: payload.company_name || payload.companyName || "",
-      contactName: payload.contact_name || payload.contactName || "",
-      contactEmail: payload.contact_email || payload.contactEmail || "",
-      contactPhone: payload.contact_phone || payload.contactPhone || "",
+      id: `lead-demo-${Date.now()}`,
+      tenantId: "demo-tenant-id",
+      title: payload.title || payload.name || "New Prospect",
+      companyName: payload.company_name || payload.companyName || payload.company || "",
+      contactName: payload.contact_name || payload.contactName || payload.name || "",
+      contactEmail: payload.contact_email || payload.contactEmail || payload.email || "",
+      contactPhone: payload.contact_phone || payload.contactPhone || payload.phone || "",
       value: Number(payload.value || 0),
-      stage: payload.stage || "New",
+      stage: payload.stage || payload.status || "New",
       priority: payload.priority || "MEDIUM",
       notes: payload.notes || "",
       createdAt: new Date().toISOString(),
@@ -885,33 +845,25 @@ export const storeAdapter = {
 
     if (!db.leads) db.leads = [];
     db.leads.unshift(newLead);
+    saveDemoDb();
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
-
-    return { ...newLead, _executionMode: context.mode };
+    return { ...newLead, _executionMode: "DEMO" };
   },
 
   async updateLead(context, id, payload) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const updated = await neonDb.updateLeadInDb(id, context.user?.tenantId, payload);
-        if (updated) return { ...updated, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon updateLead error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
       }
+      const updated = await neonDb.updateLeadInDb(id, context.user.tenantId, payload);
+      if (!updated) throw new Error(`Lead ${id} not found.`);
+      return { ...updated, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
-    const item = (db.leads || []).find(
-      (l) => l.id === id && (context.isDemo || l.tenantId === context.user?.tenantId)
-    );
-
+    const db = getDemoDb();
+    const item = (db.leads || []).find((l) => l.id === id);
     if (!item) {
-      throw new Error(`Lead ${id} not found in ${context.mode} mode.`);
+      throw new Error(`Lead ${id} not found in Demo sandbox.`);
     }
 
     if (payload.title !== undefined) item.title = payload.title;
@@ -928,173 +880,138 @@ export const storeAdapter = {
       item.contactPhone = payload.contactPhone ?? payload.contact_phone;
     }
     if (payload.value !== undefined) item.value = Number(payload.value);
-    if (payload.stage !== undefined) item.stage = payload.stage;
+    if (payload.stage !== undefined || payload.status !== undefined) {
+      item.stage = payload.stage || payload.status;
+    }
     if (payload.priority !== undefined) item.priority = payload.priority;
     if (payload.notes !== undefined) item.notes = payload.notes;
     item.updatedAt = new Date().toISOString();
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
+    saveDemoDb();
 
-    return { ...item, _executionMode: context.mode };
+    return { ...item, _executionMode: "DEMO" };
   },
 
   async deleteLead(context, id) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const ok = await neonDb.deleteLeadFromDb(id, context.user?.tenantId);
-        return { success: ok, deletedId: id, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon deleteLead error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
       }
+      const ok = await neonDb.deleteLeadFromDb(id, context.user.tenantId);
+      return { success: ok, deletedId: id, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
-    const index = (db.leads || []).findIndex(
-      (l) => l.id === id && (context.isDemo || l.tenantId === context.user?.tenantId)
-    );
-
+    const db = getDemoDb();
+    const index = (db.leads || []).findIndex((l) => l.id === id);
     if (index === -1) {
-      throw new Error(`Lead ${id} not found in ${context.mode} mode.`);
+      throw new Error(`Lead ${id} not found in Demo sandbox.`);
     }
 
     const removed = db.leads.splice(index, 1)[0];
+    saveDemoDb();
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
-
-    return { success: true, deletedId: id, deletedLead: removed, _executionMode: context.mode };
+    return { success: true, deletedId: id, deletedLead: removed, _executionMode: "DEMO" };
   },
 
   // --- CRM TASKS ---
   async getTasks(context) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const list = await neonDb.getTasksFromDb(context.user?.tenantId);
-        return list.map((t) => ({ ...t, _executionMode: "LIVE" }));
-      } catch (err) {
-        console.error("Neon getTasks error, falling back to local:", err.message);
-      }
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) return [];
+      const list = await neonDb.getTasksFromDb(context.user.tenantId);
+      return list.map((t) => ({ ...t, _executionMode: "LIVE" }));
     }
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+    const db = getDemoDb();
     let tasks = db.tasks || [];
-    if (!context.isDemo && context.user?.tenantId) {
-      tasks = tasks.filter((t) => t.tenantId === context.user.tenantId);
-    }
-    return tasks.map((t) => ({ ...t, _executionMode: context.mode }));
+    return tasks.map((t) => ({ ...t, _executionMode: "DEMO" }));
   },
 
   async createTask(context, payload) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const task = await neonDb.createTaskInDb(context.user?.tenantId, payload);
-        return { ...task, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon createTask error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required for live task creation");
       }
+      const task = await neonDb.createTaskInDb(context.user.tenantId, payload);
+      return { ...task, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+    const db = getDemoDb();
     const newTask = {
-      id: `task-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      tenantId: context.user?.tenantId || "demo-tenant-id",
-      title: payload.title,
-      dueDate: payload.due_date || payload.dueDate || new Date().toISOString().split("T")[0],
-      priority: payload.priority || "MEDIUM",
-      status: payload.status || "PENDING",
+      id: `task-demo-${Date.now()}`,
+      tenantId: "demo-tenant-id",
+      title: payload.title || "New Task",
+      description: payload.description || "",
+      status: (payload.status || "PENDING").toUpperCase(),
+      priority: (payload.priority || "MEDIUM").toUpperCase(),
+      dueDate: payload.dueDate || payload.due_date || new Date().toISOString().split("T")[0],
+      due_date: payload.dueDate || payload.due_date || new Date().toISOString().split("T")[0],
+      assignedTo: payload.assignedTo || "Alex Reynolds",
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     if (!db.tasks) db.tasks = [];
     db.tasks.unshift(newTask);
+    saveDemoDb();
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
-
-    return { ...newTask, _executionMode: context.mode };
+    return { ...newTask, _executionMode: "DEMO" };
   },
 
   async updateTask(context, id, payload) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const updated = await neonDb.updateTaskInDb(id, context.user?.tenantId, payload);
-        if (updated) return { ...updated, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon updateTask error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
       }
+      const updated = await neonDb.updateTaskInDb(id, context.user.tenantId, payload);
+      if (!updated) throw new Error(`Task ${id} not found.`);
+      return { ...updated, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
-    const item = (db.tasks || []).find(
-      (t) => t.id === id && (context.isDemo || t.tenantId === context.user?.tenantId)
-    );
-
+    const db = getDemoDb();
+    const item = (db.tasks || []).find((t) => t.id === id);
     if (!item) {
-      throw new Error(`Task ${id} not found in ${context.mode} mode.`);
+      throw new Error(`Task ${id} not found in Demo sandbox.`);
     }
 
     if (payload.title !== undefined) item.title = payload.title;
+    if (payload.description !== undefined) item.description = payload.description;
+    if (payload.status !== undefined) item.status = payload.status.toUpperCase();
+    if (payload.priority !== undefined) item.priority = payload.priority.toUpperCase();
     if (payload.dueDate !== undefined || payload.due_date !== undefined) {
-      item.dueDate = payload.dueDate ?? payload.due_date;
+      const d = payload.dueDate || payload.due_date;
+      item.dueDate = d;
+      item.due_date = d;
     }
-    if (payload.priority !== undefined) item.priority = payload.priority;
-    if (payload.status !== undefined) item.status = payload.status;
+    item.updatedAt = new Date().toISOString();
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
+    saveDemoDb();
 
-    return { ...item, _executionMode: context.mode };
+    return { ...item, _executionMode: "DEMO" };
   },
 
   async deleteTask(context, id) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const ok = await neonDb.deleteTaskFromDb(id, context.user?.tenantId);
-        return { success: ok, deletedId: id, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon deleteTask error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
       }
+      const ok = await neonDb.deleteTaskFromDb(id, context.user.tenantId);
+      return { success: ok, deletedId: id, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
-    const index = (db.tasks || []).findIndex(
-      (t) => t.id === id && (context.isDemo || t.tenantId === context.user?.tenantId)
-    );
-
+    const db = getDemoDb();
+    const index = (db.tasks || []).findIndex((t) => t.id === id);
     if (index === -1) {
-      throw new Error(`Task ${id} not found in ${context.mode} mode.`);
+      throw new Error(`Task ${id} not found in Demo sandbox.`);
     }
 
     const removed = db.tasks.splice(index, 1)[0];
+    saveDemoDb();
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
-
-    return { success: true, deletedId: id, deletedTask: removed, _executionMode: context.mode };
+    return { success: true, deletedId: id, deletedTask: removed, _executionMode: "DEMO" };
   },
 
   getCustomers(context) {
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
-    let custs = db.customers || [];
-    if (!context.isDemo && context.user?.tenantId) {
-      custs = custs.filter((c) => c.tenantId === context.user.tenantId);
-    }
-    return custs;
+    const db = getDemoDb();
+    return db.customers || [];
   },
 
   // --- DASHBOARD & ANALYTICS ---
@@ -1227,88 +1144,74 @@ export const storeAdapter = {
   // --- CHARTS ---
   async getCharts(context) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const list = await neonDb.getChartsFromDb(context.user?.tenantId);
-        return list.map((c) => ({ ...c, _executionMode: "LIVE" }));
-      } catch (err) {
-        console.error("Neon getCharts error, falling back to local:", err.message);
-      }
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) return [];
+      const list = await neonDb.getChartsFromDb(context.user.tenantId);
+      return list.map((c) => ({ ...c, _executionMode: "LIVE" }));
     }
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+    const db = getDemoDb();
     let charts = db.charts || [];
-    if (!context.isDemo && context.user?.tenantId) {
-      charts = charts.filter((c) => c.tenantId === context.user.tenantId);
-    }
-    return charts.map((c) => ({ ...c, _executionMode: context.mode }));
+    return charts.map((c) => ({ ...c, _executionMode: "DEMO" }));
   },
 
   async createChart(context, payload) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const chart = await neonDb.createChartInDb(context.user?.tenantId, context.user?.id, payload);
-        return { ...chart, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon createChart error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required for live chart creation");
       }
+      const chart = await neonDb.createChartInDb(context.user.tenantId, context.user.id, payload);
+      return { ...chart, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+    const db = getDemoDb();
     const newChart = {
-      id: `chart-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      tenantId: context.user?.tenantId || "demo-tenant-id",
+      id: `chart-demo-${Date.now()}`,
+      tenantId: "demo-tenant-id",
       title: payload.title || "Custom Analytics Chart",
-      chartType: payload.chartType || payload.chart_type || "bar",
-      metric: payload.metric || "inventory_stock",
-      timeframe: payload.timeframe || "CURRENT",
-      data: payload.data || [],
+      type: payload.chartType || payload.type || "bar",
+      config: payload.config || {
+        chartType: payload.chartType || payload.type || "bar",
+        metric: payload.metric || "inventory_stock",
+        timeframe: payload.timeframe || "CURRENT",
+        data: payload.data || [],
+      },
       createdAt: new Date().toISOString(),
     };
 
     if (!db.charts) db.charts = [];
     db.charts.unshift(newChart);
+    saveDemoDb();
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
-
-    return { ...newChart, _executionMode: context.mode };
+    return { ...newChart, _executionMode: "DEMO" };
   },
 
   async deleteChart(context, id) {
     if (!context.isDemo && process.env.DATABASE_URL) {
-      try {
-        const ok = await neonDb.deleteChartFromDb(id, context.user?.tenantId);
-        return { success: ok, deletedId: id, _executionMode: "LIVE" };
-      } catch (err) {
-        console.error("Neon deleteChart error, falling back to local:", err.message);
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
       }
+      const ok = await neonDb.deleteChartFromDb(id, context.user.tenantId);
+      return { success: ok, deletedId: id, _executionMode: "LIVE" };
     }
 
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
-    const index = (db.charts || []).findIndex(
-      (c) => c.id === id && (context.isDemo || c.tenantId === context.user?.tenantId)
-    );
-
+    const db = getDemoDb();
+    const index = (db.charts || []).findIndex((c) => c.id === id);
     if (index === -1) {
-      throw new Error(`Chart ${id} not found in ${context.mode} mode.`);
+      throw new Error(`Chart ${id} not found in Demo sandbox.`);
     }
 
     const removed = db.charts.splice(index, 1)[0];
+    saveDemoDb();
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
-
-    return { success: true, deletedId: id, deletedChart: removed, _executionMode: context.mode };
+    return { success: true, deletedId: id, deletedChart: removed, _executionMode: "DEMO" };
   },
 
   // --- CONVERSATIONS & CHAT ---
-  getConversations(context) {
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+  async getConversations(context) {
+    if (!context.isDemo && process.env.DATABASE_URL) {
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) return [];
+      return await neonDb.getConversationsFromDb(context.user.tenantId);
+    }
+    const db = getDemoDb();
     let convs = db.conversations || [];
     return convs.map((c) => ({
       id: c.id,
@@ -1316,12 +1219,18 @@ export const storeAdapter = {
       agentId: c.agentId,
       createdAt: c.createdAt,
       messageCount: (c.messages || []).length,
-      _executionMode: context.mode,
+      _executionMode: "DEMO",
     }));
   },
 
-  getConversationMessages(context, convId) {
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+  async getConversationMessages(context, convId) {
+    if (!context.isDemo && process.env.DATABASE_URL) {
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        return { id: convId, messages: [] };
+      }
+      return await neonDb.getConversationMessagesFromDb(convId, context.user.tenantId);
+    }
+    const db = getDemoDb();
     const conv = (db.conversations || []).find((c) => c.id === convId);
     if (!conv) {
       return { id: convId, messages: [] };
@@ -1331,32 +1240,47 @@ export const storeAdapter = {
       title: conv.title,
       agentId: conv.agentId,
       messages: conv.messages || [],
-      _executionMode: context.mode,
+      _executionMode: "DEMO",
     };
   },
 
-  deleteConversation(context, convId) {
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+  async deleteConversation(context, convId) {
+    if (!context.isDemo && process.env.DATABASE_URL) {
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
+      }
+      const ok = await neonDb.deleteConversationFromDb(convId, context.user.tenantId);
+      return { success: ok, deletedId: convId, _executionMode: "LIVE" };
+    }
+    const db = getDemoDb();
     const index = (db.conversations || []).findIndex((c) => c.id === convId);
     if (index === -1) {
       return { success: false, message: "Conversation not found" };
     }
     db.conversations.splice(index, 1);
+    saveDemoDb();
 
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
-
-    return { success: true, deletedId: convId, _executionMode: context.mode };
+    return { success: true, deletedId: convId, _executionMode: "DEMO" };
   },
 
   // --- HITL PENDING ACTIONS ---
-  createPendingAction(context, { actionType, title, summary, payload }) {
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+  async createPendingAction(context, { actionType, title, summary, payload }) {
+    if (!context.isDemo && process.env.DATABASE_URL) {
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
+      }
+      return await neonDb.createPendingActionInDb(context.user.tenantId, context.user?.id, {
+        actionType,
+        title,
+        summary,
+        payload,
+        targetEntity: { entity: "product", id: payload?.productId },
+      });
+    }
+
+    const db = getDemoDb();
     const newAction = {
-      id: `act-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: `act-demo-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       actionType,
       title,
       summary,
@@ -1364,48 +1288,111 @@ export const storeAdapter = {
       status: "PENDING_CONFIRMATION",
       expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       createdAt: new Date().toISOString(),
-      executionMode: context.mode,
+      executionMode: "DEMO",
     };
 
     if (!db.pendingActions) db.pendingActions = [];
     db.pendingActions.unshift(newAction);
-
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
+    saveDemoDb();
 
     return newAction;
   },
 
-  approvePendingAction(context, actionId) {
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+  async approvePendingAction(context, actionId) {
+    if (!context.isDemo && process.env.DATABASE_URL) {
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
+      }
+      const action = await neonDb.getPendingActionByIdFromDb(actionId, context.user.tenantId);
+      if (!action) {
+        throw new Error(`Pending action ${actionId} not found.`);
+      }
+      if (action.status !== "PENDING_CONFIRMATION" && action.status !== "PENDING") {
+        throw new Error(`Action is already ${action.status}`);
+      }
+
+      let executionResult = null;
+      if (action.actionType === "RESTOCK_PRODUCT" || action.actionType === "ADJUST_STOCK") {
+        const { productId, changeType, quantityDelta, reason } = action.payload;
+        executionResult = await this.adjustStock(context, productId, {
+          changeType: changeType || "IN",
+          quantityDelta: quantityDelta || 25,
+          reason: reason || "HITL Approved Restock (LIVE mode)",
+        });
+      } else if (action.actionType === "EDIT_PRODUCT" || action.actionType === "UPDATE_PRODUCT") {
+        const { productId, updates } = action.payload;
+        executionResult = await this.updateProduct(context, productId, updates || {});
+      } else if (action.actionType === "DELETE_PRODUCT") {
+        const { productId } = action.payload;
+        executionResult = await this.deleteProduct(context, productId);
+      } else if (action.actionType === "EDIT_LEAD" || action.actionType === "UPDATE_LEAD") {
+        const { leadId, updates } = action.payload;
+        executionResult = await this.updateLead(context, leadId, updates || {});
+      } else if (action.actionType === "DELETE_LEAD") {
+        const { leadId } = action.payload;
+        executionResult = await this.deleteLead(context, leadId);
+      } else if (action.actionType === "EDIT_TASK" || action.actionType === "UPDATE_TASK") {
+        const { taskId, updates } = action.payload;
+        executionResult = await this.updateTask(context, taskId, updates || {});
+      } else if (action.actionType === "DELETE_TASK") {
+        const { taskId } = action.payload;
+        executionResult = await this.deleteTask(context, taskId);
+      } else if (action.actionType === "CREATE_CHART") {
+        executionResult = await this.createChart(context, action.payload);
+      } else {
+        executionResult = { executed: true, note: `Processed ${action.actionType}` };
+      }
+
+      await neonDb.updatePendingActionInDb(actionId, context.user.tenantId, "APPROVED", executionResult);
+
+      return {
+        success: true,
+        actionId,
+        status: "APPROVED",
+        executionMode: "LIVE",
+        result: executionResult,
+      };
+    }
+
+    const db = getDemoDb();
     const action = (db.pendingActions || []).find((a) => a.id === actionId);
 
     if (!action) {
       throw new Error(`Pending action ${actionId} not found.`);
     }
 
-    if (action.status !== "PENDING_CONFIRMATION") {
+    if (action.status !== "PENDING_CONFIRMATION" && action.status !== "PENDING") {
       throw new Error(`Action is already ${action.status}`);
     }
 
     let executionResult = null;
-
-    // Execute the action strictly against the current execution mode's data!
     if (action.actionType === "RESTOCK_PRODUCT" || action.actionType === "ADJUST_STOCK") {
       const { productId, changeType, quantityDelta, reason } = action.payload;
-      executionResult = this.adjustStock(context, productId, {
+      executionResult = await this.adjustStock(context, productId, {
         changeType: changeType || "IN",
         quantityDelta: quantityDelta || 25,
-        reason: reason || `HITL Approved Restock (${context.mode} mode)`,
+        reason: reason || "HITL Approved Restock (DEMO mode)",
       });
+    } else if (action.actionType === "EDIT_PRODUCT" || action.actionType === "UPDATE_PRODUCT") {
+      const { productId, updates } = action.payload;
+      executionResult = await this.updateProduct(context, productId, updates || {});
     } else if (action.actionType === "DELETE_PRODUCT") {
       const { productId } = action.payload;
-      executionResult = this.deleteProduct(context, productId);
+      executionResult = await this.deleteProduct(context, productId);
+    } else if (action.actionType === "EDIT_LEAD" || action.actionType === "UPDATE_LEAD") {
+      const { leadId, updates } = action.payload;
+      executionResult = await this.updateLead(context, leadId, updates || {});
+    } else if (action.actionType === "DELETE_LEAD") {
+      const { leadId } = action.payload;
+      executionResult = await this.deleteLead(context, leadId);
+    } else if (action.actionType === "EDIT_TASK" || action.actionType === "UPDATE_TASK") {
+      const { taskId, updates } = action.payload;
+      executionResult = await this.updateTask(context, taskId, updates || {});
+    } else if (action.actionType === "DELETE_TASK") {
+      const { taskId } = action.payload;
+      executionResult = await this.deleteTask(context, taskId);
     } else if (action.actionType === "CREATE_CHART") {
-      executionResult = this.createChart(context, action.payload);
+      executionResult = await this.createChart(context, action.payload);
     } else {
       executionResult = { executed: true, note: `Processed ${action.actionType}` };
     }
@@ -1413,24 +1400,32 @@ export const storeAdapter = {
     action.status = "APPROVED";
     action.approvedAt = new Date().toISOString();
     action.result = executionResult;
-
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
+    saveDemoDb();
 
     return {
       success: true,
       actionId,
       status: "APPROVED",
-      executionMode: context.mode,
+      executionMode: "DEMO",
       result: executionResult,
     };
   },
 
-  rejectPendingAction(context, actionId) {
-    const db = context.isDemo ? getDemoDb() : getLiveDb();
+  async rejectPendingAction(context, actionId) {
+    if (!context.isDemo && process.env.DATABASE_URL) {
+      if (!context.user?.tenantId || !neonDb.isValidUuid(context.user.tenantId)) {
+        throw new Error("Valid tenantId required");
+      }
+      await neonDb.updatePendingActionInDb(actionId, context.user.tenantId, "REJECTED", { rejected: true });
+      return {
+        success: true,
+        actionId,
+        status: "REJECTED",
+        executionMode: "LIVE",
+      };
+    }
+
+    const db = getDemoDb();
     const action = (db.pendingActions || []).find((a) => a.id === actionId);
 
     if (!action) {
@@ -1439,18 +1434,13 @@ export const storeAdapter = {
 
     action.status = "REJECTED";
     action.rejectedAt = new Date().toISOString();
-
-    if (context.isDemo) {
-      saveDemoDb();
-    } else {
-      saveLiveDb();
-    }
+    saveDemoDb();
 
     return {
       success: true,
       actionId,
       status: "REJECTED",
-      executionMode: context.mode,
+      executionMode: "DEMO",
     };
   },
 };

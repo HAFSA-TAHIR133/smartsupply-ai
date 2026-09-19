@@ -219,7 +219,8 @@ export default function CRMPage() {
       setDeleteLeadDialogOpen(false);
       setLeadToDelete(null);
     } catch (err) {
-      alert(`Failed to delete lead: ${err.message}`);
+      console.error("Failed to delete lead:", err);
+      setFormError(`Failed to delete lead: ${err.message}`);
     } finally {
       setDeleteLeadLoading(false);
     }
@@ -287,7 +288,8 @@ export default function CRMPage() {
       setDeleteTaskDialogOpen(false);
       setTaskToDelete(null);
     } catch (err) {
-      alert(`Failed to delete task: ${err.message}`);
+      console.error("Failed to delete task:", err);
+      setFormError(`Failed to delete task: ${err.message}`);
     } finally {
       setDeleteTaskLoading(false);
     }
@@ -713,7 +715,7 @@ export default function CRMPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete lead{" "}
-              <strong className="text-white">"{leadToDelete?.title}"</strong> ($
+              <strong className="text-white">&ldquo;{leadToDelete?.title}&rdquo;</strong> ($
               {Number(leadToDelete?.value || 0).toLocaleString()})? This operation will remove the opportunity from your{" "}
               {isDemo ? "demo sandbox" : "pipeline records"}.
             </AlertDialogDescription>
@@ -744,7 +746,7 @@ export default function CRMPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the follow-up task{" "}
-              <strong className="text-white">"{taskToDelete?.title}"</strong>?
+              <strong className="text-white">&ldquo;{taskToDelete?.title}&rdquo;</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

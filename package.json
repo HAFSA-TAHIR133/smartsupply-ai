@@ -2,6 +2,9 @@
   "name": "smartsupply-ai",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
   "scripts": {
     "dev": "npm run --prefix apps/web dev",
     "build": "npm run --prefix apps/web build",
@@ -13,7 +16,7 @@
     "uuid": "^14.0.2"
   },
   "devDependencies": {
-    "eslint": "^10.11.0",
-    "eslint-config-next": "^16.3.5"
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.0"
   }
 }
