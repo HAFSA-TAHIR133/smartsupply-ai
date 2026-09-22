@@ -478,14 +478,15 @@ let liveDb = null;
 
 export function getDemoDb() {
   if (!demoDb) {
-    demoDb = JSON.parse(JSON.stringify(INITIAL_DEMO_DATA));
+    demoDb = readJson(DEMO_DB_PATH, INITIAL_DEMO_DATA);
   }
   return demoDb;
 }
 
 export function saveDemoDb() {
-  // Demo mode is strictly ephemeral and frontend-focused.
-  // Mutations do NOT persist to backend disk so the original demo state is always preserved.
+  if (demoDb) {
+    writeJson(DEMO_DB_PATH, demoDb);
+  }
 }
 
 export function resetDemoDb() {
@@ -1180,23 +1181,35 @@ export const storeAdapter = {
 
   async getCustomers(context) {
     const isLive = !context.isDemo;
-    const db = isLive ? getLiveDb() : getDemoDb();
-    let customers = db.customers || [];
-    if (isLive && context.user?.tenantId) {
-      customers = customers.filter((c) => c.tenantId === context.user.tenantId);
+    let customers = [];
+    let leads = [];
+
+    if (isLive && neonDb.isNeonConfigured() && context.user?.tenantId && neonDb.isValidUuid(context.user.tenantId)) {
+      try {
+        customers = await neonDb.getCustomersFromDb(context.user.tenantId);
+        leads = await neonDb.getLeadsFromDb(context.user.tenantId);
+      } catch (err) {
+        console.warn("Neon getCustomers error, fallback to local:", err.message);
+      }
     }
 
-    // Also include leads as customer accounts so lead details ALWAYS show in Customers & Accounts view
-    let leads = db.leads || [];
-    if (isLive && context.user?.tenantId) {
-      leads = leads.filter((l) => l.tenantId === context.user.tenantId);
+    if (customers.length === 0 && leads.length === 0) {
+      const db = isLive ? getLiveDb() : getDemoDb();
+      customers = db.customers || [];
+      if (isLive && context.user?.tenantId) {
+        customers = customers.filter((c) => c.tenantId === context.user.tenantId);
+      }
+      leads = db.leads || [];
+      if (isLive && context.user?.tenantId) {
+        leads = leads.filter((l) => l.tenantId === context.user.tenantId);
+      }
     }
 
     const existingNames = new Set(customers.map((c) => (c.name || "").toLowerCase().trim()));
     const leadAccounts = [];
 
     leads.forEach((l, idx) => {
-      const companyOrTitle = l.companyName || l.title || l.name;
+      const companyOrTitle = l.companyName || l.company || l.title || l.name;
       const cleanName = (companyOrTitle || "").toLowerCase().trim();
       if (!existingNames.has(cleanName)) {
         existingNames.add(cleanName);
@@ -1208,9 +1221,9 @@ export const storeAdapter = {
           name: companyOrTitle,
           company: companyOrTitle,
           industry: l.industry || (l.notes ? l.notes.slice(0, 40) : "Logistics / Industrial"),
-          contactName: l.contactName || l.contact_name || "Primary Contact",
-          email: l.contactEmail || l.contact_email || "contact@client.com",
-          phone: l.contactPhone || l.contact_phone || "+1 (555) 019-2831",
+          contactName: l.contactName || l.contact_name || l.name || "Primary Contact",
+          email: l.contactEmail || l.contact_email || l.email || "contact@client.com",
+          phone: l.contactPhone || l.contact_phone || l.phone || "+1 (555) 019-2831",
           status: l.customerStatus || "ACTIVE",
           isActive: l.customerStatus ? l.customerStatus.toUpperCase() === "ACTIVE" : true,
           totalSpend: Number(l.value || 0),
@@ -1232,6 +1245,15 @@ export const storeAdapter = {
 
   async createCustomer(context, payload) {
     const isLive = !context.isDemo;
+    if (isLive && neonDb.isNeonConfigured() && context.user?.tenantId && neonDb.isValidUuid(context.user.tenantId)) {
+      try {
+        const item = await neonDb.createCustomerInDb(context.user.tenantId, payload);
+        if (item) return { ...item, _executionMode: "LIVE" };
+      } catch (err) {
+        console.warn("Neon createCustomer fallback:", err.message);
+      }
+    }
+
     const db = isLive ? getLiveDb() : getDemoDb();
     if (!db.customers) db.customers = [];
 
@@ -1263,6 +1285,15 @@ export const storeAdapter = {
 
   async updateCustomer(context, id, payload) {
     const isLive = !context.isDemo;
+    if (isLive && neonDb.isNeonConfigured() && context.user?.tenantId && neonDb.isValidUuid(context.user.tenantId)) {
+      try {
+        const updated = await neonDb.updateCustomerInDb(id, context.user.tenantId, payload);
+        if (updated) return { ...updated, _executionMode: "LIVE" };
+      } catch (err) {
+        console.warn("Neon updateCustomer fallback:", err.message);
+      }
+    }
+
     const db = isLive ? getLiveDb() : getDemoDb();
     if (!db.customers) db.customers = [];
 
@@ -1334,6 +1365,15 @@ export const storeAdapter = {
 
   async deleteCustomer(context, id) {
     const isLive = !context.isDemo;
+    if (isLive && neonDb.isNeonConfigured() && context.user?.tenantId && neonDb.isValidUuid(context.user.tenantId)) {
+      try {
+        const ok = await neonDb.deleteCustomerFromDb(id, context.user.tenantId);
+        if (ok) return { success: true, deletedId: id, _executionMode: "LIVE" };
+      } catch (err) {
+        console.warn("Neon deleteCustomer fallback:", err.message);
+      }
+    }
+
     const db = isLive ? getLiveDb() : getDemoDb();
     const index = (db.customers || []).findIndex((c) => (!isLive || c.tenantId === context.user?.tenantId) && c.id === id);
     if (index !== -1) {

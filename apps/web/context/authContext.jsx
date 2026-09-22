@@ -95,18 +95,6 @@ export function AuthProvider({ children }) {
           localStorage.setItem("smartsupply_last_active", Date.now().toString());
         }
 
-        // Ephemeral Demo Account:
-        // When the user refreshes the page, restore the original pristine demo account data
-        if (savedDemo) {
-          apiRequest("/demo/reset", { method: "POST" })
-            .then(() => {
-              if (typeof window !== "undefined") {
-                window.dispatchEvent(new CustomEvent("smartsupply:data-updated"));
-              }
-            })
-            .catch(() => {});
-        }
-
         setLoading(false);
         return;
       } catch (e) {

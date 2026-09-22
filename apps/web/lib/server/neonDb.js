@@ -379,14 +379,14 @@ export async function getLeadsFromDb(tenantId) {
   const p = getNeonPool();
   if (!p) return [];
   try {
-    if (tenantId) {
+    if (tenantId && isValidUuid(tenantId)) {
       const res = await p.query(
-        'SELECT * FROM leads WHERE "tenantId"::text = $1 OR tenant_id::text = $1 ORDER BY "createdAt" DESC;',
-        [String(tenantId)]
-      ).catch(() => p.query('SELECT * FROM leads ORDER BY created_at DESC;'));
+        'SELECT * FROM leads WHERE "tenantId" = $1 ORDER BY "createdAt" DESC;',
+        [tenantId]
+      );
       return res.rows.map(normalizeLead);
     }
-    const res = await p.query('SELECT * FROM leads ORDER BY "createdAt" DESC;');
+    const res = await p.query('SELECT * FROM leads ORDER BY "createdAt" DESC LIMIT 100;');
     return res.rows.map(normalizeLead);
   } catch (err) {
     console.warn("Neon getLeadsFromDb error:", err.message);
@@ -405,24 +405,15 @@ export async function createLeadInDb(tenantId, data) {
   const value = Math.max(0, parseFloat(data.value ?? data.amount ?? 0));
   const source = data.source || "Direct";
   const assignedTo = data.assignedTo || "Account Manager";
+  const validTenant = isValidUuid(tenantId) ? tenantId : "3e6c5a8e-f131-4902-8d80-1c9056f858d4";
 
-  try {
-    const res = await p.query(
-      `INSERT INTO leads (id, "tenantId", name, email, company, status, value, source, "assignedTo", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-       RETURNING *;`,
-      [id, tenantId || "default-tenant", name, email, company, status, value, source, assignedTo]
-    );
-    return normalizeLead(res.rows[0]);
-  } catch {
-    const res = await p.query(
-      `INSERT INTO leads (id, tenant_id, name, email, company, status, value, source, assigned_to, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-       RETURNING *;`,
-      [id, tenantId || "default-tenant", name, email, company, status, value, source, assignedTo]
-    );
-    return normalizeLead(res.rows[0]);
-  }
+  const res = await p.query(
+    `INSERT INTO leads (id, "tenantId", name, email, company, status, value, source, "assignedTo", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+     RETURNING *;`,
+    [id, validTenant, name, email, company, status, value, source, assignedTo]
+  );
+  return normalizeLead(res.rows[0]);
 }
 
 export async function updateLeadInDb(id, tenantId, data) {
@@ -430,24 +421,19 @@ export async function updateLeadInDb(id, tenantId, data) {
   if (!p || !id) return null;
   try {
     let existingRes = null;
-    try {
-      existingRes = await p.query(
-        'SELECT * FROM leads WHERE (id::text = $1 OR name ILIKE $1 OR title ILIKE $1) LIMIT 1;',
-        [String(id)]
-      );
-    } catch {
-      existingRes = await p.query(
-        'SELECT * FROM leads WHERE (id::text = $1 OR name ILIKE $1) LIMIT 1;',
-        [String(id)]
-      );
+    if (isValidUuid(id)) {
+      if (isValidUuid(tenantId)) {
+        existingRes = await p.query('SELECT * FROM leads WHERE id = $1 AND "tenantId" = $2 LIMIT 1;', [id, tenantId]);
+      } else {
+        existingRes = await p.query('SELECT * FROM leads WHERE id = $1 LIMIT 1;', [id]);
+      }
     }
-
     if (!existingRes || !existingRes.rows.length) {
-      // Partial name match
-      existingRes = await p.query(
-        'SELECT * FROM leads WHERE name ILIKE $1 OR company ILIKE $1 LIMIT 1;',
-        [`%${id}%`]
-      );
+      if (isValidUuid(tenantId)) {
+        existingRes = await p.query('SELECT * FROM leads WHERE (name ILIKE $1 OR company ILIKE $1) AND "tenantId" = $2 LIMIT 1;', [id, tenantId]);
+      } else {
+        existingRes = await p.query('SELECT * FROM leads WHERE name ILIKE $1 OR company ILIKE $1 LIMIT 1;', [id]);
+      }
     }
 
     if (!existingRes || !existingRes.rows.length) return null;
@@ -461,25 +447,14 @@ export async function updateLeadInDb(id, tenantId, data) {
       ? parseFloat(data.value)
       : (data.amount !== undefined ? parseFloat(data.amount) : existing.value);
 
-    try {
-      const res = await p.query(
-        `UPDATE leads 
-         SET name = $1, email = $2, company = $3, status = $4, value = $5, "updatedAt" = NOW()
-         WHERE id = $6
-         RETURNING *;`,
-        [name, email, company, status, value, existing.id]
-      );
-      return normalizeLead(res.rows[0]);
-    } catch {
-      const res = await p.query(
-        `UPDATE leads 
-         SET name = $1, email = $2, company = $3, status = $4, value = $5, updated_at = NOW()
-         WHERE id = $6
-         RETURNING *;`,
-        [name, email, company, status, value, existing.id]
-      );
-      return normalizeLead(res.rows[0]);
-    }
+    const res = await p.query(
+      `UPDATE leads 
+       SET name = $1, email = $2, company = $3, status = $4, value = $5, "updatedAt" = NOW()
+       WHERE id = $6
+       RETURNING *;`,
+      [name, email, company, status, value, existing.id]
+    );
+    return normalizeLead(res.rows[0]);
   } catch (err) {
     console.warn("Neon updateLeadInDb error:", err.message);
     return null;
@@ -490,14 +465,141 @@ export async function deleteLeadFromDb(id, tenantId) {
   const p = getNeonPool();
   if (!p || !id) return false;
   try {
-    if (tenantId && isValidUuid(tenantId)) {
-      const res = await p.query('DELETE FROM leads WHERE id::text = $1 AND "tenantId" = $2 RETURNING id;', [String(id), tenantId]);
+    if (isValidUuid(id)) {
+      if (isValidUuid(tenantId)) {
+        const res = await p.query('DELETE FROM leads WHERE id = $1 AND "tenantId" = $2 RETURNING id;', [id, tenantId]);
+        return res.rowCount > 0;
+      }
+      const res = await p.query('DELETE FROM leads WHERE id = $1 RETURNING id;', [id]);
       return res.rowCount > 0;
     }
-    const res = await p.query('DELETE FROM leads WHERE id::text = $1 RETURNING id;', [String(id)]);
+    if (isValidUuid(tenantId)) {
+      const res = await p.query('DELETE FROM leads WHERE (name ILIKE $1 OR company ILIKE $1) AND "tenantId" = $2 RETURNING id;', [id, tenantId]);
+      return res.rowCount > 0;
+    }
+    const res = await p.query('DELETE FROM leads WHERE name ILIKE $1 OR company ILIKE $1 RETURNING id;', [id]);
     return res.rowCount > 0;
   } catch (err) {
     console.warn("Neon deleteLeadFromDb error:", err.message);
+    return false;
+  }
+}
+
+// -------------------------------------------------------------
+// CRM CUSTOMERS QUERIES
+// -------------------------------------------------------------
+function normalizeCustomer(c) {
+  if (!c) return null;
+  return {
+    ...c,
+    accountNo: c.accountNo || `C-${(c.id || "").slice(0, 4).toUpperCase()}`,
+    name: c.name || c.company || "Customer Account",
+    company: c.company || c.name || "Customer Company",
+    email: c.email || "contact@client.com",
+    phone: c.phone || "+1 (555) 019-2831",
+    status: (c.status || "ACTIVE").toUpperCase(),
+    isActive: c.status ? c.status.toUpperCase() === "ACTIVE" : true,
+    totalSpend: Number(c.totalSpend || 0),
+    createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString(),
+    updatedAt: c.updatedAt ? new Date(c.updatedAt).toISOString() : new Date().toISOString(),
+  };
+}
+
+export async function getCustomersFromDb(tenantId) {
+  const p = getNeonPool();
+  if (!p) return [];
+  try {
+    if (tenantId && isValidUuid(tenantId)) {
+      const res = await p.query('SELECT * FROM customers WHERE "tenantId" = $1 ORDER BY "createdAt" DESC;', [tenantId]);
+      return res.rows.map(normalizeCustomer);
+    }
+    const res = await p.query('SELECT * FROM customers ORDER BY "createdAt" DESC LIMIT 100;');
+    return res.rows.map(normalizeCustomer);
+  } catch (err) {
+    console.warn("Neon getCustomersFromDb error:", err.message);
+    return [];
+  }
+}
+
+export async function createCustomerInDb(tenantId, data) {
+  const p = getNeonPool();
+  if (!p) throw new Error("Database connection not established");
+  const id = data.id && isValidUuid(data.id) ? data.id : crypto.randomUUID();
+  const validTenant = isValidUuid(tenantId) ? tenantId : "3e6c5a8e-f131-4902-8d80-1c9056f858d4";
+  const name = data.name || data.company || "New Customer";
+  const email = data.email || "contact@client.com";
+  const phone = data.phone || "+1 (555) 019-2831";
+  const company = data.company || data.name || "Commercial Client";
+  const status = (data.status || "ACTIVE").toUpperCase();
+  const totalSpend = Math.max(0, parseFloat(data.totalSpend ?? data.value ?? 0));
+
+  const res = await p.query(
+    `INSERT INTO customers (id, "tenantId", name, email, phone, company, status, "totalSpend", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+     RETURNING *;`,
+    [id, validTenant, name, email, phone, company, status, totalSpend]
+  );
+  return normalizeCustomer(res.rows[0]);
+}
+
+export async function updateCustomerInDb(id, tenantId, data) {
+  const p = getNeonPool();
+  if (!p || !id) return null;
+  try {
+    let existingRes = null;
+    if (isValidUuid(id)) {
+      if (isValidUuid(tenantId)) {
+        existingRes = await p.query('SELECT * FROM customers WHERE id = $1 AND "tenantId" = $2 LIMIT 1;', [id, tenantId]);
+      } else {
+        existingRes = await p.query('SELECT * FROM customers WHERE id = $1 LIMIT 1;', [id]);
+      }
+    }
+    if (!existingRes || !existingRes.rows.length) {
+      if (isValidUuid(tenantId)) {
+        existingRes = await p.query('SELECT * FROM customers WHERE (name ILIKE $1 OR company ILIKE $1) AND "tenantId" = $2 LIMIT 1;', [id, tenantId]);
+      } else {
+        existingRes = await p.query('SELECT * FROM customers WHERE name ILIKE $1 OR company ILIKE $1 LIMIT 1;', [id]);
+      }
+    }
+    if (!existingRes || !existingRes.rows.length) return null;
+    const existing = existingRes.rows[0];
+
+    const name = data.name || existing.name;
+    const email = data.email || existing.email;
+    const phone = data.phone || existing.phone;
+    const company = data.company || existing.company;
+    const status = (data.status !== undefined ? data.status : (data.isActive !== undefined ? (data.isActive ? "ACTIVE" : "INACTIVE") : existing.status)).toUpperCase();
+    const totalSpend = data.totalSpend !== undefined ? parseFloat(data.totalSpend) : existing.totalSpend;
+
+    const res = await p.query(
+      `UPDATE customers
+       SET name = $1, email = $2, phone = $3, company = $4, status = $5, "totalSpend" = $6, "updatedAt" = NOW()
+       WHERE id = $7
+       RETURNING *;`,
+      [name, email, phone, company, status, totalSpend, existing.id]
+    );
+    return normalizeCustomer(res.rows[0]);
+  } catch (err) {
+    console.warn("Neon updateCustomerInDb error:", err.message);
+    return null;
+  }
+}
+
+export async function deleteCustomerFromDb(id, tenantId) {
+  const p = getNeonPool();
+  if (!p || !id) return false;
+  try {
+    if (isValidUuid(id)) {
+      if (isValidUuid(tenantId)) {
+        const res = await p.query('DELETE FROM customers WHERE id = $1 AND "tenantId" = $2 RETURNING id;', [id, tenantId]);
+        return res.rowCount > 0;
+      }
+      const res = await p.query('DELETE FROM customers WHERE id = $1 RETURNING id;', [id]);
+      return res.rowCount > 0;
+    }
+    return false;
+  } catch (err) {
+    console.warn("Neon deleteCustomerFromDb error:", err.message);
     return false;
   }
 }
