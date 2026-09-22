@@ -6,12 +6,12 @@
       "name": "Brushless Motor 24V High-Torque",
       "sku": "MTR-BRSH-024",
       "category": "Machinery",
-      "unitPrice": 185,
-      "quantity": 42,
+      "unitPrice": 299,
+      "quantity": 62,
       "reorderPoint": 15,
       "description": "Industrial grade 24V brushless motor for conveyor assemblies",
-      "createdAt": "2026-09-09T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-09T11:48:03.384Z",
+      "updatedAt": "2026-09-19T11:48:08.787Z"
     },
     {
       "id": "prod-demo-2",
@@ -23,21 +23,8 @@
       "quantity": 6,
       "reorderPoint": 10,
       "description": "High-density energy storage pack with thermal safeguard",
-      "createdAt": "2026-09-11T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
-    },
-    {
-      "id": "prod-demo-3",
-      "tenantId": "demo-tenant-id",
-      "name": "Optoelectronic Sensor 5V",
-      "sku": "SEN-OPTO-005",
-      "category": "Electronics",
-      "unitPrice": 24.5,
-      "quantity": 110,
-      "reorderPoint": 25,
-      "description": "Precision photoelectric proximity beam sensor",
-      "createdAt": "2026-09-14T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-11T11:48:03.384Z",
+      "updatedAt": "2026-09-19T11:48:03.384Z"
     },
     {
       "id": "prod-demo-4",
@@ -49,8 +36,8 @@
       "quantity": 0,
       "reorderPoint": 12,
       "description": "Aerospace grade grade-5 titanium corrosion-resistant fasteners",
-      "createdAt": "2026-09-15T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-15T11:48:03.384Z",
+      "updatedAt": "2026-09-19T11:48:03.384Z"
     },
     {
       "id": "prod-demo-5",
@@ -62,11 +49,25 @@
       "quantity": 18,
       "reorderPoint": 8,
       "description": "High tensile 3K weave structural plate",
-      "createdAt": "2026-09-17T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-17T11:48:03.384Z",
+      "updatedAt": "2026-09-19T11:48:03.384Z"
     }
   ],
   "stockLogs": [
+    {
+      "id": "log-1789818488690",
+      "tenantId": "demo-tenant-id",
+      "productId": "prod-demo-1",
+      "productName": "Brushless Motor 24V High-Torque",
+      "sku": "MTR-BRSH-024",
+      "changeType": "IN",
+      "quantityDelta": 20,
+      "previousQuantity": 42,
+      "newQuantity": 62,
+      "reason": "Restock operation requested via AI Assistant",
+      "executedBy": "Alex Reynolds",
+      "createdAt": "2026-09-19T11:48:08.690Z"
+    },
     {
       "id": "log-demo-1",
       "productId": "prod-demo-1",
@@ -78,7 +79,7 @@
       "newQuantity": 42,
       "reason": "Supplier batch delivery #PO-9812",
       "executedBy": "Alex Reynolds (Demo)",
-      "createdAt": "2026-09-19T05:13:21.295Z"
+      "createdAt": "2026-09-19T06:48:03.384Z"
     },
     {
       "id": "log-demo-2",
@@ -91,7 +92,7 @@
       "newQuantity": 6,
       "reason": "Customer order shipment #ORD-5011",
       "executedBy": "Alex Reynolds (Demo)",
-      "createdAt": "2026-09-18T22:13:21.295Z"
+      "createdAt": "2026-09-18T23:48:03.384Z"
     }
   ],
   "leads": [
@@ -104,12 +105,29 @@
       "contactName": "gdgu bsjd",
       "contactEmail": "contact@gdgubsjd.com",
       "contactPhone": "+1 (555) 019-2834",
-      "value": 30000,
+      "value": 50000,
       "stage": "New",
       "priority": "HIGH",
       "notes": "Equipment and component supply deal",
-      "createdAt": "2026-09-19T08:00:00.000Z",
-      "updatedAt": "2026-09-19T10:49:58.701Z"
+      "createdAt": "2026-09-17T11:48:03.384Z",
+      "updatedAt": "2026-09-19T11:48:03.384Z"
+    },
+    {
+      "id": "lead-live-1",
+      "tenantId": "demo-tenant-id",
+      "title": "National Courier Fleet Automation",
+      "name": "National Courier Fleet Automation",
+      "companyName": "Prime Logistics Group",
+      "contactName": "Arthur Vance",
+      "contactEmail": "avance@primelog.com",
+      "contactPhone": "+1 (555) 234-8800",
+      "value": 120000,
+      "stage": "Contacted",
+      "priority": "HIGH",
+      "notes": "Evaluating linear actuators and servo amplifiers for conveyor line.",
+      "createdAt": "2026-09-16T11:48:03.384Z",
+      "updatedAt": "2026-09-19T11:48:09.386Z",
+      "status": "Contacted"
     },
     {
       "id": "lead-demo-1",
@@ -123,8 +141,8 @@
       "stage": "Qualified",
       "priority": "HIGH",
       "notes": "Urgent need for 24V motors and battery packs before Q4 delivery.",
-      "createdAt": "2026-09-12T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-12T11:48:03.384Z",
+      "updatedAt": "2026-09-19T11:48:03.384Z"
     },
     {
       "id": "lead-demo-2",
@@ -138,8 +156,8 @@
       "stage": "Proposal",
       "priority": "HIGH",
       "notes": "Proposal submitted for 200 high-density 48V battery units.",
-      "createdAt": "2026-09-14T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-14T11:48:03.384Z",
+      "updatedAt": "2026-09-19T11:48:03.384Z"
     },
     {
       "id": "lead-demo-3",
@@ -153,8 +171,8 @@
       "stage": "Contacted",
       "priority": "MEDIUM",
       "notes": "Requested technical specification sheet for optoelectronic sensors.",
-      "createdAt": "2026-09-16T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-16T11:48:03.384Z",
+      "updatedAt": "2026-09-19T11:48:03.384Z"
     },
     {
       "id": "lead-demo-4",
@@ -168,30 +186,54 @@
       "stage": "Won",
       "priority": "HIGH",
       "notes": "Contract signed for annual fastener and motor fulfillment.",
-      "createdAt": "2026-09-07T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-07T11:48:03.384Z",
+      "updatedAt": "2026-09-19T11:48:03.384Z"
     }
   ],
   "customers": [
     {
+      "id": "cust-12",
+      "tenantId": "demo-tenant-id",
+      "accountNo": "12",
+      "name": "Aeropax Industries",
+      "company": "Aeropax Industries",
+      "industry": "Aeropax Industries",
+      "contactName": "Primary Contact",
+      "email": "contact@aeropax.com",
+      "phone": "03001254165",
+      "status": "ACTIVE",
+      "isActive": true,
+      "totalSpend": 95000,
+      "createdAt": "2026-12-01T00:00:00.000Z",
+      "updatedAt": "2026-12-01T00:00:00.000Z"
+    },
+    {
       "id": "cust-demo-1",
       "tenantId": "demo-tenant-id",
+      "accountNo": "101",
       "name": "Apex Heavy Industries",
       "email": "procurement@apexheavy.com",
       "phone": "+1 (555) 609-3382",
       "company": "Apex Heavy Industries",
+      "industry": "Heavy Machinery & Logistics",
       "totalSpend": 210000,
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "isActive": true,
+      "createdAt": "2026-08-15T09:00:00.000Z"
     },
     {
       "id": "cust-demo-2",
       "tenantId": "demo-tenant-id",
+      "accountNo": "102",
       "name": "Vanguard Marine Systems",
       "email": "supplies@vanguard-marine.com",
       "phone": "+1 (555) 881-4412",
       "company": "Vanguard Marine Systems",
+      "industry": "Maritime Navigation",
       "totalSpend": 74500,
-      "status": "ACTIVE"
+      "status": "ACTIVE",
+      "isActive": true,
+      "createdAt": "2026-08-20T10:30:00.000Z"
     }
   ],
   "tasks": [
@@ -202,7 +244,7 @@
       "dueDate": "2026-09-21",
       "priority": "HIGH",
       "status": "PENDING",
-      "createdAt": "2026-09-18T10:13:21.295Z"
+      "createdAt": "2026-09-18T11:48:03.384Z"
     },
     {
       "id": "task-demo-2",
@@ -211,7 +253,7 @@
       "dueDate": "2026-09-20",
       "priority": "HIGH",
       "status": "PENDING",
-      "createdAt": "2026-09-17T10:13:21.295Z"
+      "createdAt": "2026-09-17T11:48:03.384Z"
     },
     {
       "id": "task-demo-3",
@@ -220,7 +262,7 @@
       "dueDate": "2026-09-23",
       "priority": "MEDIUM",
       "status": "COMPLETED",
-      "createdAt": "2026-09-15T10:13:21.295Z"
+      "createdAt": "2026-09-15T11:48:03.384Z"
     }
   ],
   "charts": [
@@ -253,68 +295,540 @@
           "value": 0
         }
       ],
-      "createdAt": "2026-09-16T10:13:21.295Z"
+      "createdAt": "2026-09-16T11:48:03.384Z"
     }
   ],
   "conversations": [
     {
-      "id": "conv-demo-1789814998577",
-      "title": "Update the lead amount of gdgu bsjd from...",
-      "agentId": "agent-crm",
-      "createdAt": "2026-09-19T10:49:58.577Z",
+      "id": "conv-demo-1789818489504",
+      "title": "No",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:09.504Z",
       "messages": [
         {
-          "id": "msg-user-1789814998577",
+          "id": "msg-user-1789818489504",
           "sender": "USER",
-          "content": "Update the lead amount of gdgu bsjd from 50,000 to 30,000",
-          "createdAt": "2026-09-19T10:49:58.577Z"
+          "content": "No",
+          "createdAt": "2026-09-19T11:48:09.504Z"
         },
         {
-          "id": "msg-bot-1789814998577",
+          "id": "msg-bot-1789818489504",
           "sender": "AGENT",
-          "content": "I have prepared the update for lead **gdgu bsjd** (Amount to $30,000).\n\nPlease confirm below and I will immediately save this to the database and update your CRM view.",
+          "content": "Understood. The action \"Move Lead: National Courier Fleet Automation\" was cancelled and no changes were made.",
           "sources": [],
           "toolsUsed": [
-            "crm_lead_updater"
+            "hitl_cancellation_executor"
           ],
-          "executionTimeMs": 25,
+          "executionTimeMs": 1,
+          "requiresConfirmation": false,
+          "pendingAction": {
+            "id": "act-demo-1789818489489-63",
+            "actionType": "EDIT_LEAD",
+            "title": "Move Lead: National Courier Fleet Automation",
+            "summary": "Move lead \"National Courier Fleet Automation\" from Contacted to Proposal",
+            "payload": {
+              "leadId": "lead-live-1",
+              "leadTitle": "National Courier Fleet Automation",
+              "fromStage": "Contacted",
+              "toStage": "Proposal",
+              "updates": {
+                "stage": "Proposal"
+              }
+            },
+            "status": "REJECTED",
+            "expiresAt": "2026-09-19T12:03:09.489Z",
+            "createdAt": "2026-09-19T11:48:09.489Z",
+            "executionMode": "DEMO",
+            "rejectedAt": "2026-09-19T11:48:09.503Z"
+          },
+          "createdAt": "2026-09-19T11:48:09.504Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-1789818489489",
+      "title": "Move National Courier Fleet Automation t...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:09.489Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818489489",
+          "sender": "USER",
+          "content": "Move National Courier Fleet Automation to stage Proposal",
+          "createdAt": "2026-09-19T11:48:09.489Z"
+        },
+        {
+          "id": "msg-bot-1789818489489",
+          "sender": "AGENT",
+          "content": "I found the lead \"National Courier Fleet Automation\". You want to move it from Contacted to Proposal. Shall I proceed?",
+          "sources": [],
+          "toolsUsed": [
+            "crm_lead_stage_router"
+          ],
+          "executionTimeMs": 1,
           "requiresConfirmation": true,
           "pendingAction": {
-            "id": "act-demo-1789814998576-493",
+            "id": "act-demo-1789818489489-63",
             "actionType": "EDIT_LEAD",
-            "title": "Edit Lead: gdgu bsjd",
-            "summary": "Update lead \"gdgu bsjd\": Set Amount to $30,000.",
+            "title": "Move Lead: National Courier Fleet Automation",
+            "summary": "Move lead \"National Courier Fleet Automation\" from Contacted to Proposal",
             "payload": {
-              "leadId": "lead-gdgu-bsjd",
-              "leadTitle": "gdgu bsjd",
+              "leadId": "lead-live-1",
+              "leadTitle": "National Courier Fleet Automation",
+              "fromStage": "Contacted",
+              "toStage": "Proposal",
               "updates": {
-                "value": 30000
+                "stage": "Proposal"
+              }
+            },
+            "status": "REJECTED",
+            "expiresAt": "2026-09-19T12:03:09.489Z",
+            "createdAt": "2026-09-19T11:48:09.489Z",
+            "executionMode": "DEMO",
+            "rejectedAt": "2026-09-19T11:48:09.503Z"
+          },
+          "createdAt": "2026-09-19T11:48:09.489Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-1789818489464",
+      "title": "Please move the National Courier Fleet A...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:09.464Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818489464",
+          "sender": "USER",
+          "content": "Please move the National Courier Fleet Automation to stage Completed",
+          "createdAt": "2026-09-19T11:48:09.464Z"
+        },
+        {
+          "id": "msg-bot-1789818489464",
+          "sender": "AGENT",
+          "content": "\"Completed\" is not a valid CRM stage. Valid stages are: New, Contacted, Qualified, Proposal, Won.",
+          "sources": [],
+          "toolsUsed": [
+            "crm_lead_stage_router"
+          ],
+          "executionTimeMs": 46,
+          "requiresConfirmation": false,
+          "pendingAction": null,
+          "createdAt": "2026-09-19T11:48:09.464Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-1789818489387",
+      "title": "Yes",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:09.387Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818489387",
+          "sender": "USER",
+          "content": "Yes",
+          "createdAt": "2026-09-19T11:48:09.387Z"
+        },
+        {
+          "id": "msg-bot-1789818489387",
+          "sender": "AGENT",
+          "content": "Done. The lead \"National Courier Fleet Automation\" has been moved to Contacted.",
+          "sources": [],
+          "toolsUsed": [
+            "hitl_confirmation_executor"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": false,
+          "pendingAction": {
+            "id": "act-demo-1789818489370-156",
+            "actionType": "EDIT_LEAD",
+            "title": "Move Lead: National Courier Fleet Automation",
+            "summary": "Move lead \"National Courier Fleet Automation\" from Qualified to Contacted",
+            "payload": {
+              "leadId": "lead-live-1",
+              "leadTitle": "National Courier Fleet Automation",
+              "fromStage": "Qualified",
+              "toStage": "Contacted",
+              "updates": {
+                "stage": "Contacted"
               }
             },
             "status": "APPROVED",
-            "expiresAt": "2026-09-19T11:04:58.576Z",
-            "createdAt": "2026-09-19T10:49:58.576Z",
+            "expiresAt": "2026-09-19T12:03:09.370Z",
+            "createdAt": "2026-09-19T11:48:09.370Z",
             "executionMode": "DEMO",
-            "approvedAt": "2026-09-19T10:49:58.702Z",
+            "approvedAt": "2026-09-19T11:48:09.387Z",
             "result": {
-              "id": "lead-gdgu-bsjd",
+              "success": true,
+              "actionId": "act-demo-1789818489370-156",
+              "status": "APPROVED",
+              "executionMode": "DEMO",
+              "result": {
+                "id": "lead-live-1",
+                "tenantId": "demo-tenant-id",
+                "title": "National Courier Fleet Automation",
+                "name": "National Courier Fleet Automation",
+                "companyName": "Prime Logistics Group",
+                "contactName": "Arthur Vance",
+                "contactEmail": "avance@primelog.com",
+                "contactPhone": "+1 (555) 234-8800",
+                "value": 120000,
+                "stage": "Contacted",
+                "priority": "HIGH",
+                "notes": "Evaluating linear actuators and servo amplifiers for conveyor line.",
+                "createdAt": "2026-09-16T11:48:03.384Z",
+                "updatedAt": "2026-09-19T11:48:09.386Z",
+                "status": "Contacted",
+                "_executionMode": "DEMO"
+              }
+            }
+          },
+          "createdAt": "2026-09-19T11:48:09.387Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-1789818489370",
+      "title": "Please move the National Courier Fleet A...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:09.370Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818489370",
+          "sender": "USER",
+          "content": "Please move the National Courier Fleet Automation to stage Contacted",
+          "createdAt": "2026-09-19T11:48:09.370Z"
+        },
+        {
+          "id": "msg-bot-1789818489370",
+          "sender": "AGENT",
+          "content": "I found the lead \"National Courier Fleet Automation\". You want to move it from Qualified to Contacted. Shall I proceed?",
+          "sources": [],
+          "toolsUsed": [
+            "crm_lead_stage_router"
+          ],
+          "executionTimeMs": 2,
+          "requiresConfirmation": true,
+          "pendingAction": {
+            "id": "act-demo-1789818489370-156",
+            "actionType": "EDIT_LEAD",
+            "title": "Move Lead: National Courier Fleet Automation",
+            "summary": "Move lead \"National Courier Fleet Automation\" from Qualified to Contacted",
+            "payload": {
+              "leadId": "lead-live-1",
+              "leadTitle": "National Courier Fleet Automation",
+              "fromStage": "Qualified",
+              "toStage": "Contacted",
+              "updates": {
+                "stage": "Contacted"
+              }
+            },
+            "status": "APPROVED",
+            "expiresAt": "2026-09-19T12:03:09.370Z",
+            "createdAt": "2026-09-19T11:48:09.370Z",
+            "executionMode": "DEMO",
+            "approvedAt": "2026-09-19T11:48:09.387Z",
+            "result": {
+              "id": "lead-live-1",
               "tenantId": "demo-tenant-id",
-              "title": "gdgu bsjd",
-              "name": "gdgu bsjd",
-              "companyName": "gdgu bsjd",
-              "contactName": "gdgu bsjd",
-              "contactEmail": "contact@gdgubsjd.com",
-              "contactPhone": "+1 (555) 019-2834",
-              "value": 30000,
-              "stage": "New",
+              "title": "National Courier Fleet Automation",
+              "name": "National Courier Fleet Automation",
+              "companyName": "Prime Logistics Group",
+              "contactName": "Arthur Vance",
+              "contactEmail": "avance@primelog.com",
+              "contactPhone": "+1 (555) 234-8800",
+              "value": 120000,
+              "stage": "Contacted",
               "priority": "HIGH",
-              "notes": "Equipment and component supply deal",
-              "createdAt": "2026-09-19T08:00:00.000Z",
-              "updatedAt": "2026-09-19T10:49:58.701Z",
+              "notes": "Evaluating linear actuators and servo amplifiers for conveyor line.",
+              "createdAt": "2026-09-16T11:48:03.384Z",
+              "updatedAt": "2026-09-19T11:48:09.386Z",
+              "status": "Contacted",
               "_executionMode": "DEMO"
             }
           },
-          "createdAt": "2026-09-19T10:49:58.577Z"
+          "createdAt": "2026-09-19T11:48:09.370Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-1789818489329",
+      "title": "How can I improve warehouse picking effi...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:09.329Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818489329",
+          "sender": "USER",
+          "content": "How can I improve warehouse picking efficiency?",
+          "createdAt": "2026-09-19T11:48:09.329Z"
+        },
+        {
+          "id": "msg-bot-1789818489329",
+          "sender": "AGENT",
+          "content": "Hello Alex Reynolds! I am your supply chain assistant. You can ask me questions about your stock, leads, or tasks, or instruct me to move leads to new stages, renew stock, edit items, or delete records. I will always ask for your confirmation before making changes. How can I help you today?",
+          "sources": [],
+          "toolsUsed": [],
+          "executionTimeMs": 438,
+          "requiresConfirmation": false,
+          "pendingAction": null,
+          "createdAt": "2026-09-19T11:48:09.329Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-1789818488802",
+      "title": "delete product Optoelectronic Sensor",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:08.802Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818488802",
+          "sender": "USER",
+          "content": "delete product Optoelectronic Sensor",
+          "createdAt": "2026-09-19T11:48:08.802Z"
+        },
+        {
+          "id": "msg-bot-1789818488802",
+          "sender": "AGENT",
+          "content": "I have prepared the request to delete product **Optoelectronic Sensor 5V** (**SEN-OPTO-005**).\n\nBecause this will permanently remove it from inventory, please confirm below before I proceed.",
+          "sources": [],
+          "toolsUsed": [
+            "inventory_sku_deleter"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": true,
+          "pendingAction": {
+            "id": "act-demo-1789818488801-856",
+            "actionType": "DELETE_PRODUCT",
+            "title": "Delete Product: Optoelectronic Sensor 5V",
+            "summary": "Permanently delete product \"Optoelectronic Sensor 5V\" (SEN-OPTO-005) from inventory.",
+            "payload": {
+              "productId": "prod-demo-3",
+              "productName": "Optoelectronic Sensor 5V",
+              "sku": "SEN-OPTO-005"
+            },
+            "status": "APPROVED",
+            "expiresAt": "2026-09-19T12:03:08.801Z",
+            "createdAt": "2026-09-19T11:48:08.801Z",
+            "executionMode": "DEMO",
+            "approvedAt": "2026-09-19T11:48:08.874Z",
+            "result": {
+              "success": true,
+              "deletedId": "prod-demo-3",
+              "deletedProduct": {
+                "id": "prod-demo-3",
+                "tenantId": "demo-tenant-id",
+                "name": "Optoelectronic Sensor 5V",
+                "sku": "SEN-OPTO-005",
+                "category": "Electronics",
+                "unitPrice": 24.5,
+                "quantity": 110,
+                "reorderPoint": 25,
+                "description": "Precision photoelectric proximity beam sensor",
+                "createdAt": "2026-09-14T11:48:03.384Z",
+                "updatedAt": "2026-09-19T11:48:03.384Z"
+              },
+              "_executionMode": "DEMO"
+            }
+          },
+          "createdAt": "2026-09-19T11:48:08.802Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-1789818488771",
+      "title": "edit the price of Brushless Motor to $29...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:08.771Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818488771",
+          "sender": "USER",
+          "content": "edit the price of Brushless Motor to $299",
+          "createdAt": "2026-09-19T11:48:08.771Z"
+        },
+        {
+          "id": "msg-bot-1789818488771",
+          "sender": "AGENT",
+          "content": "I have prepared the update for **Brushless Motor 24V High-Torque** (**MTR-BRSH-024**): unitPrice to 299.\n\nPlease confirm below before I apply the changes.",
+          "sources": [],
+          "toolsUsed": [
+            "inventory_product_updater"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": true,
+          "pendingAction": {
+            "id": "act-demo-1789818488770-22",
+            "actionType": "EDIT_PRODUCT",
+            "title": "Edit Product: Brushless Motor 24V High-Torque",
+            "summary": "Update Brushless Motor 24V High-Torque (MTR-BRSH-024): Set unitPrice to 299.",
+            "payload": {
+              "productId": "prod-demo-1",
+              "sku": "MTR-BRSH-024",
+              "productName": "Brushless Motor 24V High-Torque",
+              "updates": {
+                "unitPrice": 299
+              }
+            },
+            "status": "APPROVED",
+            "expiresAt": "2026-09-19T12:03:08.770Z",
+            "createdAt": "2026-09-19T11:48:08.770Z",
+            "executionMode": "DEMO",
+            "approvedAt": "2026-09-19T11:48:08.788Z",
+            "result": {
+              "id": "prod-demo-1",
+              "tenantId": "demo-tenant-id",
+              "name": "Brushless Motor 24V High-Torque",
+              "sku": "MTR-BRSH-024",
+              "category": "Machinery",
+              "unitPrice": 299,
+              "quantity": 62,
+              "reorderPoint": 15,
+              "description": "Industrial grade 24V brushless motor for conveyor assemblies",
+              "createdAt": "2026-09-09T11:48:03.384Z",
+              "updatedAt": "2026-09-19T11:48:08.787Z",
+              "unit_price": 299,
+              "current_stock": 62,
+              "min_stock_threshold": 15,
+              "_executionMode": "DEMO"
+            }
+          },
+          "createdAt": "2026-09-19T11:48:08.771Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-1789818488594",
+      "title": "renew the stock of Brushless Motor by 20...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:08.594Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818488594",
+          "sender": "USER",
+          "content": "renew the stock of Brushless Motor by 20 units",
+          "createdAt": "2026-09-19T11:48:08.594Z"
+        },
+        {
+          "id": "msg-bot-1789818488594",
+          "sender": "AGENT",
+          "content": "I have prepared the request to renew the stock of **Brushless Motor 24V High-Torque** (**MTR-BRSH-024**) by **+20 units** (current stock: 42 units).\n\nPlease confirm below before I proceed.",
+          "sources": [],
+          "toolsUsed": [
+            "inventory_restock_evaluator"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": true,
+          "pendingAction": {
+            "id": "act-demo-1789818488593-481",
+            "actionType": "RESTOCK_PRODUCT",
+            "title": "Renew Stock: Brushless Motor 24V High-Torque",
+            "summary": "Add +20 units to Brushless Motor 24V High-Torque (MTR-BRSH-024). Current stock: 42 units (Min threshold: 15).",
+            "payload": {
+              "productId": "prod-demo-1",
+              "sku": "MTR-BRSH-024",
+              "productName": "Brushless Motor 24V High-Torque",
+              "changeType": "IN",
+              "quantityDelta": 20,
+              "reason": "Restock operation requested via AI Assistant"
+            },
+            "status": "APPROVED",
+            "expiresAt": "2026-09-19T12:03:08.593Z",
+            "createdAt": "2026-09-19T11:48:08.593Z",
+            "executionMode": "DEMO",
+            "approvedAt": "2026-09-19T11:48:08.691Z",
+            "result": {
+              "product": {
+                "id": "prod-demo-1",
+                "tenantId": "demo-tenant-id",
+                "name": "Brushless Motor 24V High-Torque",
+                "sku": "MTR-BRSH-024",
+                "category": "Machinery",
+                "unitPrice": 185,
+                "quantity": 62,
+                "reorderPoint": 15,
+                "description": "Industrial grade 24V brushless motor for conveyor assemblies",
+                "createdAt": "2026-09-09T11:48:03.384Z",
+                "updatedAt": "2026-09-19T11:48:08.690Z",
+                "unit_price": 185,
+                "current_stock": 62,
+                "min_stock_threshold": 15,
+                "_executionMode": "DEMO"
+              },
+              "log": {
+                "id": "log-1789818488690",
+                "tenantId": "demo-tenant-id",
+                "productId": "prod-demo-1",
+                "productName": "Brushless Motor 24V High-Torque",
+                "sku": "MTR-BRSH-024",
+                "changeType": "IN",
+                "quantityDelta": 20,
+                "previousQuantity": 42,
+                "newQuantity": 62,
+                "reason": "Restock operation requested via AI Assistant",
+                "executedBy": "Alex Reynolds",
+                "createdAt": "2026-09-19T11:48:08.690Z"
+              },
+              "_executionMode": "DEMO"
+            }
+          },
+          "createdAt": "2026-09-19T11:48:08.594Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-1789818488550",
+      "title": "restock Brushless Motor",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:08.550Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818488550",
+          "sender": "USER",
+          "content": "restock Brushless Motor",
+          "createdAt": "2026-09-19T11:48:08.550Z"
+        },
+        {
+          "id": "msg-bot-1789818488550",
+          "sender": "AGENT",
+          "content": "How many units of **Brushless Motor 24V High-Torque** would you like to restock? Please specify the quantity you want to add.",
+          "sources": [],
+          "toolsUsed": [
+            "inventory_restock_evaluator"
+          ],
+          "executionTimeMs": 0,
+          "requiresConfirmation": false,
+          "pendingAction": null,
+          "createdAt": "2026-09-19T11:48:08.550Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-demo-1789818488536",
+      "title": "which products are on low stock",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:08.536Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818488536",
+          "sender": "USER",
+          "content": "which products are on low stock",
+          "createdAt": "2026-09-19T11:48:08.536Z"
+        },
+        {
+          "id": "msg-bot-1789818488536",
+          "sender": "AGENT",
+          "content": "Here are the products currently on low or out of stock:\n\n**Out of Stock (0 units):**\n• **Titanium Hex Bolts M8x40 (Box 50)** (`FST-TI-M840`) — 0 in stock (Min threshold: 12)\n\n**Low Stock Items:**\n• **Lithium Polymer Pack 48V 20Ah** (`BAT-LIPO-4820`) — 6 units left (Min threshold: 10)",
+          "sources": [],
+          "toolsUsed": [
+            "warehouse_inventory_scanner"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": false,
+          "pendingAction": null,
+          "createdAt": "2026-09-19T11:48:08.536Z"
         }
       ]
     },
@@ -322,19 +836,19 @@
       "id": "conv-demo-1",
       "title": "Stock Audit & Reorder Recommendations",
       "agentId": "supply-chain-agent",
-      "createdAt": "2026-09-19T04:13:21.295Z",
+      "createdAt": "2026-09-19T05:48:03.384Z",
       "messages": [
         {
           "id": "msg-demo-1",
           "sender": "USER",
           "content": "Can you review our low stock items and give me a summary?",
-          "createdAt": "2026-09-19T04:13:21.295Z"
+          "createdAt": "2026-09-19T05:48:03.384Z"
         },
         {
           "id": "msg-demo-2",
           "sender": "AGENT",
           "content": "I have analyzed your warehouse inventory: **Titanium Hex Bolts M8x40** is currently **Out of Stock** (0 units vs. 12 reorder threshold). **Lithium Polymer Pack 48V** is also on **Low Stock Alert** with only 6 units remaining (min threshold 10).\n\nWould you like me to draft an autonomous purchase order or restock action for these items?",
-          "createdAt": "2026-09-19T04:13:23.295Z",
+          "createdAt": "2026-09-19T05:48:05.384Z",
           "sources": [
             "Warehouse Inventory Master",
             "Safety Stock Policy v2.4"
@@ -345,37 +859,183 @@
   ],
   "pendingActions": [
     {
-      "id": "act-demo-1789814998576-493",
+      "id": "act-demo-1789818489489-63",
       "actionType": "EDIT_LEAD",
-      "title": "Edit Lead: gdgu bsjd",
-      "summary": "Update lead \"gdgu bsjd\": Set Amount to $30,000.",
+      "title": "Move Lead: National Courier Fleet Automation",
+      "summary": "Move lead \"National Courier Fleet Automation\" from Contacted to Proposal",
       "payload": {
-        "leadId": "lead-gdgu-bsjd",
-        "leadTitle": "gdgu bsjd",
+        "leadId": "lead-live-1",
+        "leadTitle": "National Courier Fleet Automation",
+        "fromStage": "Contacted",
+        "toStage": "Proposal",
         "updates": {
-          "value": 30000
+          "stage": "Proposal"
+        }
+      },
+      "status": "REJECTED",
+      "expiresAt": "2026-09-19T12:03:09.489Z",
+      "createdAt": "2026-09-19T11:48:09.489Z",
+      "executionMode": "DEMO",
+      "rejectedAt": "2026-09-19T11:48:09.503Z"
+    },
+    {
+      "id": "act-demo-1789818489370-156",
+      "actionType": "EDIT_LEAD",
+      "title": "Move Lead: National Courier Fleet Automation",
+      "summary": "Move lead \"National Courier Fleet Automation\" from Qualified to Contacted",
+      "payload": {
+        "leadId": "lead-live-1",
+        "leadTitle": "National Courier Fleet Automation",
+        "fromStage": "Qualified",
+        "toStage": "Contacted",
+        "updates": {
+          "stage": "Contacted"
         }
       },
       "status": "APPROVED",
-      "expiresAt": "2026-09-19T11:04:58.576Z",
-      "createdAt": "2026-09-19T10:49:58.576Z",
+      "expiresAt": "2026-09-19T12:03:09.370Z",
+      "createdAt": "2026-09-19T11:48:09.370Z",
       "executionMode": "DEMO",
-      "approvedAt": "2026-09-19T10:49:58.702Z",
+      "approvedAt": "2026-09-19T11:48:09.387Z",
       "result": {
-        "id": "lead-gdgu-bsjd",
+        "id": "lead-live-1",
         "tenantId": "demo-tenant-id",
-        "title": "gdgu bsjd",
-        "name": "gdgu bsjd",
-        "companyName": "gdgu bsjd",
-        "contactName": "gdgu bsjd",
-        "contactEmail": "contact@gdgubsjd.com",
-        "contactPhone": "+1 (555) 019-2834",
-        "value": 30000,
-        "stage": "New",
+        "title": "National Courier Fleet Automation",
+        "name": "National Courier Fleet Automation",
+        "companyName": "Prime Logistics Group",
+        "contactName": "Arthur Vance",
+        "contactEmail": "avance@primelog.com",
+        "contactPhone": "+1 (555) 234-8800",
+        "value": 120000,
+        "stage": "Contacted",
         "priority": "HIGH",
-        "notes": "Equipment and component supply deal",
-        "createdAt": "2026-09-19T08:00:00.000Z",
-        "updatedAt": "2026-09-19T10:49:58.701Z",
+        "notes": "Evaluating linear actuators and servo amplifiers for conveyor line.",
+        "createdAt": "2026-09-16T11:48:03.384Z",
+        "updatedAt": "2026-09-19T11:48:09.386Z",
+        "status": "Contacted",
+        "_executionMode": "DEMO"
+      }
+    },
+    {
+      "id": "act-demo-1789818488801-856",
+      "actionType": "DELETE_PRODUCT",
+      "title": "Delete Product: Optoelectronic Sensor 5V",
+      "summary": "Permanently delete product \"Optoelectronic Sensor 5V\" (SEN-OPTO-005) from inventory.",
+      "payload": {
+        "productId": "prod-demo-3",
+        "productName": "Optoelectronic Sensor 5V",
+        "sku": "SEN-OPTO-005"
+      },
+      "status": "APPROVED",
+      "expiresAt": "2026-09-19T12:03:08.801Z",
+      "createdAt": "2026-09-19T11:48:08.801Z",
+      "executionMode": "DEMO",
+      "approvedAt": "2026-09-19T11:48:08.874Z",
+      "result": {
+        "success": true,
+        "deletedId": "prod-demo-3",
+        "deletedProduct": {
+          "id": "prod-demo-3",
+          "tenantId": "demo-tenant-id",
+          "name": "Optoelectronic Sensor 5V",
+          "sku": "SEN-OPTO-005",
+          "category": "Electronics",
+          "unitPrice": 24.5,
+          "quantity": 110,
+          "reorderPoint": 25,
+          "description": "Precision photoelectric proximity beam sensor",
+          "createdAt": "2026-09-14T11:48:03.384Z",
+          "updatedAt": "2026-09-19T11:48:03.384Z"
+        },
+        "_executionMode": "DEMO"
+      }
+    },
+    {
+      "id": "act-demo-1789818488770-22",
+      "actionType": "EDIT_PRODUCT",
+      "title": "Edit Product: Brushless Motor 24V High-Torque",
+      "summary": "Update Brushless Motor 24V High-Torque (MTR-BRSH-024): Set unitPrice to 299.",
+      "payload": {
+        "productId": "prod-demo-1",
+        "sku": "MTR-BRSH-024",
+        "productName": "Brushless Motor 24V High-Torque",
+        "updates": {
+          "unitPrice": 299
+        }
+      },
+      "status": "APPROVED",
+      "expiresAt": "2026-09-19T12:03:08.770Z",
+      "createdAt": "2026-09-19T11:48:08.770Z",
+      "executionMode": "DEMO",
+      "approvedAt": "2026-09-19T11:48:08.788Z",
+      "result": {
+        "id": "prod-demo-1",
+        "tenantId": "demo-tenant-id",
+        "name": "Brushless Motor 24V High-Torque",
+        "sku": "MTR-BRSH-024",
+        "category": "Machinery",
+        "unitPrice": 299,
+        "quantity": 62,
+        "reorderPoint": 15,
+        "description": "Industrial grade 24V brushless motor for conveyor assemblies",
+        "createdAt": "2026-09-09T11:48:03.384Z",
+        "updatedAt": "2026-09-19T11:48:08.787Z",
+        "unit_price": 299,
+        "current_stock": 62,
+        "min_stock_threshold": 15,
+        "_executionMode": "DEMO"
+      }
+    },
+    {
+      "id": "act-demo-1789818488593-481",
+      "actionType": "RESTOCK_PRODUCT",
+      "title": "Renew Stock: Brushless Motor 24V High-Torque",
+      "summary": "Add +20 units to Brushless Motor 24V High-Torque (MTR-BRSH-024). Current stock: 42 units (Min threshold: 15).",
+      "payload": {
+        "productId": "prod-demo-1",
+        "sku": "MTR-BRSH-024",
+        "productName": "Brushless Motor 24V High-Torque",
+        "changeType": "IN",
+        "quantityDelta": 20,
+        "reason": "Restock operation requested via AI Assistant"
+      },
+      "status": "APPROVED",
+      "expiresAt": "2026-09-19T12:03:08.593Z",
+      "createdAt": "2026-09-19T11:48:08.593Z",
+      "executionMode": "DEMO",
+      "approvedAt": "2026-09-19T11:48:08.691Z",
+      "result": {
+        "product": {
+          "id": "prod-demo-1",
+          "tenantId": "demo-tenant-id",
+          "name": "Brushless Motor 24V High-Torque",
+          "sku": "MTR-BRSH-024",
+          "category": "Machinery",
+          "unitPrice": 185,
+          "quantity": 62,
+          "reorderPoint": 15,
+          "description": "Industrial grade 24V brushless motor for conveyor assemblies",
+          "createdAt": "2026-09-09T11:48:03.384Z",
+          "updatedAt": "2026-09-19T11:48:08.690Z",
+          "unit_price": 185,
+          "current_stock": 62,
+          "min_stock_threshold": 15,
+          "_executionMode": "DEMO"
+        },
+        "log": {
+          "id": "log-1789818488690",
+          "tenantId": "demo-tenant-id",
+          "productId": "prod-demo-1",
+          "productName": "Brushless Motor 24V High-Torque",
+          "sku": "MTR-BRSH-024",
+          "changeType": "IN",
+          "quantityDelta": 20,
+          "previousQuantity": 42,
+          "newQuantity": 62,
+          "reason": "Restock operation requested via AI Assistant",
+          "executedBy": "Alex Reynolds",
+          "createdAt": "2026-09-19T11:48:08.690Z"
+        },
         "_executionMode": "DEMO"
       }
     }

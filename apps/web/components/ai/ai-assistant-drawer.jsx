@@ -211,6 +211,16 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
         setActiveConvId(response.conversationId);
       }
 
+      if (response.executedAction || response.pendingAction?.status === "APPROVED") {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("smartsupply:data-updated", {
+              detail: { actionId: response.pendingAction?.id, result: response.pendingAction?.result },
+            })
+          );
+        }
+      }
+
       const botMsg = {
         id: `bot-${Date.now()}`,
         sender: "AGENT",
@@ -222,7 +232,17 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
         pendingAction: response.pendingAction || null,
       };
 
-      setMessages((prev) => [...prev, botMsg]);
+      setMessages((prev) => {
+        // If an action was just approved conversational-style, mark any older pending actions as approved too
+        if (response.executedAction || response.pendingAction?.status === "APPROVED") {
+          return prev.map((m) =>
+            m.pendingAction && (m.pendingAction.status === "PENDING" || m.pendingAction.status === "PENDING_CONFIRMATION")
+              ? { ...m, pendingAction: { ...m.pendingAction, status: "APPROVED" } }
+              : m
+          ).concat(botMsg);
+        }
+        return [...prev, botMsg];
+      });
     } catch (err) {
       setMessages((prev) => [
         ...prev,

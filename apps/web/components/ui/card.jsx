@@ -5,8 +5,8 @@ const Card = React.forwardRef(({ className, glow = false, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border border-dark-border bg-dark-card/90 text-slate-100 shadow-xl backdrop-blur-xl transition-all duration-200",
-      glow && "border-brand-500/30 shadow-glow-sm",
+      "rounded-xl border border-zinc-800/80 bg-zinc-900/60 text-zinc-100 shadow-sm transition-all duration-150",
+      glow && "border-indigo-500/40 bg-zinc-900/80",
       className
     )}
     {...props}
@@ -15,17 +15,17 @@ const Card = React.forwardRef(({ className, glow = false, ...props }, ref) => (
 Card.displayName = "Card";
 
 const CardHeader = React.forwardRef(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("flex flex-col space-y-1.5 p-5 pb-3", className)} {...props} />
+  <div ref={ref} className={cn("flex flex-col space-y-1 p-5 pb-3", className)} {...props} />
 ));
 CardHeader.displayName = "CardHeader";
 
 const CardTitle = React.forwardRef(({ className, ...props }, ref) => (
-  <h3 ref={ref} className={cn("text-base font-semibold leading-none tracking-tight text-white", className)} {...props} />
+  <h3 ref={ref} className={cn("text-sm font-semibold leading-tight tracking-tight text-zinc-100", className)} {...props} />
 ));
 CardTitle.displayName = "CardTitle";
 
 const CardDescription = React.forwardRef(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn("text-xs text-slate-400 mt-1", className)} {...props} />
+  <p ref={ref} className={cn("text-xs text-zinc-400 mt-0.5 leading-normal", className)} {...props} />
 ));
 CardDescription.displayName = "CardDescription";
 
@@ -35,7 +35,7 @@ const CardContent = React.forwardRef(({ className, ...props }, ref) => (
 CardContent.displayName = "CardContent";
 
 const CardFooter = React.forwardRef(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("flex items-center p-5 pt-0 border-t border-dark-border/50 mt-4", className)} {...props} />
+  <div ref={ref} className={cn("flex items-center p-5 pt-3 border-t border-zinc-800/80 mt-4", className)} {...props} />
 ));
 CardFooter.displayName = "CardFooter";
 

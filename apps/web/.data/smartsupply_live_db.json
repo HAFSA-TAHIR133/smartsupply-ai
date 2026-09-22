@@ -14,13 +14,79 @@
     {
       "id": "user-1789815325277",
       "email": "heerc838@gmail.com",
-      "name": "Heerc838",
+      "name": "Hafsa Tahir",
       "passwordHash": "$2b$10$8x88UEfU61lT4AP08xI0uuHM0K.6f2UzkI.fCm7We3GUXjhJuQZlC",
       "role": "ADMIN",
       "tenantId": "tenant-1789815325141",
       "isActive": true,
       "isDemo": false,
       "createdAt": "2026-09-19T10:55:25.277Z"
+    },
+    {
+      "id": "user-1789818248826",
+      "email": "live_user_a_1789818248396@apexlogistics.com",
+      "name": "Alice Vance",
+      "passwordHash": "$2b$10$1zVEUfxOdGVzB43VVrKgreHW2GllBUnj1aB2FJAn9f40vfiTvQQcW",
+      "role": "ADMIN",
+      "tenantId": "tenant-1789818248690",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:44:08.826Z"
+    },
+    {
+      "id": "user-1789818421490",
+      "email": "live_user_a_1789818420972@apexlogistics.com",
+      "name": "Alice Vance",
+      "passwordHash": "$2b$10$k8xcOYIe.RbDbQh9oIZeWuZAisKVhGhZkwNt6XB8LnTS4KNMsK2.2",
+      "role": "ADMIN",
+      "tenantId": "tenant-1789818421305",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:47:01.490Z"
+    },
+    {
+      "id": "user-1789818421974",
+      "email": "live_user_b_1789818420972@zenithfreight.com",
+      "name": "Bob Stone",
+      "passwordHash": "$2b$10$mt07Njj.n/G4lMOobZelHu9OohOur49ye1/BZy94z1o2LCCaob9Aq",
+      "role": "ADMIN",
+      "tenantId": "tenant-1789818421868",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:47:01.974Z"
+    },
+    {
+      "id": "user-1789818483937",
+      "email": "live_user_a_1789818483466@apexlogistics.com",
+      "name": "Alice Vance",
+      "passwordHash": "$2b$10$dtiEQAX4WkOdy0lKZYAqyO8iSt7pyikDQxMYoK2xCGBQ3JehMrSnK",
+      "role": "ADMIN",
+      "tenantId": "tenant-1789818483799",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:48:03.937Z"
+    },
+    {
+      "id": "user-1789818484594",
+      "email": "live_user_b_1789818483466@zenithfreight.com",
+      "name": "Bob Stone",
+      "passwordHash": "$2b$10$J55qjdTOHskmo1krEqeu.uCFkY0NArQWXSjbAPEYsaKCD3ctoCKvS",
+      "role": "ADMIN",
+      "tenantId": "tenant-1789818484428",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:48:04.594Z"
+    },
+    {
+      "id": "user-1789818625712",
+      "email": "forw8007@gmail.com",
+      "name": "Forw8007",
+      "passwordHash": "$2b$10$4P4guNo4ZtsJe0mmkRMTUubIAE0KAtuTZmVUv0Ag4KVnuDSIHpJ/2",
+      "role": "ADMIN",
+      "tenantId": "tenant-1789818625574",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:50:25.712Z"
     }
   ],
   "tenants": [
@@ -39,9 +105,96 @@
       "isActive": true,
       "isDemo": false,
       "createdAt": "2026-09-19T10:55:25.141Z"
+    },
+    {
+      "id": "tenant-1789818248690",
+      "name": "Apex Logistics Global",
+      "slug": "apex-logistics-global",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:44:08.690Z"
+    },
+    {
+      "id": "tenant-1789818421305",
+      "name": "Apex Logistics Global",
+      "slug": "apex-logistics-global",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:47:01.305Z"
+    },
+    {
+      "id": "tenant-1789818421868",
+      "name": "Zenith Freight Systems",
+      "slug": "zenith-freight-systems",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:47:01.868Z"
+    },
+    {
+      "id": "tenant-1789818483799",
+      "name": "Apex Logistics Global",
+      "slug": "apex-logistics-global",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:48:03.799Z"
+    },
+    {
+      "id": "tenant-1789818484428",
+      "name": "Zenith Freight Systems",
+      "slug": "zenith-freight-systems",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:48:04.428Z"
+    },
+    {
+      "id": "tenant-1789818625574",
+      "name": "Forw8007's Enterprise",
+      "slug": "forw8007",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-19T11:50:25.574Z"
     }
   ],
   "products": [
+    {
+      "id": "prod-live-1789818691522",
+      "tenantId": "tenant-1789818625574",
+      "name": "Brushless Motor",
+      "sku": "MTR-564",
+      "category": "Electronics",
+      "unitPrice": 199.99,
+      "quantity": 4,
+      "reorderPoint": 15,
+      "description": "",
+      "createdAt": "2026-09-19T11:51:31.522Z",
+      "updatedAt": "2026-09-19T11:51:31.522Z"
+    },
+    {
+      "id": "prod-live-1789818484005",
+      "tenantId": "tenant-1789818483799",
+      "name": "Industrial IoT Gateway Pro v2",
+      "sku": "SKU-IOT-1789818483466",
+      "category": "Hardware",
+      "unitPrice": 319.99,
+      "quantity": 105,
+      "reorderPoint": 20,
+      "description": "Enterprise grade sensor gateway",
+      "createdAt": "2026-09-19T11:48:04.005Z",
+      "updatedAt": "2026-09-19T11:48:04.381Z"
+    },
+    {
+      "id": "prod-live-1789818421522",
+      "tenantId": "tenant-1789818421305",
+      "name": "Industrial IoT Gateway Pro v2",
+      "sku": "SKU-IOT-1789818420972",
+      "category": "Hardware",
+      "unitPrice": 319.99,
+      "quantity": 105,
+      "reorderPoint": 20,
+      "description": "Enterprise grade sensor gateway",
+      "createdAt": "2026-09-19T11:47:01.522Z",
+      "updatedAt": "2026-09-19T11:47:01.793Z"
+    },
     {
       "id": "prod-live-1",
       "tenantId": "tenant-live-default",
@@ -70,6 +223,104 @@
     }
   ],
   "stockLogs": [
+    {
+      "id": "log-1789818691522",
+      "tenantId": "tenant-1789818625574",
+      "productId": "prod-live-1789818691522",
+      "productName": "Brushless Motor",
+      "sku": "MTR-564",
+      "changeType": "IN",
+      "quantityDelta": 4,
+      "previousQuantity": 0,
+      "newQuantity": 4,
+      "reason": "Initial stock intake",
+      "executedBy": "Forw8007",
+      "createdAt": "2026-09-19T11:51:31.522Z"
+    },
+    {
+      "id": "log-1789818484381",
+      "tenantId": "tenant-1789818483799",
+      "productId": "prod-live-1789818484005",
+      "productName": "Industrial IoT Gateway Pro v2",
+      "sku": "SKU-IOT-1789818483466",
+      "changeType": "IN",
+      "quantityDelta": 30,
+      "previousQuantity": 75,
+      "newQuantity": 105,
+      "reason": "Restock operation requested via AI Assistant",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-19T11:48:04.381Z"
+    },
+    {
+      "id": "log-1789818484040",
+      "tenantId": "tenant-1789818483799",
+      "productId": "prod-live-1789818484005",
+      "productName": "Industrial IoT Gateway Pro",
+      "sku": "SKU-IOT-1789818483466",
+      "changeType": "IN",
+      "quantityDelta": 25,
+      "previousQuantity": 50,
+      "newQuantity": 75,
+      "reason": "Incoming pallet delivery",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-19T11:48:04.040Z"
+    },
+    {
+      "id": "log-1789818484005",
+      "tenantId": "tenant-1789818483799",
+      "productId": "prod-live-1789818484005",
+      "productName": "Industrial IoT Gateway Pro",
+      "sku": "SKU-IOT-1789818483466",
+      "changeType": "IN",
+      "quantityDelta": 50,
+      "previousQuantity": 0,
+      "newQuantity": 50,
+      "reason": "Initial stock intake",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-19T11:48:04.005Z"
+    },
+    {
+      "id": "log-1789818421793",
+      "tenantId": "tenant-1789818421305",
+      "productId": "prod-live-1789818421522",
+      "productName": "Industrial IoT Gateway Pro v2",
+      "sku": "SKU-IOT-1789818420972",
+      "changeType": "IN",
+      "quantityDelta": 30,
+      "previousQuantity": 75,
+      "newQuantity": 105,
+      "reason": "Restock operation requested via AI Assistant",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-19T11:47:01.793Z"
+    },
+    {
+      "id": "log-1789818421578",
+      "tenantId": "tenant-1789818421305",
+      "productId": "prod-live-1789818421522",
+      "productName": "Industrial IoT Gateway Pro",
+      "sku": "SKU-IOT-1789818420972",
+      "changeType": "IN",
+      "quantityDelta": 25,
+      "previousQuantity": 50,
+      "newQuantity": 75,
+      "reason": "Incoming pallet delivery",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-19T11:47:01.578Z"
+    },
+    {
+      "id": "log-1789818421522",
+      "tenantId": "tenant-1789818421305",
+      "productId": "prod-live-1789818421522",
+      "productName": "Industrial IoT Gateway Pro",
+      "sku": "SKU-IOT-1789818420972",
+      "changeType": "IN",
+      "quantityDelta": 50,
+      "previousQuantity": 0,
+      "newQuantity": 50,
+      "reason": "Initial stock intake",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-19T11:47:01.522Z"
+    },
     {
       "id": "log-1789808406576",
       "productId": "prod-1789808406559-894",
@@ -112,6 +363,57 @@
   ],
   "leads": [
     {
+      "id": "lead-1789818776809",
+      "tenantId": "tenant-1789818625574",
+      "title": "Q4 Automated Warehouse Expansion",
+      "name": "Q4 Automated Warehouse Expansion",
+      "companyName": "AeroTech company",
+      "contactName": "Ayesha",
+      "contactEmail": "ayesha123@gmail.com",
+      "contactPhone": "03002123541",
+      "value": 50000,
+      "stage": "Contacted",
+      "priority": "HIGH",
+      "notes": "",
+      "createdAt": "2026-09-19T11:52:56.809Z",
+      "updatedAt": "2026-09-19T11:58:04.168Z",
+      "status": "Contacted"
+    },
+    {
+      "id": "lead-1789818484166",
+      "tenantId": "tenant-1789818483799",
+      "title": "Supply Chain Overhaul Deal",
+      "name": "Supply Chain Overhaul Deal",
+      "companyName": "MegaCorp Industries",
+      "contactName": "Robert Smith",
+      "contactEmail": "rsmith@megacorp.com",
+      "contactPhone": "",
+      "value": 120000,
+      "stage": "Qualified",
+      "priority": "HIGH",
+      "notes": "",
+      "createdAt": "2026-09-19T11:48:04.166Z",
+      "updatedAt": "2026-09-19T11:48:04.185Z",
+      "status": "Qualified"
+    },
+    {
+      "id": "lead-1789818421638",
+      "tenantId": "tenant-1789818421305",
+      "title": "Supply Chain Overhaul Deal",
+      "name": "Supply Chain Overhaul Deal",
+      "companyName": "MegaCorp Industries",
+      "contactName": "Robert Smith",
+      "contactEmail": "rsmith@megacorp.com",
+      "contactPhone": "",
+      "value": 120000,
+      "stage": "Qualified",
+      "priority": "HIGH",
+      "notes": "",
+      "createdAt": "2026-09-19T11:47:01.638Z",
+      "updatedAt": "2026-09-19T11:47:01.674Z",
+      "status": "Qualified"
+    },
+    {
       "id": "lead-gdgu-bsjd",
       "tenantId": "tenant-live-default",
       "title": "gdgu bsjd",
@@ -143,8 +445,67 @@
       "updatedAt": "2026-09-19T09:00:06.372Z"
     }
   ],
-  "customers": [],
+  "customers": [
+    {
+      "id": "cust-12-live",
+      "tenantId": "tenant-live-default",
+      "accountNo": "12",
+      "name": "Aeropax Industries",
+      "company": "Aeropax Industries",
+      "industry": "Aeropax Industries",
+      "contactName": "Primary Contact",
+      "email": "contact@aeropax.com",
+      "phone": "03001254165",
+      "status": "ACTIVE",
+      "isActive": true,
+      "totalSpend": 95000,
+      "createdAt": "2026-12-01T00:00:00.000Z",
+      "updatedAt": "2026-12-01T00:00:00.000Z"
+    },
+    {
+      "id": "cust-12-tenant",
+      "tenantId": "tenant-1789818625574",
+      "accountNo": "12",
+      "name": "Aeropax Industries",
+      "company": "Aeropax Industries",
+      "industry": "Aeropax Industries",
+      "contactName": "Primary Contact",
+      "email": "contact@aeropax.com",
+      "phone": "03001254165",
+      "status": "ACTIVE",
+      "isActive": true,
+      "totalSpend": 95000,
+      "createdAt": "2026-12-01T00:00:00.000Z",
+      "updatedAt": "2026-12-01T00:00:00.000Z"
+    }
+  ],
   "tasks": [
+    {
+      "id": "task-live-1789818484202",
+      "tenantId": "tenant-1789818483799",
+      "title": "Deliver IoT gateway proposal",
+      "description": "",
+      "status": "COMPLETED",
+      "priority": "HIGH",
+      "dueDate": "2026-10-01",
+      "due_date": "2026-10-01",
+      "assignedTo": "Alice Vance",
+      "createdAt": "2026-09-19T11:48:04.202Z",
+      "updatedAt": "2026-09-19T11:48:04.216Z"
+    },
+    {
+      "id": "task-live-1789818421688",
+      "tenantId": "tenant-1789818421305",
+      "title": "Deliver IoT gateway proposal",
+      "description": "",
+      "status": "COMPLETED",
+      "priority": "HIGH",
+      "dueDate": "2026-10-01",
+      "due_date": "2026-10-01",
+      "assignedTo": "Alice Vance",
+      "createdAt": "2026-09-19T11:47:01.688Z",
+      "updatedAt": "2026-09-19T11:47:01.698Z"
+    },
     {
       "id": "task-live-1",
       "tenantId": "tenant-live-default",
@@ -155,9 +516,661 @@
       "createdAt": "2026-09-19T09:00:06.372Z"
     }
   ],
-  "charts": [],
-  "conversations": [],
-  "pendingActions": [],
+  "charts": [
+    {
+      "id": "chart-live-1789818484231",
+      "tenantId": "tenant-1789818483799",
+      "title": "Q4 Warehouse Throughput",
+      "type": "bar",
+      "config": {
+        "dataSource": "inventory_category",
+        "data": [
+          {
+            "name": "Hardware",
+            "value": 75
+          }
+        ]
+      },
+      "createdAt": "2026-09-19T11:48:04.231Z"
+    },
+    {
+      "id": "chart-live-1789818421709",
+      "tenantId": "tenant-1789818421305",
+      "title": "Q4 Warehouse Throughput",
+      "type": "bar",
+      "config": {
+        "dataSource": "inventory_category",
+        "data": [
+          {
+            "name": "Hardware",
+            "value": 75
+          }
+        ]
+      },
+      "createdAt": "2026-09-19T11:47:01.709Z"
+    }
+  ],
+  "conversations": [
+    {
+      "id": "conv-live-1789818834963",
+      "title": "Which products need restocking?",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:53:54.963Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818834963",
+          "sender": "USER",
+          "content": "Which products need restocking?",
+          "createdAt": "2026-09-19T11:53:54.963Z"
+        },
+        {
+          "id": "msg-bot-1789818834963",
+          "sender": "AGENT",
+          "content": "Here are the products currently on low or out of stock:\n\n**Low Stock Items:**\n• **Brushless Motor** (`MTR-564`) — 4 units left (Min threshold: 15)",
+          "sources": [],
+          "toolsUsed": [
+            "warehouse_inventory_scanner"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": false,
+          "pendingAction": null,
+          "createdAt": "2026-09-19T11:53:54.963Z"
+        },
+        {
+          "id": "msg-user-1789818871447",
+          "sender": "USER",
+          "content": "Create a customer account with account no 12",
+          "createdAt": "2026-09-19T11:54:31.447Z"
+        },
+        {
+          "id": "msg-bot-1789818871447",
+          "sender": "AGENT",
+          "content": "You currently have **1 active lead(s)** totaling **$50,000** in pipeline value (0 won).\n\nThere are **1 pending follow-up task(s)**.\n\n• **Q4 Automated Warehouse Expansion** ($50,000 — *New*)",
+          "sources": [],
+          "toolsUsed": [
+            "crm_pipeline_aggregator"
+          ],
+          "executionTimeMs": 49,
+          "requiresConfirmation": false,
+          "pendingAction": null,
+          "createdAt": "2026-09-19T11:54:31.447Z"
+        },
+        {
+          "id": "msg-user-1789818982941",
+          "sender": "USER",
+          "content": "create a customer account with customer account 12 ,Industry is Aeropax Industries, Primary Contact is 03001254165,Status active,Created on 12/1/2026",
+          "createdAt": "2026-09-19T11:56:22.941Z"
+        },
+        {
+          "id": "msg-bot-1789818982941",
+          "sender": "AGENT",
+          "content": "You currently have **1 active lead(s)** totaling **$50,000** in pipeline value (0 won).\n\nThere are **1 pending follow-up task(s)**.\n\n• **Q4 Automated Warehouse Expansion** ($50,000 — *New*)",
+          "sources": [],
+          "toolsUsed": [
+            "crm_pipeline_aggregator"
+          ],
+          "executionTimeMs": 0,
+          "requiresConfirmation": false,
+          "pendingAction": null,
+          "createdAt": "2026-09-19T11:56:22.941Z"
+        },
+        {
+          "id": "msg-user-1789819018304",
+          "sender": "USER",
+          "content": "restock the Brushless Motor by 5 units more",
+          "createdAt": "2026-09-19T11:56:58.304Z"
+        },
+        {
+          "id": "msg-bot-1789819018304",
+          "sender": "AGENT",
+          "content": "I have prepared the request to renew the stock of **Brushless Motor** (**MTR-564**) by **+5 units** (current stock: 4 units).\n\nPlease confirm below before I proceed.",
+          "sources": [],
+          "toolsUsed": [
+            "inventory_restock_evaluator"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": true,
+          "pendingAction": {
+            "id": "act-live-1789819018303-847",
+            "actionType": "RESTOCK_PRODUCT",
+            "title": "Renew Stock: Brushless Motor",
+            "summary": "Add +5 units to Brushless Motor (MTR-564). Current stock: 4 units (Min threshold: 15).",
+            "payload": {
+              "productId": "prod-live-1789818691522",
+              "sku": "MTR-564",
+              "productName": "Brushless Motor",
+              "changeType": "IN",
+              "quantityDelta": 5,
+              "reason": "Restock operation requested via AI Assistant"
+            },
+            "status": "REJECTED",
+            "expiresAt": "2026-09-19T12:11:58.303Z",
+            "createdAt": "2026-09-19T11:56:58.303Z",
+            "executionMode": "LIVE",
+            "rejectedAt": "2026-09-19T11:57:01.324Z"
+          },
+          "createdAt": "2026-09-19T11:56:58.304Z"
+        },
+        {
+          "id": "msg-user-1789819080174",
+          "sender": "USER",
+          "content": "move the pipeline Q4 Automated Warehouse Expansion to stage contacted",
+          "createdAt": "2026-09-19T11:58:00.174Z"
+        },
+        {
+          "id": "msg-bot-1789819080174",
+          "sender": "AGENT",
+          "content": "I found the lead \"Q4 Automated Warehouse Expansion\". You want to move it from New to Contacted. Shall I proceed?",
+          "sources": [],
+          "toolsUsed": [
+            "crm_lead_stage_router"
+          ],
+          "executionTimeMs": 2,
+          "requiresConfirmation": true,
+          "pendingAction": {
+            "id": "act-live-1789819080173-830",
+            "actionType": "EDIT_LEAD",
+            "title": "Move Lead: Q4 Automated Warehouse Expansion",
+            "summary": "Move lead \"Q4 Automated Warehouse Expansion\" from New to Contacted",
+            "payload": {
+              "leadId": "lead-1789818776809",
+              "leadTitle": "Q4 Automated Warehouse Expansion",
+              "fromStage": "New",
+              "toStage": "Contacted",
+              "updates": {
+                "stage": "Contacted"
+              }
+            },
+            "status": "APPROVED",
+            "expiresAt": "2026-09-19T12:13:00.173Z",
+            "createdAt": "2026-09-19T11:58:00.173Z",
+            "executionMode": "LIVE",
+            "approvedAt": "2026-09-19T11:58:04.172Z",
+            "result": {
+              "id": "lead-1789818776809",
+              "tenantId": "tenant-1789818625574",
+              "title": "Q4 Automated Warehouse Expansion",
+              "name": "Q4 Automated Warehouse Expansion",
+              "companyName": "AeroTech company",
+              "contactName": "Ayesha",
+              "contactEmail": "ayesha123@gmail.com",
+              "contactPhone": "03002123541",
+              "value": 50000,
+              "stage": "Contacted",
+              "priority": "HIGH",
+              "notes": "",
+              "createdAt": "2026-09-19T11:52:56.809Z",
+              "updatedAt": "2026-09-19T11:58:04.168Z",
+              "status": "Contacted",
+              "_executionMode": "LIVE"
+            }
+          },
+          "createdAt": "2026-09-19T11:58:00.174Z"
+        },
+        {
+          "id": "msg-user-1789819111241",
+          "sender": "USER",
+          "content": "delete the task Schedule shipping the product to custoer",
+          "createdAt": "2026-09-19T11:58:31.241Z"
+        },
+        {
+          "id": "msg-bot-1789819111241",
+          "sender": "AGENT",
+          "content": "I have prepared the request to delete task **Schedule shipping the product to custoer**.\n\nPlease confirm below before I permanently remove it.",
+          "sources": [],
+          "toolsUsed": [
+            "crm_task_deleter"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": true,
+          "pendingAction": {
+            "id": "act-live-1789819111240-407",
+            "actionType": "DELETE_TASK",
+            "title": "Delete Task: Schedule shipping the product to custoer",
+            "summary": "Permanently delete task \"Schedule shipping the product to custoer\".",
+            "payload": {
+              "taskId": "task-live-1789818818146",
+              "taskTitle": "Schedule shipping the product to custoer"
+            },
+            "status": "APPROVED",
+            "expiresAt": "2026-09-19T12:13:31.240Z",
+            "createdAt": "2026-09-19T11:58:31.240Z",
+            "executionMode": "LIVE",
+            "approvedAt": "2026-09-19T11:58:34.657Z",
+            "result": {
+              "success": true,
+              "deletedId": "task-live-1789818818146",
+              "deletedTask": {
+                "id": "task-live-1789818818146",
+                "tenantId": "tenant-1789818625574",
+                "title": "Schedule shipping the product to custoer",
+                "description": "",
+                "status": "PENDING",
+                "priority": "MEDIUM",
+                "dueDate": "2026-09-26",
+                "due_date": "2026-09-26",
+                "assignedTo": "Forw8007",
+                "createdAt": "2026-09-19T11:53:38.146Z",
+                "updatedAt": "2026-09-19T11:53:38.146Z"
+              },
+              "_executionMode": "LIVE"
+            }
+          },
+          "createdAt": "2026-09-19T11:58:31.241Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-live-1789818484333",
+      "title": "Restock Industrial IoT Gateway Pro v2 by...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:04.333Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818484333",
+          "sender": "USER",
+          "content": "Restock Industrial IoT Gateway Pro v2 by 30 units",
+          "createdAt": "2026-09-19T11:48:04.333Z"
+        },
+        {
+          "id": "msg-bot-1789818484333",
+          "sender": "AGENT",
+          "content": "I have prepared the request to renew the stock of **Industrial IoT Gateway Pro v2** (**SKU-IOT-1789818483466**) by **+30 units** (current stock: 75 units).\n\nPlease confirm below before I proceed.",
+          "sources": [],
+          "toolsUsed": [
+            "inventory_restock_evaluator"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": true,
+          "pendingAction": {
+            "id": "act-live-1789818484333-50",
+            "actionType": "RESTOCK_PRODUCT",
+            "title": "Renew Stock: Industrial IoT Gateway Pro v2",
+            "summary": "Add +30 units to Industrial IoT Gateway Pro v2 (SKU-IOT-1789818483466). Current stock: 75 units (Min threshold: 20).",
+            "payload": {
+              "productId": "prod-live-1789818484005",
+              "sku": "SKU-IOT-1789818483466",
+              "productName": "Industrial IoT Gateway Pro v2",
+              "changeType": "IN",
+              "quantityDelta": 30,
+              "reason": "Restock operation requested via AI Assistant"
+            },
+            "status": "APPROVED",
+            "expiresAt": "2026-09-19T12:03:04.333Z",
+            "createdAt": "2026-09-19T11:48:04.333Z",
+            "executionMode": "LIVE",
+            "approvedAt": "2026-09-19T11:48:04.382Z",
+            "result": {
+              "product": {
+                "id": "prod-live-1789818484005",
+                "tenantId": "tenant-1789818483799",
+                "name": "Industrial IoT Gateway Pro v2",
+                "sku": "SKU-IOT-1789818483466",
+                "category": "Hardware",
+                "unitPrice": 319.99,
+                "quantity": 105,
+                "reorderPoint": 20,
+                "description": "Enterprise grade sensor gateway",
+                "createdAt": "2026-09-19T11:48:04.005Z",
+                "updatedAt": "2026-09-19T11:48:04.381Z",
+                "unit_price": 319.99,
+                "current_stock": 105,
+                "min_stock_threshold": 20,
+                "_executionMode": "LIVE"
+              },
+              "log": {
+                "id": "log-1789818484381",
+                "tenantId": "tenant-1789818483799",
+                "productId": "prod-live-1789818484005",
+                "productName": "Industrial IoT Gateway Pro v2",
+                "sku": "SKU-IOT-1789818483466",
+                "changeType": "IN",
+                "quantityDelta": 30,
+                "previousQuantity": 75,
+                "newQuantity": 105,
+                "reason": "Restock operation requested via AI Assistant",
+                "executedBy": "Alice Vance",
+                "createdAt": "2026-09-19T11:48:04.381Z"
+              },
+              "_executionMode": "LIVE"
+            }
+          },
+          "createdAt": "2026-09-19T11:48:04.333Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-live-1789818484308",
+      "title": "What is our current stock and inventory ...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:48:04.308Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818484308",
+          "sender": "USER",
+          "content": "What is our current stock and inventory status?",
+          "createdAt": "2026-09-19T11:48:04.308Z"
+        },
+        {
+          "id": "msg-bot-1789818484308",
+          "sender": "AGENT",
+          "content": "Here is your current inventory overview:\n\n- **Total Inventory SKUs:** 1\n- **Healthy Stock:** 1 items\n- **Low Stock Alerts:** 0 items\n\n**Inventory SKUs:**\n• **Industrial IoT Gateway Pro v2** (`SKU-IOT-1789818483466`) — 75 in stock\n",
+          "sources": [],
+          "toolsUsed": [
+            "warehouse_inventory_scanner"
+          ],
+          "executionTimeMs": 0,
+          "requiresConfirmation": false,
+          "pendingAction": null,
+          "createdAt": "2026-09-19T11:48:04.308Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-live-1789818421779",
+      "title": "Restock Industrial IoT Gateway Pro v2 by...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:47:01.779Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818421779",
+          "sender": "USER",
+          "content": "Restock Industrial IoT Gateway Pro v2 by 30 units",
+          "createdAt": "2026-09-19T11:47:01.779Z"
+        },
+        {
+          "id": "msg-bot-1789818421779",
+          "sender": "AGENT",
+          "content": "I have prepared the request to renew the stock of **Industrial IoT Gateway Pro v2** (**SKU-IOT-1789818420972**) by **+30 units** (current stock: 75 units).\n\nPlease confirm below before I proceed.",
+          "sources": [],
+          "toolsUsed": [
+            "inventory_restock_evaluator"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": true,
+          "pendingAction": {
+            "id": "act-live-1789818421779-256",
+            "actionType": "RESTOCK_PRODUCT",
+            "title": "Renew Stock: Industrial IoT Gateway Pro v2",
+            "summary": "Add +30 units to Industrial IoT Gateway Pro v2 (SKU-IOT-1789818420972). Current stock: 75 units (Min threshold: 20).",
+            "payload": {
+              "productId": "prod-live-1789818421522",
+              "sku": "SKU-IOT-1789818420972",
+              "productName": "Industrial IoT Gateway Pro v2",
+              "changeType": "IN",
+              "quantityDelta": 30,
+              "reason": "Restock operation requested via AI Assistant"
+            },
+            "status": "APPROVED",
+            "expiresAt": "2026-09-19T12:02:01.779Z",
+            "createdAt": "2026-09-19T11:47:01.779Z",
+            "executionMode": "LIVE",
+            "approvedAt": "2026-09-19T11:47:01.794Z",
+            "result": {
+              "product": {
+                "id": "prod-live-1789818421522",
+                "tenantId": "tenant-1789818421305",
+                "name": "Industrial IoT Gateway Pro v2",
+                "sku": "SKU-IOT-1789818420972",
+                "category": "Hardware",
+                "unitPrice": 319.99,
+                "quantity": 105,
+                "reorderPoint": 20,
+                "description": "Enterprise grade sensor gateway",
+                "createdAt": "2026-09-19T11:47:01.522Z",
+                "updatedAt": "2026-09-19T11:47:01.793Z",
+                "unit_price": 319.99,
+                "current_stock": 105,
+                "min_stock_threshold": 20,
+                "_executionMode": "LIVE"
+              },
+              "log": {
+                "id": "log-1789818421793",
+                "tenantId": "tenant-1789818421305",
+                "productId": "prod-live-1789818421522",
+                "productName": "Industrial IoT Gateway Pro v2",
+                "sku": "SKU-IOT-1789818420972",
+                "changeType": "IN",
+                "quantityDelta": 30,
+                "previousQuantity": 75,
+                "newQuantity": 105,
+                "reason": "Restock operation requested via AI Assistant",
+                "executedBy": "Alice Vance",
+                "createdAt": "2026-09-19T11:47:01.793Z"
+              },
+              "_executionMode": "LIVE"
+            }
+          },
+          "createdAt": "2026-09-19T11:47:01.779Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-live-1789818421732",
+      "title": "What is our current stock and inventory ...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-19T11:47:01.732Z",
+      "messages": [
+        {
+          "id": "msg-user-1789818421732",
+          "sender": "USER",
+          "content": "What is our current stock and inventory status?",
+          "createdAt": "2026-09-19T11:47:01.732Z"
+        },
+        {
+          "id": "msg-bot-1789818421732",
+          "sender": "AGENT",
+          "content": "Here is your current inventory overview:\n\n- **Total Inventory SKUs:** 1\n- **Healthy Stock:** 1 items\n- **Low Stock Alerts:** 0 items\n\n**Inventory SKUs:**\n• **Industrial IoT Gateway Pro v2** (`SKU-IOT-1789818420972`) — 75 in stock\n",
+          "sources": [],
+          "toolsUsed": [
+            "warehouse_inventory_scanner"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": false,
+          "pendingAction": null,
+          "createdAt": "2026-09-19T11:47:01.732Z"
+        }
+      ]
+    }
+  ],
+  "pendingActions": [
+    {
+      "id": "act-live-1789819111240-407",
+      "actionType": "DELETE_TASK",
+      "title": "Delete Task: Schedule shipping the product to custoer",
+      "summary": "Permanently delete task \"Schedule shipping the product to custoer\".",
+      "payload": {
+        "taskId": "task-live-1789818818146",
+        "taskTitle": "Schedule shipping the product to custoer"
+      },
+      "status": "APPROVED",
+      "expiresAt": "2026-09-19T12:13:31.240Z",
+      "createdAt": "2026-09-19T11:58:31.240Z",
+      "executionMode": "LIVE",
+      "approvedAt": "2026-09-19T11:58:34.657Z",
+      "result": {
+        "success": true,
+        "deletedId": "task-live-1789818818146",
+        "deletedTask": {
+          "id": "task-live-1789818818146",
+          "tenantId": "tenant-1789818625574",
+          "title": "Schedule shipping the product to custoer",
+          "description": "",
+          "status": "PENDING",
+          "priority": "MEDIUM",
+          "dueDate": "2026-09-26",
+          "due_date": "2026-09-26",
+          "assignedTo": "Forw8007",
+          "createdAt": "2026-09-19T11:53:38.146Z",
+          "updatedAt": "2026-09-19T11:53:38.146Z"
+        },
+        "_executionMode": "LIVE"
+      }
+    },
+    {
+      "id": "act-live-1789819080173-830",
+      "actionType": "EDIT_LEAD",
+      "title": "Move Lead: Q4 Automated Warehouse Expansion",
+      "summary": "Move lead \"Q4 Automated Warehouse Expansion\" from New to Contacted",
+      "payload": {
+        "leadId": "lead-1789818776809",
+        "leadTitle": "Q4 Automated Warehouse Expansion",
+        "fromStage": "New",
+        "toStage": "Contacted",
+        "updates": {
+          "stage": "Contacted"
+        }
+      },
+      "status": "APPROVED",
+      "expiresAt": "2026-09-19T12:13:00.173Z",
+      "createdAt": "2026-09-19T11:58:00.173Z",
+      "executionMode": "LIVE",
+      "approvedAt": "2026-09-19T11:58:04.172Z",
+      "result": {
+        "id": "lead-1789818776809",
+        "tenantId": "tenant-1789818625574",
+        "title": "Q4 Automated Warehouse Expansion",
+        "name": "Q4 Automated Warehouse Expansion",
+        "companyName": "AeroTech company",
+        "contactName": "Ayesha",
+        "contactEmail": "ayesha123@gmail.com",
+        "contactPhone": "03002123541",
+        "value": 50000,
+        "stage": "Contacted",
+        "priority": "HIGH",
+        "notes": "",
+        "createdAt": "2026-09-19T11:52:56.809Z",
+        "updatedAt": "2026-09-19T11:58:04.168Z",
+        "status": "Contacted",
+        "_executionMode": "LIVE"
+      }
+    },
+    {
+      "id": "act-live-1789819018303-847",
+      "actionType": "RESTOCK_PRODUCT",
+      "title": "Renew Stock: Brushless Motor",
+      "summary": "Add +5 units to Brushless Motor (MTR-564). Current stock: 4 units (Min threshold: 15).",
+      "payload": {
+        "productId": "prod-live-1789818691522",
+        "sku": "MTR-564",
+        "productName": "Brushless Motor",
+        "changeType": "IN",
+        "quantityDelta": 5,
+        "reason": "Restock operation requested via AI Assistant"
+      },
+      "status": "REJECTED",
+      "expiresAt": "2026-09-19T12:11:58.303Z",
+      "createdAt": "2026-09-19T11:56:58.303Z",
+      "executionMode": "LIVE",
+      "rejectedAt": "2026-09-19T11:57:01.324Z"
+    },
+    {
+      "id": "act-live-1789818484333-50",
+      "actionType": "RESTOCK_PRODUCT",
+      "title": "Renew Stock: Industrial IoT Gateway Pro v2",
+      "summary": "Add +30 units to Industrial IoT Gateway Pro v2 (SKU-IOT-1789818483466). Current stock: 75 units (Min threshold: 20).",
+      "payload": {
+        "productId": "prod-live-1789818484005",
+        "sku": "SKU-IOT-1789818483466",
+        "productName": "Industrial IoT Gateway Pro v2",
+        "changeType": "IN",
+        "quantityDelta": 30,
+        "reason": "Restock operation requested via AI Assistant"
+      },
+      "status": "APPROVED",
+      "expiresAt": "2026-09-19T12:03:04.333Z",
+      "createdAt": "2026-09-19T11:48:04.333Z",
+      "executionMode": "LIVE",
+      "approvedAt": "2026-09-19T11:48:04.382Z",
+      "result": {
+        "product": {
+          "id": "prod-live-1789818484005",
+          "tenantId": "tenant-1789818483799",
+          "name": "Industrial IoT Gateway Pro v2",
+          "sku": "SKU-IOT-1789818483466",
+          "category": "Hardware",
+          "unitPrice": 319.99,
+          "quantity": 105,
+          "reorderPoint": 20,
+          "description": "Enterprise grade sensor gateway",
+          "createdAt": "2026-09-19T11:48:04.005Z",
+          "updatedAt": "2026-09-19T11:48:04.381Z",
+          "unit_price": 319.99,
+          "current_stock": 105,
+          "min_stock_threshold": 20,
+          "_executionMode": "LIVE"
+        },
+        "log": {
+          "id": "log-1789818484381",
+          "tenantId": "tenant-1789818483799",
+          "productId": "prod-live-1789818484005",
+          "productName": "Industrial IoT Gateway Pro v2",
+          "sku": "SKU-IOT-1789818483466",
+          "changeType": "IN",
+          "quantityDelta": 30,
+          "previousQuantity": 75,
+          "newQuantity": 105,
+          "reason": "Restock operation requested via AI Assistant",
+          "executedBy": "Alice Vance",
+          "createdAt": "2026-09-19T11:48:04.381Z"
+        },
+        "_executionMode": "LIVE"
+      }
+    },
+    {
+      "id": "act-live-1789818421779-256",
+      "actionType": "RESTOCK_PRODUCT",
+      "title": "Renew Stock: Industrial IoT Gateway Pro v2",
+      "summary": "Add +30 units to Industrial IoT Gateway Pro v2 (SKU-IOT-1789818420972). Current stock: 75 units (Min threshold: 20).",
+      "payload": {
+        "productId": "prod-live-1789818421522",
+        "sku": "SKU-IOT-1789818420972",
+        "productName": "Industrial IoT Gateway Pro v2",
+        "changeType": "IN",
+        "quantityDelta": 30,
+        "reason": "Restock operation requested via AI Assistant"
+      },
+      "status": "APPROVED",
+      "expiresAt": "2026-09-19T12:02:01.779Z",
+      "createdAt": "2026-09-19T11:47:01.779Z",
+      "executionMode": "LIVE",
+      "approvedAt": "2026-09-19T11:47:01.794Z",
+      "result": {
+        "product": {
+          "id": "prod-live-1789818421522",
+          "tenantId": "tenant-1789818421305",
+          "name": "Industrial IoT Gateway Pro v2",
+          "sku": "SKU-IOT-1789818420972",
+          "category": "Hardware",
+          "unitPrice": 319.99,
+          "quantity": 105,
+          "reorderPoint": 20,
+          "description": "Enterprise grade sensor gateway",
+          "createdAt": "2026-09-19T11:47:01.522Z",
+          "updatedAt": "2026-09-19T11:47:01.793Z",
+          "unit_price": 319.99,
+          "current_stock": 105,
+          "min_stock_threshold": 20,
+          "_executionMode": "LIVE"
+        },
+        "log": {
+          "id": "log-1789818421793",
+          "tenantId": "tenant-1789818421305",
+          "productId": "prod-live-1789818421522",
+          "productName": "Industrial IoT Gateway Pro v2",
+          "sku": "SKU-IOT-1789818420972",
+          "changeType": "IN",
+          "quantityDelta": 30,
+          "previousQuantity": 75,
+          "newQuantity": 105,
+          "reason": "Restock operation requested via AI Assistant",
+          "executedBy": "Alice Vance",
+          "createdAt": "2026-09-19T11:47:01.793Z"
+        },
+        "_executionMode": "LIVE"
+      }
+    }
+  ],
   "memories": {},
   "passwordResets": {
     "794361": {

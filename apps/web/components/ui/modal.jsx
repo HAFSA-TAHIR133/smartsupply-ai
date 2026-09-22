@@ -35,25 +35,25 @@ export function Modal({ isOpen, onClose, title, description, children, maxWidth 
 
           {/* Modal Container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            initial={{ opacity: 0, scale: 0.98, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ duration: 0.2 }}
+            exit={{ opacity: 0, scale: 0.98, y: 8 }}
+            transition={{ duration: 0.15 }}
             className={cn(
-              "relative z-10 w-full overflow-hidden rounded-2xl border border-dark-border bg-dark-card p-6 shadow-2xl backdrop-blur-2xl",
+              "relative z-10 w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 p-5 shadow-2xl",
               maxWidth
             )}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-dark-border">
+            <div className="flex items-center justify-between pb-3.5 border-b border-zinc-800">
               <div>
-                <h3 className="text-lg font-bold text-white tracking-tight">{title}</h3>
-                {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
+                <h3 className="text-sm font-semibold text-zinc-100 tracking-tight">{title}</h3>
+                {description && <p className="text-xs text-zinc-400 mt-0.5 leading-normal">{description}</p>}
               </div>
               <button
                 onClick={onClose}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-dark-cardHover hover:text-white transition-colors"
+                className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 

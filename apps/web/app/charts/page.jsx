@@ -33,7 +33,6 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { AppLayout } from "@/components/layout/app-layout";
 import { chartsAPI, inventoryAPI } from "@/lib/api";
 import { useAuthContext } from "@/context/authContext";
 
@@ -92,10 +91,21 @@ const PRESET_SOURCES = [
 
 const PIE_COLORS = ["#6366f1", "#a855f7", "#ec4899", "#f59e0b", "#10b981"];
 
+const DEFAULT_CHARTS = PRESET_SOURCES.map((p) => ({
+  id: `preset-chart-${p.id}`,
+  title: p.defaultTitle,
+  type: p.defaultType,
+  config: {
+    dataSource: p.id,
+    data: p.data,
+  },
+  createdAt: new Date().toISOString(),
+}));
+
 export default function ChartsPage() {
   const { user } = useAuthContext();
-  const [charts, setCharts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [charts, setCharts] = useState(DEFAULT_CHARTS);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Builder Modal State
@@ -113,20 +123,24 @@ export default function ChartsPage() {
 
   useEffect(() => {
     if (user) {
-      fetchCharts();
+      fetchCharts(false);
     }
   }, [user]);
 
-  const fetchCharts = async () => {
-    setLoading(true);
+  const fetchCharts = async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     setError(null);
     try {
       const data = await chartsAPI.getAll();
-      setCharts(Array.isArray(data) ? data : []);
+      if (Array.isArray(data) && data.length > 0) {
+        setCharts(data);
+      }
     } catch (err) {
-      setError(err.message || "Failed to load charts.");
+      if (showLoading) {
+        setError(err.message || "Failed to load charts.");
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -273,8 +287,7 @@ export default function ChartsPage() {
   };
 
   return (
-    <AppLayout>
-      <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5">
           <div>
@@ -610,6 +623,5 @@ export default function ChartsPage() {
           )}
         </AnimatePresence>
       </div>
-    </AppLayout>
   );
 }

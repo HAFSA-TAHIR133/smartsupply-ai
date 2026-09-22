@@ -113,6 +113,29 @@ export async function findUserById(id) {
   return null;
 }
 
+export async function updateUserPasswordInDb(userId, passwordHash) {
+  const p = getNeonPool();
+  if (!p || !userId) return false;
+  try {
+    await p.query(
+      'UPDATE users SET "passwordHash" = $1, "updatedAt" = NOW() WHERE id::text = $2 OR LOWER(email) = LOWER($2);',
+      [passwordHash, String(userId)]
+    );
+    return true;
+  } catch {
+    try {
+      await p.query(
+        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id::text = $2 OR LOWER(email) = LOWER($2);',
+        [passwordHash, String(userId)]
+      );
+      return true;
+    } catch (err) {
+      console.warn("Neon updateUserPasswordInDb error:", err.message);
+      return false;
+    }
+  }
+}
+
 export async function findTenantById(id) {
   const p = getNeonPool();
   if (!p || !id) return { id: String(id || "tenant-default"), name: "Enterprise Global Logistics" };
@@ -716,6 +739,30 @@ export async function createPendingActionInDb(tenantId, userId, action) {
     createdAt: res.rows[0].createdAt,
     executionMode: "LIVE",
   };
+}
+
+export async function getPendingActionsFromDb(tenantId) {
+  const p = getNeonPool();
+  if (!p || !isValidUuid(tenantId)) return [];
+  try {
+    const res = await p.query(
+      'SELECT * FROM pending_actions WHERE "tenantId" = $1 AND status IN (\'PENDING_CONFIRMATION\', \'PENDING\') ORDER BY "createdAt" DESC LIMIT 10;',
+      [tenantId]
+    );
+    return res.rows.map((row) => ({
+      id: row.id,
+      actionType: row.actionType,
+      summary: row.summary,
+      status: row.status,
+      payload: row.params || {},
+      targetEntity: row.targetEntity || {},
+      createdAt: row.createdAt,
+      executionMode: "LIVE",
+    }));
+  } catch (err) {
+    console.warn("Neon getPendingActionsFromDb error:", err.message);
+    return [];
+  }
 }
 
 export async function getPendingActionByIdFromDb(id, tenantId) {

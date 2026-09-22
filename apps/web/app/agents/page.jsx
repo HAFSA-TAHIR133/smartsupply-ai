@@ -168,33 +168,33 @@ export default function AgentsPage() {
   const getAgentIcon = (type) => {
     switch (type) {
       case "INVENTORY":
-        return <Boxes className="w-5 h-5 text-blue-400" />;
+        return <Boxes className="w-4.5 h-4.5 text-blue-400" />;
       case "CRM":
-        return <Users className="w-5 h-5 text-purple-400" />;
+        return <Users className="w-4.5 h-4.5 text-indigo-400" />;
       case "DOCUMENT":
-        return <FileText className="w-5 h-5 text-emerald-400" />;
+        return <FileText className="w-4.5 h-4.5 text-emerald-400" />;
       default:
-        return <Workflow className="w-5 h-5 text-violet-400" />;
+        return <Workflow className="w-4.5 h-4.5 text-violet-400" />;
     }
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-violet-900/30">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-800">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Bot className="w-6 h-6 text-violet-400" />
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-100 flex items-center gap-2">
+            <Bot className="w-5 h-5 text-indigo-400" />
             Autonomous AI Agent Orchestration
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Configure agent models, guardrails, controlled Python tools, and inspect execution audit telemetry
+          <p className="text-xs text-zinc-400 mt-1">
+            Configure agent models, guardrails, controlled Python tools, and inspect execution audit telemetry.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <Badge variant="purple" className="gap-1 px-3 py-1 text-xs">
-            <Sparkles className="w-3.5 h-3.5 text-violet-300" />
+        <div className="flex items-center gap-2">
+          <Badge variant="indigo" className="gap-1.5 px-2.5 py-1 text-xs">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
             Groq Compound Engine
           </Badge>
         </div>
@@ -206,49 +206,49 @@ export default function AgentsPage() {
           return (
             <Card
               key={agent.id}
-              className="p-5 bg-slate-900/70 border-violet-900/40 hover:border-violet-600/60 transition-all flex flex-col justify-between space-y-4"
+              className="p-5 bg-zinc-900/60 border border-zinc-800/80 hover:border-zinc-700 transition-colors flex flex-col justify-between space-y-4 shadow-xs"
             >
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                    <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800">
                       {getAgentIcon(agent.agent_type)}
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">{agent.name}</h3>
-                      <p className="text-[11px] font-mono text-violet-400">{agent.agent_type} AGENT</p>
+                      <h3 className="text-sm font-semibold text-zinc-100">{agent.name}</h3>
+                      <p className="text-[11px] font-mono text-zinc-400">{agent.agent_type} AGENT</p>
                     </div>
                   </div>
 
                   {/* Toggle Switch */}
                   <button
                     onClick={() => handleToggleAgent(agent)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      agent.is_active ? "bg-violet-600" : "bg-slate-800"
+                    className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${
+                      agent.is_active ? "bg-indigo-600" : "bg-zinc-800"
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        agent.is_active ? "translate-x-6" : "translate-x-1"
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                        agent.is_active ? "translate-x-5.5" : "translate-x-1"
                       }`}
                     />
                   </button>
                 </div>
 
-                <p className="text-xs text-slate-400 mt-3 leading-relaxed line-clamp-2">
+                <p className="text-xs text-zinc-400 mt-3 leading-relaxed line-clamp-2">
                   {agent.system_prompt}
                 </p>
 
                 {/* Allowed Tools Badge List */}
-                <div className="mt-3">
-                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1.5">
+                <div className="mt-3.5">
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold block mb-1.5">
                     Authorized Tools & Guardrails
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {(agent.allowed_tools || []).map((tool) => (
                       <span
                         key={tool}
-                        className="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800 text-[10px] font-mono text-slate-300"
+                        className="px-2 py-0.5 rounded bg-zinc-950 border border-zinc-800 text-[10px] font-mono text-zinc-300"
                       >
                         ⚡ {tool}
                       </span>
@@ -257,13 +257,13 @@ export default function AgentsPage() {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                <span className="text-[11px] text-slate-400 font-mono">Model: {agent.model || "groq/compound"}</span>
+              <div className="pt-3 border-t border-zinc-800 flex items-center justify-between text-xs">
+                <span className="text-[11px] text-zinc-400 font-mono">Model: {agent.model || "groq/compound"}</span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleOpenPrompt(agent)}
-                  className="text-xs py-1 px-2.5 border-violet-900/60 text-violet-300 hover:bg-violet-950"
+                  className="text-xs py-1 px-2.5 border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-300"
                 >
                   <Sliders className="w-3.5 h-3.5 mr-1" />
                   Edit Directives
@@ -275,18 +275,18 @@ export default function AgentsPage() {
       </div>
 
       {/* Execution Telemetry & Audit Logs Table */}
-      <Card className="bg-slate-900/70 border-violet-900/40 overflow-hidden">
-        <div className="p-4 border-b border-violet-900/40 flex items-center justify-between">
+      <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl overflow-hidden shadow-xs">
+        <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-violet-400" />
-            <h3 className="text-sm font-bold text-white">Agent Execution & Tool Telemetry Logs</h3>
+            <Activity className="w-4 h-4 text-indigo-400" />
+            <h3 className="text-sm font-semibold text-zinc-100">Agent Execution & Tool Telemetry Logs</h3>
           </div>
           <Badge variant="success">RabbitMQ Real-time Stream</Badge>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/80 text-slate-400 border-b border-violet-900/40 text-[10px] uppercase font-semibold">
+            <thead className="bg-zinc-950/80 text-zinc-400 border-b border-zinc-800 text-[10px] uppercase font-semibold">
               <tr>
                 <th className="py-3 px-4">Agent</th>
                 <th className="py-3 px-4">User Instruction / Trigger</th>
@@ -296,19 +296,19 @@ export default function AgentsPage() {
                 <th className="py-3 px-4 text-right">Inspect</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-zinc-800/60">
               {executions.map((exec) => (
-                <tr key={exec.id} className="hover:bg-violet-950/20 transition-colors">
-                  <td className="py-3.5 px-4 font-mono font-semibold text-violet-300">
+                <tr key={exec.id} className="hover:bg-zinc-850/40 transition-colors">
+                  <td className="py-3.5 px-4 font-mono font-medium text-indigo-300">
                     {exec.agent_type}
                   </td>
-                  <td className="py-3.5 px-4 text-slate-200 max-w-xs truncate">
+                  <td className="py-3.5 px-4 text-zinc-200 max-w-xs truncate">
                     {exec.query}
                   </td>
-                  <td className="py-3.5 px-4 font-mono text-[11px] text-slate-400">
+                  <td className="py-3.5 px-4 font-mono text-[11px] text-zinc-400">
                     {(exec.tools_used || []).join(", ") || "none"}
                   </td>
-                  <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
+                  <td className="py-3.5 px-4 font-mono text-zinc-400 text-[11px]">
                     {exec.latency_ms || 600}ms
                   </td>
                   <td className="py-3.5 px-4">
@@ -319,7 +319,7 @@ export default function AgentsPage() {
                   <td className="py-3.5 px-4 text-right">
                     <button
                       onClick={() => { setSelectedExecution(exec); setExecModalOpen(true); }}
-                      className="p-1.5 text-violet-400 hover:text-white rounded hover:bg-violet-950 transition-colors"
+                      className="p-1.5 text-zinc-400 hover:text-zinc-100 rounded hover:bg-zinc-800 transition-colors"
                       title="Inspect execution trace"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -330,7 +330,7 @@ export default function AgentsPage() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
       {/* System Prompt Modal */}
       <Modal
@@ -340,24 +340,24 @@ export default function AgentsPage() {
         maxWidth="max-w-lg"
       >
         <form onSubmit={handleSavePrompt} className="space-y-4">
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-zinc-400">
             Define the persona, behavior constraints, and execution style for this autonomous agent.
           </p>
           <div>
-            <label className="text-xs font-medium text-slate-300 block mb-1">System Prompt Directive</label>
+            <label className="text-xs font-medium text-zinc-300 block mb-1">System Prompt Directive</label>
             <textarea
               rows={6}
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 font-mono leading-relaxed focus:outline-none focus:border-violet-500"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs text-zinc-100 placeholder-zinc-500 font-mono leading-relaxed focus:outline-none focus:border-zinc-700"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
             <Button type="button" variant="outline" size="sm" onClick={() => setPromptModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="gradient" size="sm">
+            <Button type="submit" variant="primary" size="sm">
               Save Directives
             </Button>
           </div>
@@ -373,33 +373,33 @@ export default function AgentsPage() {
       >
         {selectedExecution && (
           <div className="space-y-4 text-xs">
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-              <div className="flex justify-between text-slate-400 font-mono text-[10px]">
+            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1">
+              <div className="flex justify-between text-zinc-400 font-mono text-[10px]">
                 <span>AGENT: {selectedExecution.agent_type}</span>
                 <span>STATUS: {selectedExecution.status}</span>
               </div>
-              <div className="text-white font-medium pt-1">{selectedExecution.query}</div>
+              <div className="text-zinc-100 font-medium pt-1">{selectedExecution.query}</div>
             </div>
 
             <div>
-              <span className="text-slate-400 font-semibold block mb-1">Agent Response / Structured Synthesis:</span>
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-violet-900/40 text-slate-200 leading-relaxed font-sans text-xs">
+              <span className="text-zinc-400 font-medium block mb-1">Agent Response / Structured Synthesis:</span>
+              <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-200 leading-relaxed font-sans text-xs">
                 {selectedExecution.output}
               </div>
             </div>
 
             <div>
-              <span className="text-slate-400 font-semibold block mb-1">Tools Invoked:</span>
-              <div className="flex flex-wrap gap-1">
+              <span className="text-zinc-400 font-medium block mb-1">Tools Invoked:</span>
+              <div className="flex flex-wrap gap-1.5">
                 {(selectedExecution.tools_used || []).map((t) => (
-                  <span key={t} className="px-2 py-0.5 rounded bg-violet-950 border border-violet-800 font-mono text-[10px] text-violet-300">
+                  <span key={t} className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700/60 font-mono text-[10px] text-zinc-300">
                     {t}
                   </span>
                 ))}
               </div>
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-slate-800">
+            <div className="flex justify-end pt-2 border-t border-zinc-800">
               <Button type="button" variant="outline" size="sm" onClick={() => setExecModalOpen(false)}>
                 Close
               </Button>

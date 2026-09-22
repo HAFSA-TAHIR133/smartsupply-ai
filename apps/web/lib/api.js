@@ -40,8 +40,21 @@ export async function apiRequest(endpoint, options = {}) {
     if (!res.ok) {
       if (res.status === 401 && typeof window !== "undefined") {
         localStorage.removeItem("smartsupply_token");
+        localStorage.removeItem("smartsupply_user");
+        localStorage.removeItem("smartsupply_tenantId");
+        localStorage.removeItem("smartsupply_isDemo");
+        localStorage.removeItem("smartsupply_last_active");
+        localStorage.setItem("smartsupply_logged_out", "true");
+        if (!window.location.pathname.startsWith("/login")) {
+          const currentPath = window.location.pathname + window.location.search;
+          window.location.href = `/login?reason=session_expired&redirect=${encodeURIComponent(currentPath)}`;
+        }
       }
       throw new Error(data.message || data.error?.message || `HTTP Error ${res.status}`);
+    }
+
+    if (typeof window !== "undefined" && token) {
+      localStorage.setItem("smartsupply_last_active", Date.now().toString());
     }
 
     return data.data !== undefined ? data.data : data;
@@ -99,6 +112,10 @@ export const crmAPI = {
   updateLeadStage: (id, stage) => apiRequest(`/crm/leads/${id}/stage`, { method: "PUT", body: { stage } }),
   deleteLead: (id) => apiRequest(`/crm/leads/${id}`, { method: "DELETE" }),
   getCustomers: () => apiRequest("/crm/customers"),
+  createCustomer: (payload) => apiRequest("/crm/customers", { method: "POST", body: payload }),
+  updateCustomer: (id, payload) => apiRequest(`/crm/customers/${id}`, { method: "PUT", body: payload }),
+  updateCustomerStatus: (id, status) => apiRequest(`/crm/customers/${id}/status`, { method: "PUT", body: { status } }),
+  deleteCustomer: (id) => apiRequest(`/crm/customers/${id}`, { method: "DELETE" }),
   getTasks: () => apiRequest("/crm/tasks"),
   createTask: (payload) => apiRequest("/crm/tasks", { method: "POST", body: payload }),
   updateTask: (id, payload) => apiRequest(`/crm/tasks/${id}`, { method: "PUT", body: payload }),

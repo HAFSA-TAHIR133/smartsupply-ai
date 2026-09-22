@@ -17,30 +17,30 @@ module.exports = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         brand: {
-          50: "#FAF5FF",
-          100: "#F3E8FF",
-          200: "#E9D5FF",
-          300: "#D8B4FE",
-          400: "#C084FC", // Glow
-          500: "#A855F7", // Accent
-          600: "#7C3AED", // Purple
-          700: "#6D28D9", // Primary
-          800: "#5B21B6",
-          900: "#4C1D95",
-          950: "#2E1A47", // Dark Border
+          50: "#EEF2FF",
+          100: "#E0E7FF",
+          200: "#C7D2FE",
+          300: "#A5B4FC",
+          400: "#818CF8",
+          500: "#6366F1",
+          600: "#4F46E5",
+          700: "#4338CA",
+          800: "#3730A3",
+          900: "#312E81",
+          950: "#1E1B4B",
         },
         dark: {
-          bg: "#0B0512",
-          card: "#170D25",
-          cardHover: "#201335",
-          border: "#2E1A47",
-          borderLight: "#422765",
+          bg: "#09090B",
+          card: "#121215",
+          cardHover: "#18181B",
+          border: "#27272A",
+          borderLight: "#3F3F46",
         }
       },
       boxShadow: {
-        "glow-sm": "0 0 15px -3px rgba(192, 132, 252, 0.2)",
-        "glow": "0 0 25px -5px rgba(168, 85, 247, 0.3)",
-        "glow-lg": "0 0 35px -5px rgba(124, 58, 237, 0.4)",
+        "subtle": "0 1px 3px 0 rgba(0, 0, 0, 0.2), 0 1px 2px -1px rgba(0, 0, 0, 0.2)",
+        "card": "0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3)",
+        "dropdown": "0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4)",
       },
       animation: {
         "meteor-effect": "meteor 5s linear infinite",

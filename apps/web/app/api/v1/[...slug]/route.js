@@ -84,7 +84,7 @@ export async function GET(req, { params }) {
         return jsonSuccess(tasks);
       }
       if (slug[1] === "customers") {
-        const customers = storeAdapter.getCustomers(context);
+        const customers = await storeAdapter.getCustomers(context);
         return jsonSuccess(customers);
       }
     }
@@ -186,7 +186,7 @@ export async function POST(req, { params }) {
     if (slug[0] === "auth" && slug[1] === "login") {
       const { email, password } = body;
       if (!email || !password) {
-        return jsonError("Email and password are required", 400);
+        return jsonError("Invalid email or password", 401, "UNAUTHORIZED");
       }
 
       const normalizedEmail = email.trim().toLowerCase();
@@ -210,11 +210,6 @@ export async function POST(req, { params }) {
             if (valid) {
               user = dbUser;
               tenant = await neonDb.findTenantById(user.tenantId);
-            } else if (normalizedEmail === "heerc838@gmail.com") {
-              const newHash = await bcrypt.hash(password, 10);
-              await neonDb.updateUserPasswordInDb(dbUser.id, newHash);
-              user = dbUser;
-              tenant = await neonDb.findTenantById(user.tenantId);
             }
           }
         } catch (dbErr) {
@@ -222,10 +217,10 @@ export async function POST(req, { params }) {
         }
       }
 
-      // Fallback to local store if not found in Neon
+      // Fallback to local store
       if (!user) {
         const live = getLiveDb();
-        let localUser = (live.users || []).find((u) => u.email && u.email.toLowerCase() === normalizedEmail);
+        const localUser = (live.users || []).find((u) => u.email && u.email.toLowerCase() === normalizedEmail);
 
         if (localUser) {
           let valid = false;
@@ -240,48 +235,12 @@ export async function POST(req, { params }) {
 
           if (valid) {
             user = localUser;
-          } else if (normalizedEmail === "heerc838@gmail.com") {
-            localUser.passwordHash = await bcrypt.hash(password, 10);
-            saveLiveDb();
-            user = localUser;
-          } else {
-            return jsonError("Invalid email or password", 401, "UNAUTHORIZED");
           }
-        } else {
-          // Auto-provision account for new user so they can immediately sign in
-          const tenantId = `tenant-${Date.now()}`;
-          const namePart = normalizedEmail.split("@")[0] || "User";
-          const displayName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
-          const newTenant = {
-            id: tenantId,
-            name: `${displayName}'s Enterprise`,
-            slug: namePart.toLowerCase().replace(/[^a-z0-9]/g, "-"),
-            isActive: true,
-            isDemo: false,
-            createdAt: new Date().toISOString(),
-          };
+        }
 
-          const passwordHash = await bcrypt.hash(password, 10);
-          const newUser = {
-            id: `user-${Date.now()}`,
-            email: normalizedEmail,
-            name: displayName,
-            passwordHash,
-            role: "ADMIN",
-            tenantId,
-            isActive: true,
-            isDemo: false,
-            createdAt: new Date().toISOString(),
-          };
-
-          live.tenants = live.tenants || [];
-          live.users = live.users || [];
-          live.tenants.push(newTenant);
-          live.users.push(newUser);
-          saveLiveDb();
-
-          user = newUser;
-          tenant = newTenant;
+        // If user is not found or password is invalid, return generic error (do not reveal existence, do not auto-create)
+        if (!user) {
+          return jsonError("Invalid email or password", 401, "UNAUTHORIZED");
         }
 
         if (!tenant) {
@@ -515,6 +474,12 @@ export async function POST(req, { params }) {
       return jsonSuccess(created, "Lead created successfully", 201);
     }
 
+    // 7b. CRM: Create Customer
+    if (slug[0] === "crm" && slug[1] === "customers") {
+      const created = await storeAdapter.createCustomer(context, body);
+      return jsonSuccess(created, "Customer account created successfully", 201);
+    }
+
     // 8. CRM: Create Task
     if (slug[0] === "crm" && slug[1] === "tasks") {
       const created = await storeAdapter.createTask(context, body);
@@ -599,6 +564,24 @@ export async function PUT(req, { params }) {
       return jsonSuccess(updated, "Task updated successfully");
     }
 
+    // 4b. CRM: Update customer status
+    if (slug[0] === "crm" && slug[1] === "customers" && slug[3] === "status") {
+      const updated = await storeAdapter.updateCustomer(context, slug[2], { status: body.status });
+      return jsonSuccess(updated, "Customer status updated successfully");
+    }
+
+    // 4c. CRM: Update customer general
+    if (slug[0] === "crm" && slug[1] === "customers" && slug[2]) {
+      const updated = await storeAdapter.updateCustomer(context, slug[2], body);
+      return jsonSuccess(updated, "Customer account updated successfully");
+    }
+
+    // 4d. Auth: Update user profile
+    if (slug[0] === "auth" && (slug[1] === "profile" || slug[1] === "user")) {
+      const updated = await storeAdapter.updateUserProfile(context, body);
+      return jsonSuccess(updated, "User profile updated successfully");
+    }
+
     // 5. Notifications read all
     if (slug[0] === "notifications" && slug[1] === "read-all") {
       return jsonSuccess({ read: true });
@@ -638,6 +621,12 @@ export async function DELETE(req, { params }) {
     if (slug[0] === "crm" && slug[1] === "tasks" && slug[2]) {
       const result = await storeAdapter.deleteTask(context, slug[2]);
       return jsonSuccess(result, "Task deleted successfully");
+    }
+
+    // 3b. CRM: Delete Customer
+    if (slug[0] === "crm" && slug[1] === "customers" && slug[2]) {
+      const result = await storeAdapter.deleteCustomer(context, slug[2]);
+      return jsonSuccess(result, "Customer account deleted successfully");
     }
 
     // 4. Charts: Delete Chart

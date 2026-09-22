@@ -10,6 +10,17 @@
       "isDemo": false,
       "isActive": true,
       "createdAt": "2026-09-19T09:00:06.372Z"
+    },
+    {
+      "id": "demo-user-alex",
+      "email": "demo@smartsupply.ai",
+      "name": "Alex Reynolds",
+      "passwordHash": "$2b$10$nERvqCxp8ngZO0bW5epOwOKR7nKHB.oDw9PkB5XP2w488HYTliZPu",
+      "tenantId": "demo-tenant-id",
+      "role": "ADMIN",
+      "isDemo": true,
+      "isActive": true,
+      "createdAt": "2026-09-22T06:24:28.967Z"
     }
   ],
   "tenants": [
@@ -124,7 +135,24 @@
       "updatedAt": "2026-09-19T09:00:06.372Z"
     }
   ],
-  "customers": [],
+  "customers": [
+    {
+      "id": "cust-12-live",
+      "tenantId": "tenant-live-default",
+      "accountNo": "12",
+      "name": "Aeropax Industries",
+      "company": "Aeropax Industries",
+      "industry": "Aeropax Industries",
+      "contactName": "Primary Contact",
+      "email": "contact@aeropax.com",
+      "phone": "03001254165",
+      "status": "ACTIVE",
+      "isActive": true,
+      "totalSpend": 95000,
+      "createdAt": "2026-12-01T00:00:00.000Z",
+      "updatedAt": "2026-12-01T00:00:00.000Z"
+    }
+  ],
   "tasks": [
     {
       "id": "task-live-1",

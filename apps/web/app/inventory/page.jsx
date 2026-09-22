@@ -41,13 +41,66 @@ import {
   Sparkles,
 } from "lucide-react";
 
+const DEFAULT_PRODUCTS = [
+  {
+    id: "prod-demo-1",
+    name: "Brushless Motor 24V High-Torque",
+    sku: "MTR-BRSH-024",
+    category: "Machinery",
+    unit_price: 185.0,
+    current_stock: 42,
+    min_stock_threshold: 15,
+    description: "Industrial grade 24V brushless motor for conveyor assemblies",
+  },
+  {
+    id: "prod-demo-2",
+    name: "Lithium Polymer Pack 48V 20Ah",
+    sku: "BAT-LIPO-4820",
+    category: "Batteries",
+    unit_price: 320.0,
+    current_stock: 6,
+    min_stock_threshold: 10,
+    description: "High-density energy storage pack with thermal safeguard",
+  },
+  {
+    id: "prod-demo-3",
+    name: "Optoelectronic Sensor 5V",
+    sku: "SEN-OPTO-005",
+    category: "Electronics",
+    unit_price: 24.5,
+    current_stock: 110,
+    min_stock_threshold: 25,
+    description: "Precision photoelectric proximity beam sensor",
+  },
+  {
+    id: "prod-demo-4",
+    name: "Titanium Hex Bolts M8x40 (Box 50)",
+    sku: "FST-TI-M840",
+    category: "Fasteners",
+    unit_price: 48.0,
+    current_stock: 0,
+    min_stock_threshold: 12,
+    description: "Aerospace grade grade-5 titanium corrosion-resistant fasteners",
+  },
+  {
+    id: "prod-demo-5",
+    name: "Carbon Fiber Plate 500x500mm",
+    sku: "MAT-CF-5050",
+    category: "Raw Materials",
+    unit_price: 135.0,
+    current_stock: 18,
+    min_stock_threshold: 8,
+    description: "High tensile 3K weave structural plate",
+  },
+];
+
 export default function InventoryPage() {
   const searchParams = useSearchParams();
   const initialAdjustId = searchParams.get("adjust");
   const { isDemo } = useAuthContext();
 
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState(DEFAULT_PRODUCTS);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -334,7 +387,7 @@ export default function InventoryPage() {
     <div className="space-y-6">
       {/* Execution Mode Banner */}
       {isDemo && (
-        <div className="p-3 rounded-2xl bg-amber-950/30 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2 text-amber-300">
             <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
@@ -346,7 +399,7 @@ export default function InventoryPage() {
             size="sm"
             onClick={handleResetDemoSandbox}
             disabled={resettingDemo}
-            className="text-[11px] h-7 border-amber-500/40 text-amber-300 hover:bg-amber-950/50"
+            className="text-[11px] h-7 border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
           >
             <RotateCcw className={`w-3 h-3 mr-1 ${resettingDemo ? "animate-spin" : ""}`} />
             Reset Sandbox Data
@@ -355,35 +408,35 @@ export default function InventoryPage() {
       )}
 
       {/* Header and Quick Stats */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-violet-900/30">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-800">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Boxes className="w-6 h-6 text-violet-400" />
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-100 flex items-center gap-2">
+            <Boxes className="w-5 h-5 text-indigo-400" />
             Inventory & Stock Control
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Real-time warehouse SKU tracking, stock log auditing, and automated replenishment workflows
+          <p className="text-xs text-zinc-400 mt-1">
+            Real-time warehouse SKU tracking, stock log auditing, and automated replenishment workflows.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={loadProducts}
-            className="gap-1 text-xs border-slate-800"
+            className="gap-1.5 text-xs border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-300"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           <Button
-            variant="gradient"
+            variant="primary"
             size="sm"
             onClick={() => {
               setFormError("");
               setAddModalOpen(true);
             }}
-            className="gap-1.5 text-xs shadow-lg shadow-violet-600/30"
+            className="gap-1.5 text-xs shadow-xs"
           >
             <Plus className="w-4 h-4" />
             Add New SKU
@@ -392,16 +445,16 @@ export default function InventoryPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <Card className="p-4 bg-slate-900/70 border-violet-900/40">
+      <div className="p-3.5 bg-zinc-900/70 border border-zinc-800/80 rounded-xl">
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search products by SKU, name, or description..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+              className="w-full pl-9 pr-4 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition-colors"
             />
           </div>
 
@@ -409,7 +462,7 @@ export default function InventoryPage() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-violet-500"
+              className="bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-indigo-500"
             >
               <option value="ALL">All Categories</option>
               {categories.map((c) => (
@@ -422,7 +475,7 @@ export default function InventoryPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-violet-500"
+              className="bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-indigo-500"
             >
               <option value="ALL">All Statuses</option>
               <option value="IN_STOCK">Healthy Stock</option>
@@ -431,33 +484,33 @@ export default function InventoryPage() {
             </select>
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Products Table */}
-      <Card className="overflow-hidden border-violet-900/30 bg-slate-900/60">
+      <div className="overflow-hidden border border-zinc-800/80 bg-zinc-900/50 rounded-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-800 bg-slate-950/60 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                <th className="py-3.5 px-4">Item & Description</th>
-                <th className="py-3.5 px-4">Category</th>
-                <th className="py-3.5 px-4">Unit Price</th>
-                <th className="py-3.5 px-4">Stock Level</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
+              <tr className="border-b border-zinc-800 bg-zinc-950/80 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                <th className="py-3 px-4">Item & Description</th>
+                <th className="py-3 px-4">Category</th>
+                <th className="py-3 px-4">Unit Price</th>
+                <th className="py-3 px-4">Stock Level</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 text-xs">
+            <tbody className="divide-y divide-zinc-800/60 text-xs">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">
-                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-violet-500" />
+                  <td colSpan={6} className="py-12 text-center text-zinc-500">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-indigo-400" />
                     Loading inventory registry...
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">
+                  <td colSpan={6} className="py-12 text-center text-zinc-500">
                     No products matched your filters.
                   </td>
                 </tr>
@@ -471,30 +524,30 @@ export default function InventoryPage() {
                   return (
                     <tr
                       key={prod.id}
-                      className="hover:bg-violet-950/20 transition-colors group"
+                      className="hover:bg-zinc-850/40 transition-colors group"
                     >
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-white group-hover:text-violet-300 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="font-semibold text-zinc-100">
                           {prod.name}
                         </div>
-                        <div className="text-[11px] font-mono text-violet-400 mt-0.5">
+                        <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
                           {prod.sku}
                         </div>
                         {prod.description && (
-                          <div className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
+                          <div className="text-[11px] text-zinc-500 line-clamp-1 mt-0.5">
                             {prod.description}
                           </div>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-300">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-800 text-[11px]">
+                      <td className="py-3 px-4 text-zinc-300">
+                        <span className="px-2 py-0.5 rounded-md bg-zinc-800 border border-zinc-700/60 text-zinc-300 text-[11px]">
                           {prod.category || "General"}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 font-mono font-medium text-slate-200">
+                      <td className="py-3 px-4 font-mono font-medium text-zinc-200">
                         ${Number(prod.unit_price ?? prod.unitPrice ?? 0).toFixed(2)}
                       </td>
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <span
                             className={`font-mono font-bold ${
@@ -507,15 +560,15 @@ export default function InventoryPage() {
                           >
                             {stock} units
                           </span>
-                          <span className="text-[10px] text-slate-500">
+                          <span className="text-[10px] text-zinc-500">
                             (min {min})
                           </span>
                         </div>
-                        <div className="w-24 h-1.5 rounded-full bg-slate-800 mt-1 overflow-hidden">
+                        <div className="w-24 h-1.5 rounded-full bg-zinc-800 mt-1 overflow-hidden">
                           <div
                             className={`h-full rounded-full ${
                               isOut
-                                ? "bg-rose-600"
+                                ? "bg-rose-500"
                                 : isLow
                                 ? "bg-amber-500"
                                 : "bg-emerald-500"
@@ -526,13 +579,13 @@ export default function InventoryPage() {
                           />
                         </div>
                       </td>
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-4">
                         {isOut ? (
                           <Badge variant="danger" className="gap-1">
                             <XCircle className="w-3 h-3" /> Out of Stock
                           </Badge>
                         ) : isLow ? (
-                          <Badge variant="warning" className="gap-1 animate-pulse">
+                          <Badge variant="warning" className="gap-1">
                             <AlertTriangle className="w-3 h-3" /> Low Stock
                           </Badge>
                         ) : (
@@ -541,16 +594,16 @@ export default function InventoryPage() {
                           </Badge>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3 px-4 text-right">
                         <div className="inline-flex items-center gap-1.5">
                           {/* Stock Adjust / Restock Button */}
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleOpenAdjust(prod)}
-                            className="text-xs py-1 px-2.5 text-violet-300 border-violet-900/60 hover:bg-violet-950/50"
+                            className="text-xs py-1 px-2.5 text-zinc-200 border-zinc-800 hover:bg-zinc-800"
                           >
-                            <SlidersHorizontal className="w-3 h-3 mr-1" />
+                            <SlidersHorizontal className="w-3 h-3 mr-1 text-zinc-400" />
                             Restock
                           </Button>
 
@@ -559,7 +612,7 @@ export default function InventoryPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleOpenEdit(prod)}
-                            className="text-xs py-1 px-2 text-slate-400 hover:text-white"
+                            className="text-xs py-1 px-2 text-zinc-400 hover:text-zinc-100"
                             title="Edit SKU"
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -595,7 +648,7 @@ export default function InventoryPage() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
       {/* Shadcn UI AlertDialog for Deletion Confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -667,7 +720,7 @@ export default function InventoryPage() {
                 onChange={(e) =>
                   setNewProduct({ ...newProduct, category: e.target.value })
                 }
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
               >
                 <option value="Electronics">Electronics</option>
                 <option value="Machinery">Machinery</option>
@@ -708,7 +761,7 @@ export default function InventoryPage() {
           />
 
           <div>
-            <label className="text-xs font-medium text-slate-300 block mb-1">
+            <label className="text-xs font-medium text-zinc-300 block mb-1">
               Description / Notes
             </label>
             <textarea
@@ -718,11 +771,11 @@ export default function InventoryPage() {
                 setNewProduct({ ...newProduct, description: e.target.value })
               }
               placeholder="Warehouse bay location, specifications, or supplier notes..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
             <Button
               type="button"
               variant="outline"
@@ -731,7 +784,7 @@ export default function InventoryPage() {
             >
               Cancel
             </Button>
-            <Button type="submit" variant="gradient" size="sm">
+            <Button type="submit" variant="primary" size="sm">
               Save Product SKU
             </Button>
           </div>
@@ -747,7 +800,7 @@ export default function InventoryPage() {
       >
         <form onSubmit={handleSaveEdit} className="space-y-4">
           {formError && (
-            <div className="p-2.5 rounded-lg bg-red-950/60 border border-red-800 text-xs text-red-200">
+            <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800/80 text-xs text-rose-200">
               {formError}
             </div>
           )}
@@ -772,7 +825,7 @@ export default function InventoryPage() {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-medium text-slate-300 block mb-1">
+              <label className="text-xs font-medium text-zinc-300 block mb-1">
                 Category
               </label>
               <select
@@ -780,7 +833,7 @@ export default function InventoryPage() {
                 onChange={(e) =>
                   setEditProductData({ ...editProductData, category: e.target.value })
                 }
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-indigo-500"
               >
                 <option value="Electronics">Electronics</option>
                 <option value="Machinery">Machinery</option>
@@ -824,7 +877,7 @@ export default function InventoryPage() {
           />
 
           <div>
-            <label className="text-xs font-medium text-slate-300 block mb-1">
+            <label className="text-xs font-medium text-zinc-300 block mb-1">
               Description / Notes
             </label>
             <textarea
@@ -833,11 +886,11 @@ export default function InventoryPage() {
               onChange={(e) =>
                 setEditProductData({ ...editProductData, description: e.target.value })
               }
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
             <Button
               type="button"
               variant="outline"
@@ -846,7 +899,7 @@ export default function InventoryPage() {
             >
               Cancel
             </Button>
-            <Button type="submit" variant="gradient" size="sm">
+            <Button type="submit" variant="primary" size="sm">
               Save Changes
             </Button>
           </div>
@@ -862,32 +915,32 @@ export default function InventoryPage() {
       >
         <form onSubmit={handleExecuteAdjustment} className="space-y-4">
           {formError && (
-            <div className="p-2.5 rounded-lg bg-red-950/60 border border-red-800 text-xs text-red-200">
+            <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800/80 text-xs text-rose-200">
               {formError}
             </div>
           )}
 
-          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1">
+          <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs space-y-1">
             <div className="flex justify-between">
-              <span className="text-slate-400">Target Product:</span>
-              <span className="font-semibold text-white">{selectedProduct?.name}</span>
+              <span className="text-zinc-400">Target Product:</span>
+              <span className="font-semibold text-zinc-100">{selectedProduct?.name}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Current Stock:</span>
-              <span className="font-bold text-violet-300">
+              <span className="text-zinc-400">Current Stock:</span>
+              <span className="font-bold text-indigo-300">
                 {selectedProduct?.current_stock ?? selectedProduct?.quantity ?? 0} units
               </span>
             </div>
-            <div className="flex justify-between text-slate-400">
+            <div className="flex justify-between text-zinc-400">
               <span>Alert Threshold:</span>
-              <span className="text-slate-300">
+              <span className="text-zinc-300">
                 {selectedProduct?.min_stock_threshold ?? selectedProduct?.reorderPoint ?? 10} units
               </span>
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-slate-300 block mb-1">
+            <label className="text-xs font-medium text-zinc-300 block mb-1">
               Adjustment Type
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -896,8 +949,8 @@ export default function InventoryPage() {
                 onClick={() => setAdjustment({ ...adjustment, type: "IN" })}
                 className={`py-2 text-xs font-semibold rounded-lg border transition-all ${
                   adjustment.type === "IN"
-                    ? "bg-emerald-600/30 border-emerald-500 text-emerald-300"
-                    : "bg-slate-950 border-slate-800 text-slate-400"
+                    ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400"
+                    : "bg-zinc-950 border-zinc-800 text-zinc-400"
                 }`}
               >
                 + Receive (IN)
@@ -907,8 +960,8 @@ export default function InventoryPage() {
                 onClick={() => setAdjustment({ ...adjustment, type: "OUT" })}
                 className={`py-2 text-xs font-semibold rounded-lg border transition-all ${
                   adjustment.type === "OUT"
-                    ? "bg-rose-600/30 border-rose-500 text-rose-300"
-                    : "bg-slate-950 border-slate-800 text-slate-400"
+                    ? "bg-rose-500/10 border-rose-500/40 text-rose-400"
+                    : "bg-zinc-950 border-zinc-800 text-zinc-400"
                 }`}
               >
                 - Ship (OUT)
@@ -918,8 +971,8 @@ export default function InventoryPage() {
                 onClick={() => setAdjustment({ ...adjustment, type: "ADJUSTMENT" })}
                 className={`py-2 text-xs font-semibold rounded-lg border transition-all ${
                   adjustment.type === "ADJUSTMENT"
-                    ? "bg-violet-600/30 border-violet-500 text-violet-300"
-                    : "bg-slate-950 border-slate-800 text-slate-400"
+                    ? "bg-indigo-500/10 border-indigo-500/40 text-indigo-300"
+                    : "bg-zinc-950 border-zinc-800 text-zinc-400"
                 }`}
               >
                 Cycle Audit
@@ -949,9 +1002,9 @@ export default function InventoryPage() {
           />
 
           {/* New projected stock preview */}
-          <div className="p-2.5 rounded-lg bg-violet-950/40 border border-violet-900/60 text-xs flex justify-between items-center">
-            <span className="text-slate-300">Projected New Stock:</span>
-            <span className="font-bold text-white font-mono">
+          <div className="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-xs flex justify-between items-center">
+            <span className="text-zinc-400">Projected New Stock:</span>
+            <span className="font-bold text-zinc-100 font-mono">
               {adjustment.type === "IN"
                 ? Number(selectedProduct?.current_stock ?? selectedProduct?.quantity ?? 0) +
                   Number(adjustment.quantity || 0)
@@ -966,7 +1019,7 @@ export default function InventoryPage() {
             </span>
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
             <Button
               type="button"
               variant="outline"
@@ -977,7 +1030,7 @@ export default function InventoryPage() {
             </Button>
             <Button
               type="submit"
-              variant="gradient"
+              variant="primary"
               size="sm"
               disabled={adjustSubmitting}
             >
@@ -996,11 +1049,11 @@ export default function InventoryPage() {
       >
         <div className="space-y-3">
           {historyLoading ? (
-            <div className="py-8 text-center text-xs text-slate-500">
+            <div className="py-8 text-center text-xs text-zinc-500">
               Loading audit history...
             </div>
           ) : historyLogs.length === 0 ? (
-            <div className="py-8 text-center text-xs text-slate-500">
+            <div className="py-8 text-center text-xs text-zinc-500">
               No stock logs recorded yet for this SKU.
             </div>
           ) : (
@@ -1008,7 +1061,7 @@ export default function InventoryPage() {
               {historyLogs.map((log) => (
                 <div
                   key={log.id}
-                  className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs"
+                  className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-between text-xs"
                 >
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
@@ -1018,7 +1071,7 @@ export default function InventoryPage() {
                             ? "success"
                             : log.changeType === "OUT"
                             ? "danger"
-                            : "purple"
+                            : "info"
                         }
                       >
                         {log.changeType || "ADJUST"}{" "}
@@ -1026,18 +1079,18 @@ export default function InventoryPage() {
                           ? `+${log.quantityDelta}`
                           : log.quantityDelta}
                       </Badge>
-                      <span className="text-slate-300 font-medium">
+                      <span className="text-zinc-200 font-medium">
                         {log.reason || "Manual adjustment"}
                       </span>
                     </div>
-                    <div className="text-[11px] text-slate-500">
+                    <div className="text-[11px] text-zinc-500">
                       Previous: {log.previousQuantity} → New:{" "}
-                      <strong className="text-slate-200">
+                      <strong className="text-zinc-200">
                         {log.newQuantity}
                       </strong>
                     </div>
                   </div>
-                  <div className="text-[10px] text-slate-500 font-mono text-right">
+                  <div className="text-[10px] text-zinc-500 font-mono text-right">
                     {new Date(log.createdAt).toLocaleString()}
                   </div>
                 </div>

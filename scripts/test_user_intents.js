@@ -117,6 +117,78 @@ async function run() {
   assert(!q5.data.data.sources || q5.data.data.sources.length === 0, "No resources or sources attached");
   console.log("AI Answer:\n", q5.data.data.answer);
 
+  // -------------------------------------------------------------------
+  // 6. CRITICAL TEST: Lead Stage Move Operation & Conversational Confirmation
+  // "Please move the National Courier Fleet Automation to stage Contacted"
+  // -------------------------------------------------------------------
+  console.log("\n6. CRITICAL ACTION REQUEST: Moving lead to stage Contacted...");
+  const qLeadMove = await post("/agents/supply-chain-agent/chat", {
+    message: "Please move the National Courier Fleet Automation to stage Contacted"
+  }, token);
+
+  assert(qLeadMove.ok, "Lead move request returned 200");
+  assert(qLeadMove.data.data.requiresConfirmation === true, "Lead move MUST require human confirmation");
+  assert(qLeadMove.data.data.pendingAction != null, "Pending action must be created");
+  assert(qLeadMove.data.data.pendingAction.actionType === "EDIT_LEAD", "Action type is EDIT_LEAD");
+  assert(qLeadMove.data.data.pendingAction.payload.toStage === "Contacted", "Destination stage is Contacted");
+  assert(qLeadMove.data.data.pendingAction.payload.leadTitle.includes("National Courier Fleet Automation"), "Lead title matched correctly");
+  assert(qLeadMove.data.data.answer.includes("National Courier Fleet Automation"), "Response explicitly mentions the lead title");
+  assert(qLeadMove.data.data.answer.includes("Contacted"), "Response explicitly mentions the destination stage");
+  console.log("AI Stage Move Confirmation Prompt:\n", qLeadMove.data.data.answer);
+
+  // 6b. Conversational Approval: User says "Yes"
+  console.log("\n6b. Conversational confirmation: User sends 'Yes'...");
+  const qConfirmYes = await post("/agents/supply-chain-agent/chat", {
+    message: "Yes"
+  }, token);
+  assert(qConfirmYes.ok, "Conversational approval response returned 200");
+  assert(qConfirmYes.data.data.executedAction === true, "executedAction flag is true");
+  assert(qConfirmYes.data.data.answer.includes("moved to Contacted") || qConfirmYes.data.data.answer.includes("Done"), "AI confirms execution in answer");
+  console.log("AI Execution Confirmation:\n", qConfirmYes.data.data.answer);
+
+  // Verify lead stage in DB
+  const leadsRes = await fetch(`${API_BASE}/crm/leads`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const leadsData = await leadsRes.json();
+  const updatedLead = leadsData.data.find(l => l.title === "National Courier Fleet Automation");
+  assert(updatedLead != null, "Lead found in CRM database");
+  assert(updatedLead.stage === "Contacted", `Lead stage in DB is now 'Contacted' (was Qualified). Value: ${updatedLead.stage}`);
+
+  // 6c. Invalid Stage Test: User specifies invalid stage e.g. "Completed"
+  console.log("\n6c. Invalid stage test: User asks to move to 'Completed' (invalid)...");
+  const qInvalidStage = await post("/agents/supply-chain-agent/chat", {
+    message: "Please move the National Courier Fleet Automation to stage Completed"
+  }, token);
+  assert(qInvalidStage.ok, "Response returned 200");
+  assert(qInvalidStage.data.data.requiresConfirmation === false, "Must NOT require confirmation for invalid stage");
+  assert(qInvalidStage.data.data.pendingAction == null, "Must NOT create pending action for invalid stage");
+  assert(qInvalidStage.data.data.answer.includes("not a valid CRM stage"), "Informs user stage is invalid");
+  console.log("AI Invalid Stage Response:\n", qInvalidStage.data.data.answer);
+
+  // 6d. Conversational Rejection Test: User cancels with "No"
+  console.log("\n6d. Conversational rejection test: Staging action and saying 'No'...");
+  const qStageProposal = await post("/agents/supply-chain-agent/chat", {
+    message: "Move National Courier Fleet Automation to stage Proposal"
+  }, token);
+  assert(qStageProposal.data.data.requiresConfirmation === true, "Staged for proposal");
+
+  const qConfirmNo = await post("/agents/supply-chain-agent/chat", {
+    message: "No"
+  }, token);
+  assert(qConfirmNo.ok, "Rejection processed");
+  assert(qConfirmNo.data.data.pendingAction.status === "REJECTED", "Pending action marked as REJECTED");
+  assert(qConfirmNo.data.data.answer.toLowerCase().includes("cancelled") || qConfirmNo.data.data.answer.toLowerCase().includes("no changes"), "AI confirms cancellation");
+  console.log("AI Rejection Response:\n", qConfirmNo.data.data.answer);
+
+  // Verify lead stage remains "Contacted" (not changed to Proposal)
+  const leadsResAfterCancel = await fetch(`${API_BASE}/crm/leads`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const leadsDataAfterCancel = await leadsResAfterCancel.json();
+  const leadAfterCancel = leadsDataAfterCancel.data.find(l => l.title === "National Courier Fleet Automation");
+  assert(leadAfterCancel.stage === "Contacted", "Lead stage remained 'Contacted' after cancellation");
+
   console.log("\n🎉 ALL USER INTENT & HITL CHECKS PASSED!");
 }
 

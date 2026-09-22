@@ -5,6 +5,18 @@ import Link from "next/link";
 import { apiRequest } from "@/lib/api";
 import { useAuthContext } from "@/context/authContext";
 import {
+  DollarSign,
+  Boxes,
+  Briefcase,
+  Bot,
+  TrendingUp,
+  AlertTriangle,
+  ArrowRight,
+  Clock,
+  Sparkles,
+  ChevronRight
+} from "lucide-react";
+import {
   AreaChart,
   Area,
   BarChart,
@@ -16,62 +28,66 @@ import {
   ResponsiveContainer
 } from "recharts";
 
+const DEFAULT_STATS = {
+  inventory: {
+    totalProducts: 5,
+    totalStock: 820,
+    totalValuation: 164000,
+    lowStockCount: 2,
+    criticalItems: [
+      { id: "prod-demo-4", name: "Titanium Hex Bolts M8x40 (Box 50)", sku: "FST-TI-M840", current_stock: 0, min_stock_threshold: 12 },
+      { id: "prod-demo-2", name: "Lithium Polymer Pack 48V 20Ah", sku: "BAT-LIPO-4820", current_stock: 6, min_stock_threshold: 10 },
+    ],
+  },
+  crm: {
+    totalLeads: 3,
+    pipelineValue: 247000,
+    stageDistribution: [
+      { name: "New", value: 1, amount: 42000 },
+      { name: "Qualified", value: 1, amount: 85000 },
+      { name: "Proposal", value: 1, amount: 120000 },
+      { name: "Won", value: 0, amount: 0 },
+    ],
+    urgentTasks: [
+      { id: "task-demo-1", title: "Follow up with Marcus Vance on AeroTech quotation", due_date: "2026-09-23", status: "PENDING", priority: "HIGH" },
+      { id: "task-demo-2", title: "Restock PO for Titanium Hex Bolts M8x40", due_date: "2026-09-22", status: "PENDING", priority: "HIGH" },
+    ],
+  },
+  agents: {
+    activeAgentsCount: 4,
+    totalExecutions: 86,
+    successRate: "99.4%",
+  },
+  trendData: [
+    { month: "Apr", valuation: 120000, stock: 710 },
+    { month: "May", valuation: 135000, stock: 760 },
+    { month: "Jun", valuation: 128000, stock: 730 },
+    { month: "Jul", valuation: 148000, stock: 810 },
+    { month: "Aug", valuation: 154000, stock: 840 },
+    { month: "Sep", valuation: 164000, stock: 820 },
+  ],
+};
+
 export default function DashboardPage() {
   const { user, isDemo } = useAuthContext();
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(DEFAULT_STATS);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("valuation"); // "valuation" | "pipeline"
 
   useEffect(() => {
-    loadDashboardData();
+    if (user) {
+      loadDashboardData();
+    }
   }, [user, isDemo]);
 
   const loadDashboardData = async () => {
     try {
       const data = await apiRequest("/dashboard/stats");
-      setStats(data);
+      if (data) {
+        setStats(data);
+      }
     } catch (err) {
-      // Clean fallback state
-      setStats({
-        inventory: {
-          totalProducts: 4,
-          totalStock: 820,
-          totalValuation: 164000,
-          lowStockCount: 2,
-          criticalItems: [
-            { id: "1", name: "Industrial Servo Motor X1", sku: "IND-SRV-001", current_stock: 4, min_stock_threshold: 15 },
-            { id: "3", name: "Hydraulic Pump Valve 400", sku: "HYD-VAL-400", current_stock: 12, min_stock_threshold: 20 },
-          ],
-        },
-        crm: {
-          totalLeads: 4,
-          pipelineValue: 293500,
-          stageDistribution: [
-            { name: "New", value: 1, amount: 25000 },
-            { name: "Contacted", value: 1, amount: 48500 },
-            { name: "Qualified", value: 1, amount: 145000 },
-            { name: "Proposal", value: 1, amount: 75000 },
-            { name: "Won", value: 0, amount: 0 },
-          ],
-          urgentTasks: [
-            { id: "1", title: "Review high-voltage battery specs", due_date: "2026-09-18", status: "PENDING", priority: "HIGH" },
-            { id: "2", title: "Schedule factory floor walkthrough", due_date: "2026-09-20", status: "PENDING", priority: "MEDIUM" },
-          ],
-        },
-        agents: {
-          activeAgentsCount: 4,
-          totalExecutions: 86,
-          successRate: "99.4%",
-        },
-        trendData: [
-          { month: "Apr", valuation: 120000, stock: 710 },
-          { month: "May", valuation: 135000, stock: 760 },
-          { month: "Jun", valuation: 128000, stock: 730 },
-          { month: "Jul", valuation: 148000, stock: 810 },
-          { month: "Aug", valuation: 154000, stock: 840 },
-          { month: "Sep", valuation: 164000, stock: 820 },
-        ],
-      });
+      // Retain clean fallback state
     } finally {
       setLoading(false);
     }
@@ -98,71 +114,123 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6 font-sans text-zinc-100">
-      {/* 3. Page Header */}
-      <div>
-        <h1 className="text-xl font-semibold text-zinc-100">
-          Supply Chain Dashboard
-        </h1>
+    <div className="space-y-6 font-sans text-zinc-100 max-w-7xl mx-auto">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-100">
+            Supply Chain Dashboard
+          </h1>
+          <p className="text-xs text-zinc-400 mt-1">
+            Enterprise overview across inventory assets, CRM deals, and autonomous agents.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/inventory">
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 transition-colors">
+              <Boxes className="h-3.5 w-3.5 text-zinc-400" />
+              <span>Inventory</span>
+            </button>
+          </Link>
+          <Link href="/crm">
+            <button className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-800 transition-colors">
+              <Briefcase className="h-3.5 w-3.5 text-zinc-400" />
+              <span>CRM Deals</span>
+            </button>
+          </Link>
+        </div>
       </div>
 
-      {/* 4. Metrics Row (4 Equal-Width Cards) */}
+      {/* Metrics Row (4 Clean Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1 */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <p className="text-xs font-medium text-zinc-400">Total Asset Valuation</p>
-          <p className="text-2xl font-semibold text-zinc-100 mt-2 font-mono">
+        <div className="bg-zinc-900/70 border border-zinc-800/80 hover:border-zinc-700/80 rounded-xl p-5 transition-colors">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-zinc-400">Total Asset Valuation</p>
+            <div className="p-1.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <DollarSign className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-semibold text-zinc-100 mt-3 font-mono tracking-tight">
             ${Number(inventory.totalValuation || 164000).toLocaleString()}
           </p>
-          <p className="text-xs text-emerald-400 mt-1 font-medium">+8.4% growth</p>
+          <div className="flex items-center gap-1 text-[11px] text-emerald-400 mt-2 font-medium">
+            <TrendingUp className="h-3.5 w-3.5" />
+            <span>+8.4% monthly valuation</span>
+          </div>
         </div>
 
         {/* Metric 2 */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <p className="text-xs font-medium text-zinc-400">Active SKUs</p>
-          <p className="text-2xl font-semibold text-zinc-100 mt-2 font-mono">
-            {inventory.totalStock || 820}
+        <div className="bg-zinc-900/70 border border-zinc-800/80 hover:border-zinc-700/80 rounded-xl p-5 transition-colors">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-zinc-400">Total Warehouse Stock</p>
+            <div className="p-1.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700/60">
+              <Boxes className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-semibold text-zinc-100 mt-3 font-mono tracking-tight">
+            {inventory.totalStock || 820}{" "}
+            <span className="text-xs font-normal text-zinc-400 font-sans">units</span>
           </p>
-          <p className="text-xs text-amber-400 mt-1 font-medium">
-            {inventory.lowStockCount || 2} low stock
-          </p>
+          <div className="flex items-center gap-1.5 text-[11px] mt-2 font-medium">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <AlertTriangle className="h-3 w-3" />
+              {inventory.lowStockCount || 2} low stock
+            </span>
+          </div>
         </div>
 
         {/* Metric 3 */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <p className="text-xs font-medium text-zinc-400">Pipeline Value</p>
-          <p className="text-2xl font-semibold text-zinc-100 mt-2 font-mono">
+        <div className="bg-zinc-900/70 border border-zinc-800/80 hover:border-zinc-700/80 rounded-xl p-5 transition-colors">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-zinc-400">Pipeline Deal Value</p>
+            <div className="p-1.5 rounded-md bg-zinc-800 text-zinc-300 border border-zinc-700/60">
+              <Briefcase className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-semibold text-zinc-100 mt-3 font-mono tracking-tight">
             ${Number(crm.pipelineValue || 293500).toLocaleString()}
           </p>
-          <p className="text-xs text-zinc-400 mt-1 font-medium">
-            {crm.totalLeads || 4} deals
+          <p className="text-[11px] text-zinc-400 mt-2 font-medium">
+            {crm.totalLeads || 4} active enterprise opportunities
           </p>
         </div>
 
         {/* Metric 4 */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <p className="text-xs font-medium text-zinc-400">AI Executions</p>
-          <p className="text-2xl font-semibold text-zinc-100 mt-2 font-mono">
-            {agents.totalExecutions || 86} runs
+        <div className="bg-zinc-900/70 border border-zinc-800/80 hover:border-zinc-700/80 rounded-xl p-5 transition-colors">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-zinc-400">Autonomous Agents</p>
+            <div className="p-1.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <Bot className="h-4 w-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-semibold text-zinc-100 mt-3 font-mono tracking-tight">
+            {agents.totalExecutions || 86}{" "}
+            <span className="text-xs font-normal text-zinc-400 font-sans">runs</span>
           </p>
-          <p className="text-xs text-emerald-400 mt-1 font-medium">
-            {agents.successRate || "99.4%"} accuracy
-          </p>
+          <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 mt-2 font-medium">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              {agents.successRate || "99.4%"} accuracy rate
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* 5. Main Content Grid (2 Columns) */}
+      {/* Main Content Grid (2 Columns) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column (2/3 width): Combined Analytics Tab Card */}
-        <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <div className="flex items-center justify-between pb-4 border-b border-zinc-800 mb-4">
-            <h2 className="text-sm font-semibold text-zinc-200">Analytics Overview</h2>
+        <div className="lg:col-span-2 bg-zinc-900/70 border border-zinc-800/80 rounded-xl p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-zinc-800 gap-3 mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-100">Analytics Overview</h2>
+              <p className="text-xs text-zinc-400 mt-0.5">Historical asset accumulation and sales pipeline distribution</p>
+            </div>
             <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-lg border border-zinc-800">
               <button
                 onClick={() => setActiveTab("valuation")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                   activeTab === "valuation"
-                    ? "bg-zinc-800 text-white"
+                    ? "bg-zinc-800 text-white shadow-xs"
                     : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
@@ -172,7 +240,7 @@ export default function DashboardPage() {
                 onClick={() => setActiveTab("pipeline")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                   activeTab === "pipeline"
-                    ? "bg-zinc-800 text-white"
+                    ? "bg-zinc-800 text-white shadow-xs"
                     : "text-zinc-400 hover:text-zinc-200"
                 }`}
               >
@@ -187,20 +255,21 @@ export default function DashboardPage() {
                 <AreaChart data={trendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="valGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                  <XAxis dataKey="month" stroke="#71717a" fontSize={12} tickLine={false} />
-                  <YAxis stroke="#71717a" fontSize={12} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+                  <XAxis dataKey="month" stroke="#71717a" fontSize={11} tickLine={false} />
+                  <YAxis stroke="#71717a" fontSize={11} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#09090b",
+                      backgroundColor: "#121215",
                       borderColor: "#27272a",
                       borderRadius: "0.5rem",
                       color: "#f4f4f5",
                       fontSize: "12px",
+                      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.3)",
                     }}
                     formatter={(val) => [`$${Number(val).toLocaleString()}`, "Valuation"]}
                   />
@@ -216,15 +285,16 @@ export default function DashboardPage() {
               ) : (
                 <BarChart data={stageData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                  <XAxis dataKey="name" stroke="#71717a" fontSize={12} tickLine={false} />
-                  <YAxis stroke="#71717a" fontSize={12} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+                  <XAxis dataKey="name" stroke="#71717a" fontSize={11} tickLine={false} />
+                  <YAxis stroke="#71717a" fontSize={11} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#09090b",
+                      backgroundColor: "#121215",
                       borderColor: "#27272a",
                       borderRadius: "0.5rem",
                       color: "#f4f4f5",
                       fontSize: "12px",
+                      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.3)",
                     }}
                     formatter={(val) => [`$${Number(val).toLocaleString()}`, "Amount"]}
                   />
@@ -238,14 +308,22 @@ export default function DashboardPage() {
         {/* Right Column (1/3 width): Actionable Items */}
         <div className="space-y-6">
           {/* Restock Needed Card */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-zinc-200 mb-3">Restock Needed</h3>
-            <div className="space-y-3">
+          <div className="bg-zinc-900/70 border border-zinc-800/80 rounded-xl p-5">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800 mb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-400" />
+                <h3 className="text-sm font-semibold text-zinc-100">Restock Needed</h3>
+              </div>
+              <Link href="/inventory" className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium">
+                View all
+              </Link>
+            </div>
+            <div className="space-y-2.5">
               {inventory.criticalItems && inventory.criticalItems.length > 0 ? (
                 inventory.criticalItems.map((item) => (
                   <div
                     key={item.id}
-                    className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg flex items-center justify-between text-xs"
+                    className="p-3 bg-zinc-950 border border-zinc-800/80 rounded-lg flex items-center justify-between text-xs"
                   >
                     <div>
                       <p className="font-medium text-zinc-100">{item.name}</p>
@@ -254,39 +332,47 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <Link href={`/inventory?adjust=${item.id}`}>
-                      <button className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors">
-                        Restock SKU
+                      <button className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition-colors shadow-xs">
+                        Restock
                       </button>
                     </Link>
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-zinc-500 py-4 text-center">No restock items.</p>
+                <p className="text-xs text-zinc-500 py-4 text-center">All inventory levels are healthy.</p>
               )}
             </div>
           </div>
 
           {/* Pending Tasks Card */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-zinc-200 mb-3">Pending Tasks</h3>
-            <div className="space-y-3">
+          <div className="bg-zinc-900/70 border border-zinc-800/80 rounded-xl p-5">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800 mb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-zinc-400" />
+                <h3 className="text-sm font-semibold text-zinc-100">Pending Tasks</h3>
+              </div>
+              <Link href="/crm" className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium">
+                View CRM
+              </Link>
+            </div>
+            <div className="space-y-2.5">
               {crm.urgentTasks && crm.urgentTasks.length > 0 ? (
                 crm.urgentTasks.map((task) => (
                   <div
                     key={task.id}
-                    className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg flex items-center justify-between text-xs"
+                    className="p-3 bg-zinc-950 border border-zinc-800/80 rounded-lg flex items-center justify-between text-xs"
                   >
-                    <div>
-                      <p className="font-medium text-zinc-200">{task.title}</p>
+                    <div className="pr-2">
+                      <p className="font-medium text-zinc-200 line-clamp-1">{task.title}</p>
                       <p className="text-[11px] text-zinc-400 mt-0.5">Due: {task.due_date}</p>
                     </div>
-                    <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px] font-medium">
+                    <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700/60 text-zinc-300 text-[10px] font-medium shrink-0">
                       {task.priority}
                     </span>
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-zinc-500 py-4 text-center">No pending tasks.</p>
+                <p className="text-xs text-zinc-500 py-4 text-center">No urgent tasks pending.</p>
               )}
             </div>
           </div>
