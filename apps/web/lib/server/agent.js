@@ -273,15 +273,83 @@ function matchLeadFromText(text, leads) {
 }
 
 /**
- * Matches a task from message text by title.
+ * Matches a task from message text by title, id, or key entity tokens.
  */
 function matchTaskFromText(text, tasks) {
   if (!tasks || tasks.length === 0) return null;
   const lower = text.toLowerCase().trim();
-  for (const t of tasks) {
-    if (t.title && lower.includes(t.title.toLowerCase())) return t;
+
+  // 1. Direct ID match (e.g. "task-demo-1", "task-1", "#task-demo-1")
+  const idMatch = text.match(/(?:#?task-[a-zA-Z0-9_\-]+|#\d+)/i);
+  if (idMatch) {
+    const rawId = idMatch[0].replace(/^#/g, "").toLowerCase();
+    const foundById = tasks.find((t) => t.id && t.id.toLowerCase() === rawId);
+    if (foundById) return foundById;
   }
-  return tasks[0];
+
+  // 2. Full title contains
+  for (const t of tasks) {
+    const title = (t.title || "").toLowerCase().trim();
+    if (title && (lower.includes(title) || title.includes(lower))) return t;
+  }
+
+  // 3. Normalized candidate match
+  // Handles queries like "Delete the Follow up task with Marcus Vance on AeroTech quotation"
+  // matching task title "Follow up with Marcus Vance on AeroTech quotation"
+  const cleanUserQuery = lower
+    .replace(/^(?:please\s+)?(?:can you\s+)?(?:delete|remove|erase|cancel|drop|destroy)\s+(?:the\s+)?(?:task\s+)?/i, "")
+    .replace(/\b(?:the\s+)?(?:task|todo|to-do)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  for (const t of tasks) {
+    const cleanTitle = (t.title || "").toLowerCase().replace(/\b(?:the\s+)?(?:task|todo|to-do)\b/gi, "").replace(/\s+/g, " ").trim();
+    if (cleanTitle && cleanUserQuery) {
+      if (cleanUserQuery.includes(cleanTitle) || cleanTitle.includes(cleanUserQuery)) {
+        return t;
+      }
+    }
+  }
+
+  // 4. Token & key entity overlap scoring
+  let bestTask = null;
+  let highestScore = 0;
+  const stopWords = new Set(["delete", "remove", "erase", "cancel", "drop", "destroy", "the", "task", "with", "on", "for", "to", "in", "at", "a", "an", "of", "and", "please", "can", "you"]);
+
+  const userWords = lower
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !stopWords.has(w));
+
+  for (const t of tasks) {
+    const combined = `${t.title || ""} ${t.description || ""}`.toLowerCase();
+    let score = 0;
+    for (const w of userWords) {
+      if (combined.includes(w)) {
+        score++;
+      }
+    }
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestTask = t;
+    }
+  }
+
+  // Match if 2 or more significant words match (e.g. "marcus" + "vance", or "aerotech" + "quotation")
+  if (bestTask && highestScore >= 2) {
+    return bestTask;
+  }
+
+  // 5. Distinct single keyword match if query mentions a unique name like Marcus or AeroTech
+  for (const t of tasks) {
+    const combined = `${t.title || ""} ${t.description || ""}`.toLowerCase();
+    if (userWords.some((w) => w.length >= 5 && combined.includes(w))) {
+      return t;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -414,30 +482,42 @@ function isNegativeCancellation(text) {
 }
 
 /**
+ * Robust check for Delete intent.
+ */
+function isDeleteIntent(lowerMsg, message) {
+  return /(?:delete|remove|erase|drop|destroy|cancel)\b/i.test(message);
+}
+
+/**
  * Robust check for Task creation intent.
- * CRITICAL: Must return true for "Add a follow up task of meeting with the lead schedule on 30 sep 2026"
- * and prevent Lead creation from firing.
+ * CRITICAL:
+ * 1. Must NEVER return true if message expresses deletion/removal intent!
+ * 2. Must return true for "Add a follow up task of meeting with the lead schedule on 30 sep 2026"
+ * 3. Prevents Lead creation from firing.
  */
 function isTaskCreationIntent(lowerMsg, message) {
-  const hasTaskKeyword = lowerMsg.includes("task") || lowerMsg.includes("follow up") || lowerMsg.includes("follow-up");
+  // Never classify deletion commands as task creation
+  if (isDeleteIntent(lowerMsg, message)) return false;
+
+  const hasTaskKeyword = lowerMsg.includes("task") || lowerMsg.includes("follow up") || lowerMsg.includes("follow-up") || lowerMsg.includes("todo");
   if (!hasTaskKeyword) return false;
 
-  const hasCreateVerb = /(?:add|create|new|schedule|set up|register|insert|put)\b/i.test(message);
-  const hasTaskNoun = /\b(?:task|follow\s*-?\s*up)\b/i.test(message);
+  const hasCreateVerb = /(?:add|create|new|schedule|set up|register|insert|put|assign)\b/i.test(message);
+  const hasTaskNoun = /\b(?:task|follow\s*-?\s*up|todo|to-do)\b/i.test(message);
 
   if (hasCreateVerb && hasTaskNoun) return true;
-  if (/^task\s+(?:to|for|of|about)\b/i.test(message)) return true;
-  if (/follow\s*-?\s*up\s+task\b/i.test(message)) return true;
-  if (/\badd\s+(?:a\s+)?follow\s*-?\s*up\b/i.test(message)) return true;
+  if (/^(?:please\s+)?(?:can you\s+)?task\s+(?:to|for|of|about)\b/i.test(message)) return true;
+  if (/\b(?:add|create|schedule|set up)\s+(?:a\s+)?follow\s*-?\s*up\b/i.test(message)) return true;
 
   return false;
 }
 
 /**
  * Robust check for Lead creation intent.
- * CRITICAL: Must NEVER return true if isTaskCreationIntent is true!
+ * CRITICAL: Must NEVER return true if isTaskCreationIntent or isDeleteIntent is true!
  */
 function isLeadCreationIntent(lowerMsg, message) {
+  if (isDeleteIntent(lowerMsg, message)) return false;
   if (isTaskCreationIntent(lowerMsg, message)) return false;
 
   const hasCreateVerb = /(?:add|create|new|register|insert|open)\b/i.test(message);
@@ -450,16 +530,10 @@ function isLeadCreationIntent(lowerMsg, message) {
  * Robust check for Customer creation intent.
  */
 function isCustomerCreationIntent(lowerMsg, message) {
+  if (isDeleteIntent(lowerMsg, message)) return false;
   const hasCreateVerb = /(?:add|create|new|register|insert|open)\b/i.test(message);
   const hasCustomerNoun = /\b(?:customer|account|client)\b/i.test(message);
   return hasCreateVerb && hasCustomerNoun;
-}
-
-/**
- * Robust check for Delete intent.
- */
-function isDeleteIntent(lowerMsg, message) {
-  return /(?:delete|remove|erase|drop|destroy)\b/i.test(message);
 }
 
 /**
@@ -742,7 +816,64 @@ export async function executeAgentChat(context, { agentId, message, conversation
     }
   }
 
-  // 2D. Awaiting Quantity for Restock (Multi-turn)
+  // 2D. Awaiting Product for Restock (Multi-turn)
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "RESTOCK_PRODUCT" &&
+    currentWorkflow.step === "AWAITING_PRODUCT" &&
+    !isQuestionOrInquiry(lowerMsg)
+  ) {
+    toolsUsed.push("inventory_restock_orchestrator");
+    const matchedProduct = matchProductFromText(message, products);
+
+    if (matchedProduct) {
+      const qtyMatch = message.match(/\b(?:by|with|add|plus|\+)\s*(\d+)\b/i) ||
+        message.match(/\b(\d+)\s*(?:units?|pieces?|pcs?|items?|boxes?)\b/i) ||
+        message.match(/\b(?:quantity|qty|amount)\s*[:=]?\s*(\d+)\b/i) ||
+        message.match(/\b(\d+)\b/);
+      const hasExplicitQuantity = Boolean(qtyMatch && parseInt(qtyMatch[1], 10) > 0);
+
+      if (!hasExplicitQuantity) {
+        answer = `How many units of **${matchedProduct.name}** would you like to restock? Please specify the quantity you want to add.`;
+        requiresConfirmation = false;
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, {
+            intent: "RESTOCK_PRODUCT",
+            step: "AWAITING_QUANTITY",
+            productId: matchedProduct.id,
+            productName: matchedProduct.name,
+          });
+        }
+      } else {
+        const quantity = parseInt(qtyMatch[1], 10);
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "RESTOCK_PRODUCT",
+          title: `Restock: ${matchedProduct.name}`,
+          summary: `Renew stock for ${matchedProduct.name} (${matchedProduct.sku}) by +${quantity} units.`,
+          payload: {
+            productId: matchedProduct.id,
+            sku: matchedProduct.sku,
+            productName: matchedProduct.name,
+            quantityDelta: quantity,
+            quantity: quantity,
+            changeType: "IN",
+            reason: "User specified restocking quantity via AI assistant",
+          },
+        });
+
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, null);
+        }
+
+        answer = `I have prepared the request to renew the stock of **${matchedProduct.name}** (**${matchedProduct.sku}**) by **+${quantity} units** (current stock: ${matchedProduct.quantity} units).\n\nPlease confirm below before I proceed.`;
+      }
+    } else {
+      answer = `I could not find a product matching "${message}". Which product would you like to restock? Please specify the product name or SKU.`;
+    }
+  }
+
+  // 2E. Awaiting Quantity for Restock (Multi-turn)
   else if (
     currentWorkflow &&
     currentWorkflow.intent === "RESTOCK_PRODUCT" &&
@@ -766,6 +897,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
           sku: matchedProduct.sku,
           productName: matchedProduct.name,
           quantityDelta: quantity,
+          quantity: quantity,
           changeType: "IN",
           reason: "User specified restocking quantity via AI assistant",
         },
@@ -782,7 +914,117 @@ export async function executeAgentChat(context, { agentId, message, conversation
   }
 
   // =============================================================
-  // STEP 3: CREATE TASK (CRITICAL FIX: Task vs Lead Confusion)
+  // STEP 3: DELETE RECORDS (TASK, LEAD, PRODUCT)
+  // Evaluated BEFORE task/lead creation to avoid create-false-positives on delete commands!
+  // e.g. "delete the task Follow up with Marcus Vance on AeroTech quotation"
+  // "delete the lead #L-2357", "delete product Optoelectronic Sensor"
+  // =============================================================
+  else if (isDeleteIntent(lowerMsg, message)) {
+    const isTaskDelete =
+      /\b(?:task|todo|to-do)\b/i.test(message) ||
+      (/\bfollow\s*-?\s*up\b/i.test(message) && matchTaskFromText(message, tasks) !== null);
+
+    const isLeadDelete =
+      !isTaskDelete &&
+      (/\b(?:lead|deal|opportunity|prospect)\b/i.test(message) || extractLeadIdentifierCandidate(message) !== null);
+
+    // 3A. Delete Task
+    if (isTaskDelete) {
+      toolsUsed.push("crm_task_deleter");
+      const matchedTask = matchTaskFromText(message, tasks);
+      if (matchedTask) {
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "DELETE_TASK",
+          title: `Delete Task: ${matchedTask.title}`,
+          summary: `Delete task "${matchedTask.title}" from CRM.`,
+          payload: {
+            taskId: matchedTask.id,
+            taskTitle: matchedTask.title,
+          },
+        });
+        answer = `I have prepared the request to delete task **${matchedTask.title}**.\n\nPlease confirm below to proceed.`;
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, null);
+        }
+      } else {
+        answer = "Which task would you like to delete? Please specify the task title or ID.";
+      }
+    }
+    // 3B. Delete Lead
+    else if (isLeadDelete) {
+      toolsUsed.push("crm_lead_deleter");
+      const matchedLead = matchLeadFromText(message, leads);
+      const candidateId = extractLeadIdentifierCandidate(message);
+
+      if (matchedLead) {
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "DELETE_LEAD",
+          title: `Delete Lead: ${matchedLead.title}`,
+          summary: `Permanently delete lead "${matchedLead.title}" (ID: ${matchedLead.id}).`,
+          payload: {
+            leadId: matchedLead.id,
+            leadTitle: matchedLead.title,
+          },
+        });
+        answer = `I have prepared the request to delete lead **${matchedLead.title}** (ID: \`${matchedLead.id}\`).\n\nPlease confirm below before I permanently remove it.`;
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, null);
+        }
+      } else if (candidateId) {
+        // Candidate was explicitly requested but does not exist in tenant's records
+        const activeLeadsList = leads.length > 0
+          ? leads.slice(0, 5).map((l) => `• **${l.title}** (ID: \`${l.id}\`)`).join("\n")
+          : "None";
+        answer = `I could not find a lead with ID or title **${candidateId}** in your CRM pipeline (it may have already been deleted).\n\nHere are your current active leads:\n${activeLeadsList}\n\nWhich lead would you like to delete?`;
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, {
+            intent: "DELETE_LEAD",
+            step: "AWAITING_LEAD_IDENTIFIER",
+          });
+        }
+      } else {
+        answer = "Which lead would you like to delete? Please specify the lead title or ID.";
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, {
+            intent: "DELETE_LEAD",
+            step: "AWAITING_LEAD_IDENTIFIER",
+          });
+        }
+      }
+    }
+    // 3C. Delete Product
+    else {
+      toolsUsed.push("inventory_product_deleter");
+      const matchedProduct = matchProductFromText(message, products);
+      if (matchedProduct) {
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "DELETE_PRODUCT",
+          title: `Delete Product: ${matchedProduct.name}`,
+          summary: `Permanently delete ${matchedProduct.name} (${matchedProduct.sku}) from inventory.`,
+          payload: {
+            productId: matchedProduct.id,
+            sku: matchedProduct.sku,
+            productName: matchedProduct.name,
+          },
+        });
+        answer = `I have prepared the request to delete **${matchedProduct.name}** (**${matchedProduct.sku}**).\n\nPlease confirm below before I permanently remove it from inventory.`;
+      } else {
+        const prodMatch = message.match(/(?:product|item)\s+([a-zA-Z0-9_\-\s]+)/i);
+        const nameTried = prodMatch ? prodMatch[1].trim() : null;
+        if (nameTried) {
+          answer = `Product "${nameTried}" was not found in your inventory (it may have already been deleted).`;
+        } else {
+          answer = "Which item would you like to delete? Please specify the product name or SKU.";
+        }
+      }
+    }
+  }
+
+  // =============================================================
+  // STEP 4: CREATE TASK (CRITICAL FIX: Task vs Lead Confusion)
   // e.g. "Add a follow up task of meeting with the lead schedule on 30 sep 2026"
   // =============================================================
   else if (isTaskCreationIntent(lowerMsg, message)) {
@@ -1098,6 +1340,13 @@ export async function executeAgentChat(context, { agentId, message, conversation
 
     if (!matchedProduct) {
       answer = "Which product would you like to restock? Please specify the product name or SKU.";
+      requiresConfirmation = false;
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "RESTOCK_PRODUCT",
+          step: "AWAITING_PRODUCT",
+        });
+      }
     } else {
       // Remove product name and SKU from message text to avoid matching model numbers (e.g. v2, 24V, 400W)
       let textWithoutProduct = message;
@@ -1137,6 +1386,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
             sku: matchedProduct.sku,
             productName: matchedProduct.name,
             quantityDelta: quantity,
+            quantity: quantity,
             changeType: "IN",
             reason: "User requested restocking via AI assistant",
           },
@@ -1147,102 +1397,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
     }
   }
 
-  // =============================================================
-  // STEP 8: DELETE RECORDS (LEAD, PRODUCT, TASK)
-  // e.g. "delete the lead #L-2357", "delete product Optoelectronic Sensor"
-  // =============================================================
-  else if (isDeleteIntent(lowerMsg, message)) {
-    // 8A. Delete Lead
-    if (lowerMsg.includes("lead") || lowerMsg.includes("deal") || lowerMsg.includes("opportunity")) {
-      toolsUsed.push("crm_lead_deleter");
-      const matchedLead = matchLeadFromText(message, leads);
-      const candidateId = extractLeadIdentifierCandidate(message);
 
-      if (matchedLead) {
-        requiresConfirmation = true;
-        pendingAction = await storeAdapter.createPendingAction(context, {
-          actionType: "DELETE_LEAD",
-          title: `Delete Lead: ${matchedLead.title}`,
-          summary: `Permanently delete lead "${matchedLead.title}" (ID: ${matchedLead.id}).`,
-          payload: {
-            leadId: matchedLead.id,
-            leadTitle: matchedLead.title,
-          },
-        });
-        answer = `I have prepared the request to delete lead **${matchedLead.title}** (ID: \`${matchedLead.id}\`).\n\nPlease confirm below before I permanently remove it.`;
-        if (conversationId) {
-          await storeAdapter.setConversationState(context, conversationId, null);
-        }
-      } else if (candidateId) {
-        // Candidate was explicitly requested but does not exist in tenant's records
-        const activeLeadsList = leads.length > 0
-          ? leads.slice(0, 5).map((l) => `• **${l.title}** (ID: \`${l.id}\`)`).join("\n")
-          : "None";
-        answer = `I could not find a lead with ID or title **${candidateId}** in your CRM pipeline (it may have already been deleted).\n\nHere are your current active leads:\n${activeLeadsList}\n\nWhich lead would you like to delete?`;
-        if (conversationId) {
-          await storeAdapter.setConversationState(context, conversationId, {
-            intent: "DELETE_LEAD",
-            step: "AWAITING_LEAD_IDENTIFIER",
-          });
-        }
-      } else {
-        answer = "Which lead would you like to delete? Please specify the lead title or ID.";
-        if (conversationId) {
-          await storeAdapter.setConversationState(context, conversationId, {
-            intent: "DELETE_LEAD",
-            step: "AWAITING_LEAD_IDENTIFIER",
-          });
-        }
-      }
-    }
-    // 8B. Delete Task
-    else if (lowerMsg.includes("task")) {
-      toolsUsed.push("crm_task_deleter");
-      const matchedTask = matchTaskFromText(message, tasks);
-      if (matchedTask) {
-        requiresConfirmation = true;
-        pendingAction = await storeAdapter.createPendingAction(context, {
-          actionType: "DELETE_TASK",
-          title: `Delete Task: ${matchedTask.title}`,
-          summary: `Delete task "${matchedTask.title}" from CRM.`,
-          payload: {
-            taskId: matchedTask.id,
-            taskTitle: matchedTask.title,
-          },
-        });
-        answer = `I have prepared the request to delete task **${matchedTask.title}**.\n\nPlease confirm below to proceed.`;
-      } else {
-        answer = "Which task would you like to delete? Please specify the task title.";
-      }
-    }
-    // 8C. Delete Product
-    else {
-      toolsUsed.push("inventory_product_deleter");
-      const matchedProduct = matchProductFromText(message, products);
-      if (matchedProduct) {
-        requiresConfirmation = true;
-        pendingAction = await storeAdapter.createPendingAction(context, {
-          actionType: "DELETE_PRODUCT",
-          title: `Delete Product: ${matchedProduct.name}`,
-          summary: `Permanently delete ${matchedProduct.name} (${matchedProduct.sku}) from inventory.`,
-          payload: {
-            productId: matchedProduct.id,
-            sku: matchedProduct.sku,
-            productName: matchedProduct.name,
-          },
-        });
-        answer = `I have prepared the request to delete **${matchedProduct.name}** (**${matchedProduct.sku}**).\n\nPlease confirm below before I permanently remove it from inventory.`;
-      } else {
-        const prodMatch = message.match(/(?:product|item)\s+([a-zA-Z0-9_\-\s]+)/i);
-        const nameTried = prodMatch ? prodMatch[1].trim() : null;
-        if (nameTried) {
-          answer = `Product "${nameTried}" was not found in your inventory (it may have already been deleted).`;
-        } else {
-          answer = "Which item would you like to delete? Please specify the product name or SKU.";
-        }
-      }
-    }
-  }
 
   // =============================================================
   // STEP 9: EDIT RECORDS (PRODUCT, LEAD, TASK)

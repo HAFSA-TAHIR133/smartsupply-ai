@@ -1,16 +1,19 @@
 import "./env.js";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import * as neonDb from "./neonDb.js";
 
+const __currentDir = typeof __dirname !== "undefined" ? __dirname : path.dirname(fileURLToPath(import.meta.url));
+
 const JWT_SECRET = process.env.JWT_SECRET || "super-secret-change-me-later-smartsupply";
 const DATA_DIR_CANDIDATES = [
   path.resolve(process.cwd(), "apps/web/.data"),
   path.resolve(process.cwd(), ".data"),
-  path.resolve(__dirname, "../../.data"),
+  path.resolve(__currentDir, "../../.data"),
 ];
 
 function getPrimaryDataDir() {
@@ -128,22 +131,6 @@ const INITIAL_DEMO_DATA = {
     },
   ],
   leads: [
-    {
-      id: "lead-gdgu-bsjd",
-      tenantId: "demo-tenant-id",
-      title: "gdgu bsjd",
-      name: "gdgu bsjd",
-      companyName: "gdgu bsjd",
-      contactName: "gdgu bsjd",
-      contactEmail: "contact@gdgubsjd.com",
-      contactPhone: "+1 (555) 019-2834",
-      value: 50000,
-      stage: "New",
-      priority: "HIGH",
-      notes: "Equipment and component supply deal",
-      createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
     {
       id: "lead-live-1",
       tenantId: "demo-tenant-id",
@@ -491,20 +478,19 @@ let liveDb = null;
 
 export function getDemoDb() {
   if (!demoDb) {
-    demoDb = readJson(DEMO_DB_PATH, INITIAL_DEMO_DATA);
+    demoDb = JSON.parse(JSON.stringify(INITIAL_DEMO_DATA));
   }
   return demoDb;
 }
 
 export function saveDemoDb() {
-  if (demoDb) {
-    writeJson(DEMO_DB_PATH, demoDb);
-  }
+  // Demo mode is strictly ephemeral and frontend-focused.
+  // Mutations do NOT persist to backend disk so the original demo state is always preserved.
 }
 
 export function resetDemoDb() {
   demoDb = JSON.parse(JSON.stringify(INITIAL_DEMO_DATA));
-  saveDemoDb();
+  writeJson(DEMO_DB_PATH, demoDb);
   return demoDb;
 }
 
@@ -937,7 +923,8 @@ export const storeAdapter = {
     const isLive = !context.isDemo;
     const db = isLive ? getLiveDb() : getDemoDb();
     const newLead = {
-      id: `lead-${Date.now()}`,
+      id: payload.id || `lead-${Date.now()}`,
+      accountNo: payload.accountNo || payload.account_no || null,
       tenantId: context.user?.tenantId || (isLive ? "tenant-live-default" : "demo-tenant-id"),
       title: payload.title || payload.name || "New Prospect",
       name: payload.name || payload.title || "New Prospect",

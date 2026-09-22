@@ -176,7 +176,7 @@ describe("Suite 5: Multi-Turn Clarification and Context Workflows", () => {
 
     const histRes = await get(`/conversations/${convId}/messages`, token);
     assert(histRes.ok, "GET /conversations/:id/messages returned 200");
-    const messages = histRes.data?.data || [];
+    const messages = histRes.data?.data?.messages || (Array.isArray(histRes.data?.data) ? histRes.data?.data : []);
     assert(messages.length >= 4, `Conversation has at least 4 messages (got: ${messages.length})`);
 
     // Verify chronological order and roles

@@ -30,6 +30,13 @@ export function AuthProvider({ children }) {
     if (isLoggingOutRef.current) return;
     isLoggingOutRef.current = true;
 
+    const wasDemo = isDemo || (typeof window !== "undefined" && localStorage.getItem("smartsupply_isDemo") === "true");
+    if (wasDemo) {
+      // Ephemeral Demo Account: reset demo backend on logout
+      apiRequest("/demo/reset", { method: "POST" }).catch(() => {});
+    }
+    apiRequest("/auth/logout", { method: "POST" }).catch(() => {});
+
     setUser(null);
     setToken(null);
     setIsDemo(false);
@@ -87,6 +94,19 @@ export function AuthProvider({ children }) {
         if (typeof window !== "undefined") {
           localStorage.setItem("smartsupply_last_active", Date.now().toString());
         }
+
+        // Ephemeral Demo Account:
+        // When the user refreshes the page, restore the original pristine demo account data
+        if (savedDemo) {
+          apiRequest("/demo/reset", { method: "POST" })
+            .then(() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("smartsupply:data-updated"));
+              }
+            })
+            .catch(() => {});
+        }
+
         setLoading(false);
         return;
       } catch (e) {

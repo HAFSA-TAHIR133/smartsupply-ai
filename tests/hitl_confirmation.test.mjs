@@ -157,4 +157,66 @@ describe("Suite 4: Human-in-the-Loop Confirmation Rigor", () => {
     const droneLead = leadsRes.data?.data?.find((l) => l.title.includes("Autonomous Delivery Drone"));
     assert(droneLead != null, "Lead still exists in database");
   });
+
+  test("4.6 Pending HITL action is preserved across intermediate read-only questions", async () => {
+    const token = await getDemoToken(false);
+    const convId = "conv-hitl-retain-across-q";
+
+    // 1. Stage an action
+    const stageRes = await post("/agents/supply-chain-agent/chat", {
+      message: "restock Brushless Motor 24V High-Torque by 10 units",
+      conversationId: convId,
+    }, token);
+
+    assert(stageRes.ok, "Turn 1 returned 200");
+    assert(stageRes.data?.data?.requiresConfirmation === true, "Turn 1 requires confirmation");
+    const stagedId = stageRes.data?.data?.pendingAction?.id;
+    assert(stagedId != null, "Turn 1 staged action created");
+
+    // 2. Intermediate turn: user asks a read-only question
+    const qRes = await post("/agents/supply-chain-agent/chat", {
+      message: "What is my current inventory status?",
+      conversationId: convId,
+    }, token);
+
+    assert(qRes.ok, "Turn 2 question returned 200");
+    assert(qRes.data?.data?.requiresConfirmation === false, "Turn 2 question does not require confirmation");
+
+    // 3. Pending action must still be intact and pending
+    const checkAction = await get(`/actions/pending/${stagedId}`, token);
+    assert(checkAction.ok, "Pending action still exists");
+    assert(
+      checkAction.data?.data?.status === "PENDING" || checkAction.data?.data?.status === "PENDING_CONFIRMATION",
+      "Pending action status is still PENDING after intermediate question"
+    );
+
+    // 4. User confirms the action in Turn 3
+    const confirmRes = await post("/agents/supply-chain-agent/chat", {
+      message: "Yes, go ahead and restock it",
+      conversationId: convId,
+    }, token);
+
+    assert(confirmRes.ok, "Turn 3 confirmation returned 200");
+    assert(confirmRes.data?.data?.executedAction === true, "Turn 3 executedAction is true");
+    assert(confirmRes.data?.data?.answer.toLowerCase().includes("done"), "Confirmation reports success");
+  });
+
+  test("4.7 Assistant does not report success when action fails or has no pending action", async () => {
+    const token = await getDemoToken(false);
+    const convId = "conv-hitl-no-pending";
+
+    // Saying "yes" when there is no pending action
+    const res = await post("/agents/supply-chain-agent/chat", {
+      message: "Yes, please confirm and proceed",
+      conversationId: convId,
+    }, token);
+
+    assert(res.ok, "Chat returned 200");
+    assert(res.data?.data?.executedAction === false, "executedAction is false");
+    assert(
+      res.data?.data?.answer.toLowerCase().includes("no pending action") ||
+      res.data?.data?.answer.toLowerCase().includes("no pending"),
+      `Informs user no pending action exists (got: ${res.data?.data?.answer})`
+    );
+  });
 });

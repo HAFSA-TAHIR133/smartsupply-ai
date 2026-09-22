@@ -146,4 +146,60 @@ describe("Suite 2: AI Intent Understanding and Tool Routing", () => {
     assert(res.data?.data?.pendingAction == null, "Inquiry generates NO pending action");
     assert(res.data?.data?.answer.length > 0, "AI provided direct informational answer");
   });
+
+  test("2.8 Disambiguate Delete Task vs Create Task: 'Delete the Follow up task with Marcus Vance on AeroTech quotation'", async () => {
+    const token = await getDemoToken(true);
+    const res = await post(
+      "/agents/supply-chain-agent/chat",
+      {
+        message: "Delete the Follow up task with Marcus Vance on AeroTech quotation",
+      },
+      token
+    );
+
+    assert(res.ok, "Response returned 200");
+    const data = res.data?.data;
+    assert(data.requiresConfirmation === true, "Delete task requires confirmation");
+    assert(data.pendingAction != null, "Pending action generated");
+    assert(data.pendingAction.actionType === "DELETE_TASK", `Action MUST be DELETE_TASK (got: ${data.pendingAction.actionType})`);
+    assert(data.pendingAction.actionType !== "CREATE_TASK", "Action MUST NOT be CREATE_TASK");
+    assert(data.toolsUsed.includes("crm_task_deleter"), "Used tool crm_task_deleter");
+    assert(!data.toolsUsed.includes("crm_task_creator"), "Did NOT use crm_task_creator");
+
+    const payload = data.pendingAction.payload;
+    assert(payload.taskTitle.toLowerCase().includes("marcus vance"), `Matched task title contains 'Marcus Vance' (got: ${payload.taskTitle})`);
+  });
+
+  test("2.9 Delete Task with conversational prefix: 'please delete the Follow up task with Marcus Vance on AeroTech quotation'", async () => {
+    const token = await getDemoToken(true);
+    const res = await post(
+      "/agents/supply-chain-agent/chat",
+      {
+        message: "please delete the Follow up task with Marcus Vance on AeroTech quotation",
+      },
+      token
+    );
+
+    assert(res.ok, "Response returned 200");
+    const data = res.data?.data;
+    assert(data.pendingAction != null, "Pending action generated");
+    assert(data.pendingAction.actionType === "DELETE_TASK", `Action MUST be DELETE_TASK (got: ${data.pendingAction.actionType})`);
+    assert(data.toolsUsed.includes("crm_task_deleter"), "Used crm_task_deleter");
+    assert(!data.toolsUsed.includes("crm_task_creator"), "Did NOT use crm_task_creator");
+  });
+
+  test("2.10 Demo Mode Ephemerality: Demo data resets to pristine factory state on reset", async () => {
+    const token = await getDemoToken(true);
+    // 1. Trigger reset
+    const resetRes = await post("/demo/reset", {}, token);
+    assert(resetRes.ok, "Reset returned 200");
+
+    // 2. Fetch tasks
+    const { get } = await import("./test_helpers.mjs");
+    const tasksRes = await get("/crm/tasks", token);
+    assert(tasksRes.ok, "Fetched demo tasks");
+    const tasks = tasksRes.data?.data || [];
+    const marcusTask = tasks.find((t) => t.title?.toLowerCase().includes("marcus vance"));
+    assert(marcusTask != null, "Pristine demo task 'Follow up with Marcus Vance on AeroTech quotation' is present");
+  });
 });

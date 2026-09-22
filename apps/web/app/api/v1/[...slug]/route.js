@@ -11,6 +11,12 @@ import {
 } from "@/lib/server/store";
 import * as neonDb from "@/lib/server/neonDb";
 import { executeAgentChat } from "@/lib/server/agent";
+import {
+  checkLoginLockout,
+  recordFailedLogin,
+  recordSuccessfulLogin,
+  clearAllLoginAttempts,
+} from "@/lib/server/authLockout";
 
 function jsonSuccess(data, message = "Success", status = 200) {
   return NextResponse.json(
@@ -19,9 +25,9 @@ function jsonSuccess(data, message = "Success", status = 200) {
   );
 }
 
-function jsonError(message = "An error occurred", status = 400, code = "BAD_REQUEST") {
+function jsonError(message = "An error occurred", status = 400, code = "BAD_REQUEST", extra = {}) {
   return NextResponse.json(
-    { success: false, error: { message, code }, message },
+    { success: false, error: { message, code, ...extra }, message, ...extra },
     { status }
   );
 }
@@ -45,6 +51,20 @@ export async function GET(req, { params }) {
         isDemo: context.isDemo,
         mode: context.mode,
       });
+    }
+
+    // Demo Reset (GET supported without requiring auth)
+    if (slug[0] === "demo" && slug[1] === "reset") {
+      resetDemoDb();
+      clearAllLoginAttempts();
+      return jsonSuccess({ reset: true }, "Demo sandbox data successfully restored to factory state.");
+    }
+
+    // Lockout status check (GET supported without requiring auth)
+    if (slug[0] === "auth" && slug[1] === "lockout") {
+      const email = url.searchParams.get("email") || "";
+      const status = checkLoginLockout(email);
+      return jsonSuccess(status);
     }
 
     // Require authentication for all subsequent endpoints
@@ -187,9 +207,7 @@ export async function POST(req, { params }) {
   try {
     // 1. Auth: Demo Login
     if (slug[0] === "auth" && slug[1] === "demo") {
-      if (body?.reset || slug[2] === "reset") {
-        resetDemoDb();
-      }
+      resetDemoDb();
       const demoUser = {
         userId: "demo-user-alex",
         email: "demo@smartsupply.ai",
@@ -216,6 +234,12 @@ export async function POST(req, { params }) {
       }, "Demo mode activated. Sandboxed state ready.");
     }
 
+    // 1b. Auth: Logout
+    if (slug[0] === "auth" && slug[1] === "logout") {
+      resetDemoDb();
+      return jsonSuccess({ success: true }, "Logged out successfully.");
+    }
+
     // 2. Auth: Live Login
     if (slug[0] === "auth" && slug[1] === "login") {
       const { email, password } = body;
@@ -224,6 +248,24 @@ export async function POST(req, { params }) {
       }
 
       const normalizedEmail = email.trim().toLowerCase();
+
+      // Check if account is temporarily locked out due to 10 failed attempts
+      const lockout = checkLoginLockout(normalizedEmail);
+      if (lockout.isLocked) {
+        const remainingMinutes = lockout.remainingMinutes;
+        return jsonError(
+          `Too many failed login attempts. Limit of 10 attempts reached. Please wait ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"} before trying again.`,
+          429,
+          "TOO_MANY_ATTEMPTS",
+          {
+            remainingMinutes,
+            remainingSeconds: lockout.remainingSeconds,
+            lockedUntil: lockout.lockedUntil,
+            isLocked: true,
+          }
+        );
+      }
+
       let user = null;
       let tenant = null;
 
@@ -272,8 +314,22 @@ export async function POST(req, { params }) {
           }
         }
 
-        // If user is not found or password is invalid, return generic error (do not reveal existence, do not auto-create)
+        // If user is not found or password is invalid, record failed attempt and check lockout
         if (!user) {
+          const failure = recordFailedLogin(normalizedEmail);
+          if (failure.isLocked) {
+            return jsonError(
+              "Too many failed login attempts. Limit of 10 attempts reached. Please wait 15 minutes before trying again.",
+              429,
+              "TOO_MANY_ATTEMPTS",
+              {
+                remainingMinutes: 15,
+                remainingSeconds: failure.remainingSeconds,
+                lockedUntil: failure.lockedUntil,
+                isLocked: true,
+              }
+            );
+          }
           return jsonError("Invalid email or password", 401, "UNAUTHORIZED");
         }
 
@@ -284,6 +340,9 @@ export async function POST(req, { params }) {
           };
         }
       }
+
+      // Reset failed attempts on successful authentication
+      recordSuccessfulLogin(normalizedEmail);
 
       const tenantName = tenant?.name || "Enterprise Logistics";
       const token = signToken({
@@ -478,6 +537,7 @@ export async function POST(req, { params }) {
     // 4. Demo Reset
     if (slug[0] === "demo" && slug[1] === "reset") {
       resetDemoDb();
+      clearAllLoginAttempts();
       return jsonSuccess({ reset: true }, "Demo sandbox data successfully restored to factory state.");
     }
 
@@ -487,7 +547,7 @@ export async function POST(req, { params }) {
     }
 
     // 5. Inventory: Create product
-    if (slug[0] === "inventory" && !slug[1]) {
+    if (slug[0] === "inventory" && (!slug[1] || slug[1] === "products")) {
       const created = await storeAdapter.createProduct(context, body);
       return jsonSuccess(created, "Product created successfully", 201);
     }
@@ -582,7 +642,8 @@ export async function PUT(req, { params }) {
   try {
     // 1. Inventory: Update product
     if (slug[0] === "inventory" && slug[1]) {
-      const updated = await storeAdapter.updateProduct(context, slug[1], body);
+      const id = slug[1] === "products" ? slug[2] : slug[1];
+      const updated = await storeAdapter.updateProduct(context, id, body);
       return jsonSuccess(updated, "Product updated successfully");
     }
 
@@ -647,7 +708,8 @@ export async function DELETE(req, { params }) {
   try {
     // 1. Inventory: Delete Product
     if (slug[0] === "inventory" && slug[1]) {
-      const result = await storeAdapter.deleteProduct(context, slug[1]);
+      const id = slug[1] === "products" ? slug[2] : slug[1];
+      const result = await storeAdapter.deleteProduct(context, id);
       return jsonSuccess(result, "Product deleted successfully");
     }
 

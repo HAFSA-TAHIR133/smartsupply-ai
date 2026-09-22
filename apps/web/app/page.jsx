@@ -19,14 +19,25 @@ import {
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer
 } from "recharts";
+
+const STAGE_COLORS = {
+  New: "#06b6d4",       // Cyan Blue
+  Contacted: "#0284c7", // Bright Sky Blue
+  Qualified: "#3b82f6", // Royal Blue
+  Proposal: "#6366f1", // Indigo
+  Won: "#8b5cf6",       // Deep Violet / Purple
+};
+const STAGE_PALETTE = ["#38bdf8", "#818cf8", "#a855f7", "#f59e0b", "#10b981", "#6366f1"];
 
 const DEFAULT_STATS = {
   inventory: {
@@ -112,6 +123,14 @@ export default function DashboardPage() {
     { name: "Proposal", amount: 75000 },
     { name: "Won", amount: 0 },
   ];
+
+  const totalPipelineAmount = stageData.reduce(
+    (acc, curr) => acc + (Number(curr.amount) || 0),
+    0
+  );
+  const activePieData = stageData.filter((item) => (Number(item.amount) || 0) > 0);
+  const displayPieData =
+    activePieData.length > 0 ? activePieData : [{ name: "No Active Deals", amount: 1 }];
 
   return (
     <div className="space-y-6 font-sans text-zinc-100 max-w-7xl mx-auto">
@@ -263,6 +282,7 @@ export default function DashboardPage() {
                   <XAxis dataKey="month" stroke="#71717a" fontSize={11} tickLine={false} />
                   <YAxis stroke="#71717a" fontSize={11} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
                   <Tooltip
+                    cursor={{ stroke: "#6366f1", strokeWidth: 1, strokeDasharray: "4 4" }}
                     contentStyle={{
                       backgroundColor: "#121215",
                       borderColor: "#27272a",
@@ -283,23 +303,62 @@ export default function DashboardPage() {
                   />
                 </AreaChart>
               ) : (
-                <BarChart data={stageData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                  <XAxis dataKey="name" stroke="#71717a" fontSize={11} tickLine={false} />
-                  <YAxis stroke="#71717a" fontSize={11} tickLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+                <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                   <Tooltip
+                    cursor={false}
                     contentStyle={{
                       backgroundColor: "#121215",
                       borderColor: "#27272a",
                       borderRadius: "0.5rem",
                       color: "#f4f4f5",
                       fontSize: "12px",
-                      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.3)",
+                      boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5)",
                     }}
-                    formatter={(val) => [`$${Number(val).toLocaleString()}`, "Amount"]}
+                    itemStyle={{ color: "#f4f4f5" }}
+                    formatter={(val, name) => {
+                      if (name === "No Active Deals") return ["$0", "No Active Deals"];
+                      const pct =
+                        totalPipelineAmount > 0
+                          ? Math.round(((Number(val) || 0) / totalPipelineAmount) * 100)
+                          : 0;
+                      return [`$${Number(val).toLocaleString()} (${pct}%)`, name || "Amount"];
+                    }}
                   />
-                  <Bar dataKey="amount" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                </BarChart>
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => (
+                      <span className="text-xs text-zinc-300 font-medium ml-1 mr-3">
+                        {value}
+                      </span>
+                    )}
+                  />
+                  <Pie
+                    data={displayPieData}
+                    dataKey="amount"
+                    nameKey="name"
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={displayPieData.length > 1 ? 3 : 0}
+                    stroke="#18181b"
+                    strokeWidth={2}
+                  >
+                    {displayPieData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${entry.name || index}`}
+                        fill={
+                          entry.name === "No Active Deals"
+                            ? "#3f3f46"
+                            : (STAGE_COLORS[entry.name] || STAGE_PALETTE[index % STAGE_PALETTE.length])
+                        }
+                      />
+                    ))}
+                  </Pie>
+                </PieChart>
               )}
             </ResponsiveContainer>
           </div>

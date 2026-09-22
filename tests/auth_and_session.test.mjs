@@ -127,4 +127,70 @@ describe("Suite 1: Authentication and Session Security", () => {
     const isFresh = now - freshTime < INACTIVITY_TIMEOUT_MS;
     assert(isFresh === true, "Session younger than 15 minutes remains valid");
   });
+
+  test("1.10 Account is locked out for 15 minutes after 10 failed login attempts", async () => {
+    const testEmail = `bruteforce_test_${Date.now()}@smartsupply.test`;
+
+    // Attempt 1 through 9: Each should fail with 401 Unauthorized
+    for (let i = 1; i <= 9; i++) {
+      const res = await post("/auth/login", {
+        email: testEmail,
+        password: `WrongPassword${i}!`,
+      });
+      assert(res.status === 401, `Attempt ${i} returns 401 Unauthorized`);
+      assert(!res.ok, `Attempt ${i} is rejected`);
+    }
+
+    // 10th failed attempt triggers the lockout (HTTP 429 Too Many Requests)
+    const res10 = await post("/auth/login", {
+      email: testEmail,
+      password: "WrongPassword10!",
+    });
+    assert(res10.status === 429, "10th failed attempt triggers HTTP 429 Too Many Requests");
+    const errMsg10 = res10.data?.error?.message || res10.data?.message;
+    assert(
+      errMsg10.includes("10 attempts") || errMsg10.includes("15 minutes"),
+      `Lockout error message informs user of limit/wait time: '${errMsg10}'`
+    );
+
+    // 11th attempt within lockout period should also be blocked with HTTP 429
+    const res11 = await post("/auth/login", {
+      email: testEmail,
+      password: "WrongPassword11!",
+    });
+    assert(res11.status === 429, "11th attempt during lockout window is blocked with HTTP 429");
+
+    // Lockout status check endpoint verifies the user is locked
+    const lockoutRes = await get(`/auth/lockout?email=${encodeURIComponent(testEmail)}`);
+    assert(lockoutRes.ok, "GET /auth/lockout returns 200");
+    assert(lockoutRes.data?.data?.isLocked === true, "Account is marked locked in lockout API");
+    assert(lockoutRes.data?.data?.remainingMinutes >= 1, "Remaining minutes is at least 1");
+  });
+
+  test("1.11 Successful login resets the failed login attempt counter", async () => {
+    const timestamp = Date.now();
+    const liveUser = await createLiveUser(timestamp);
+
+    // Fail 3 times
+    for (let i = 1; i <= 3; i++) {
+      const failRes = await post("/auth/login", {
+        email: liveUser.email,
+        password: "IncorrectPassword!",
+      });
+      assert(failRes.status === 401, "Failed attempt returns 401");
+    }
+
+    // Now log in successfully with valid credentials
+    const successRes = await post("/auth/login", {
+      email: liveUser.email,
+      password: liveUser.password,
+    });
+    assert(successRes.ok, "Login succeeds with valid credentials");
+
+    // Verify lockout status is clean
+    const statusRes = await get(`/auth/lockout?email=${encodeURIComponent(liveUser.email)}`);
+    assert(statusRes.ok, "Lockout query returns 200");
+    assert(statusRes.data?.data?.isLocked === false, "Account is not locked");
+    assert(statusRes.data?.data?.attempts === 0, "Failed attempt counter was reset to 0");
+  });
 });

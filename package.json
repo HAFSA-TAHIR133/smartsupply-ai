@@ -9,7 +9,10 @@
     "dev": "npm run --prefix apps/web dev",
     "build": "npm run --prefix apps/web build",
     "start": "npm run --prefix apps/web start",
-    "lint": "npm run --prefix apps/web lint"
+    "lint": "npm run --prefix apps/web lint",
+    "test": "node --test tests/*.test.mjs && npm test --prefix services/inventory-service",
+    "test:web": "node --test tests/*.test.mjs",
+    "test:services": "npm test --prefix services/inventory-service"
   },
   "dependencies": {
     "pg": "^8.23.0",

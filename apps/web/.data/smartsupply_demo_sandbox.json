@@ -10,8 +10,8 @@
       "quantity": 42,
       "reorderPoint": 15,
       "description": "Industrial grade 24V brushless motor for conveyor assemblies",
-      "createdAt": "2026-09-12T08:25:43.570Z",
-      "updatedAt": "2026-09-22T08:25:43.570Z"
+      "createdAt": "2026-09-12T10:50:19.181Z",
+      "updatedAt": "2026-09-22T10:50:19.181Z"
     },
     {
       "id": "prod-demo-2",
@@ -23,8 +23,8 @@
       "quantity": 6,
       "reorderPoint": 10,
       "description": "High-density energy storage pack with thermal safeguard",
-      "createdAt": "2026-09-14T08:25:43.570Z",
-      "updatedAt": "2026-09-22T08:25:43.570Z"
+      "createdAt": "2026-09-14T10:50:19.181Z",
+      "updatedAt": "2026-09-22T10:50:19.181Z"
     },
     {
       "id": "prod-demo-3",
@@ -36,8 +36,8 @@
       "quantity": 110,
       "reorderPoint": 25,
       "description": "Precision photoelectric proximity beam sensor",
-      "createdAt": "2026-09-17T08:25:43.570Z",
-      "updatedAt": "2026-09-22T08:25:43.570Z"
+      "createdAt": "2026-09-17T10:50:19.181Z",
+      "updatedAt": "2026-09-22T10:50:19.181Z"
     },
     {
       "id": "prod-demo-4",
@@ -49,8 +49,8 @@
       "quantity": 0,
       "reorderPoint": 12,
       "description": "Aerospace grade grade-5 titanium corrosion-resistant fasteners",
-      "createdAt": "2026-09-18T08:25:43.570Z",
-      "updatedAt": "2026-09-22T08:25:43.570Z"
+      "createdAt": "2026-09-18T10:50:19.181Z",
+      "updatedAt": "2026-09-22T10:50:19.181Z"
     },
     {
       "id": "prod-demo-5",
@@ -62,8 +62,8 @@
       "quantity": 18,
       "reorderPoint": 8,
       "description": "High tensile 3K weave structural plate",
-      "createdAt": "2026-09-20T08:25:43.570Z",
-      "updatedAt": "2026-09-22T08:25:43.570Z"
+      "createdAt": "2026-09-20T10:50:19.181Z",
+      "updatedAt": "2026-09-22T10:50:19.181Z"
     }
   ],
   "stockLogs": [
@@ -78,7 +78,7 @@
       "newQuantity": 42,
       "reason": "Supplier batch delivery #PO-9812",
       "executedBy": "Alex Reynolds (Demo)",
-      "createdAt": "2026-09-22T03:25:43.570Z"
+      "createdAt": "2026-09-22T05:50:19.181Z"
     },
     {
       "id": "log-demo-2",
@@ -91,26 +91,10 @@
       "newQuantity": 6,
       "reason": "Customer order shipment #ORD-5011",
       "executedBy": "Alex Reynolds (Demo)",
-      "createdAt": "2026-09-21T20:25:43.570Z"
+      "createdAt": "2026-09-21T22:50:19.181Z"
     }
   ],
   "leads": [
-    {
-      "id": "lead-gdgu-bsjd",
-      "tenantId": "demo-tenant-id",
-      "title": "gdgu bsjd",
-      "name": "gdgu bsjd",
-      "companyName": "gdgu bsjd",
-      "contactName": "gdgu bsjd",
-      "contactEmail": "contact@gdgubsjd.com",
-      "contactPhone": "+1 (555) 019-2834",
-      "value": 50000,
-      "stage": "New",
-      "priority": "HIGH",
-      "notes": "Equipment and component supply deal",
-      "createdAt": "2026-09-20T08:25:43.570Z",
-      "updatedAt": "2026-09-22T08:25:43.570Z"
-    },
     {
       "id": "lead-live-1",
       "tenantId": "demo-tenant-id",
@@ -124,8 +108,8 @@
       "stage": "Qualified",
       "priority": "HIGH",
       "notes": "Evaluating linear actuators and servo amplifiers for conveyor line.",
-      "createdAt": "2026-09-19T08:25:43.570Z",
-      "updatedAt": "2026-09-22T08:25:43.570Z"
+      "createdAt": "2026-09-19T10:50:19.181Z",
+      "updatedAt": "2026-09-22T10:50:19.181Z"
     },
     {
       "id": "lead-demo-1",
@@ -139,8 +123,8 @@
       "stage": "Qualified",
       "priority": "HIGH",
       "notes": "Urgent need for 24V motors and battery packs before Q4 delivery.",
-      "createdAt": "2026-09-15T08:25:43.570Z",
-      "updatedAt": "2026-09-22T08:25:43.570Z"
+      "createdAt": "2026-09-15T10:50:19.181Z",
+      "updatedAt": "2026-09-22T10:50:19.181Z"
     },
     {
       "id": "lead-demo-2",
@@ -154,8 +138,8 @@
       "stage": "Proposal",
       "priority": "HIGH",
       "notes": "Proposal submitted for 200 high-density 48V battery units.",
-      "createdAt": "2026-09-17T08:25:43.570Z",
-      "updatedAt": "2026-09-22T08:25:43.570Z"
+      "createdAt": "2026-09-17T10:50:19.181Z",
+      "updatedAt": "2026-09-22T10:50:19.181Z"
     },
     {
       "id": "lead-demo-3",
@@ -169,8 +153,8 @@
       "stage": "Contacted",
       "priority": "MEDIUM",
       "notes": "Requested technical specification sheet for optoelectronic sensors.",
-      "createdAt": "2026-09-19T08:25:43.570Z",
-      "updatedAt": "2026-09-22T08:25:43.570Z"
+      "createdAt": "2026-09-19T10:50:19.181Z",
+      "updatedAt": "2026-09-22T10:50:19.181Z"
     },
     {
       "id": "lead-demo-4",
@@ -184,8 +168,8 @@
       "stage": "Won",
       "priority": "HIGH",
       "notes": "Contract signed for annual fastener and motor fulfillment.",
-      "createdAt": "2026-09-10T08:25:43.570Z",
-      "updatedAt": "2026-09-22T08:25:43.570Z"
+      "createdAt": "2026-09-10T10:50:19.181Z",
+      "updatedAt": "2026-09-22T10:50:19.181Z"
     }
   ],
   "customers": [
@@ -218,7 +202,7 @@
       "dueDate": "2026-09-24",
       "priority": "HIGH",
       "status": "PENDING",
-      "createdAt": "2026-09-21T08:25:43.570Z"
+      "createdAt": "2026-09-21T10:50:19.181Z"
     },
     {
       "id": "task-demo-2",
@@ -227,7 +211,7 @@
       "dueDate": "2026-09-23",
       "priority": "HIGH",
       "status": "PENDING",
-      "createdAt": "2026-09-20T08:25:43.570Z"
+      "createdAt": "2026-09-20T10:50:19.181Z"
     },
     {
       "id": "task-demo-3",
@@ -236,7 +220,7 @@
       "dueDate": "2026-09-26",
       "priority": "MEDIUM",
       "status": "COMPLETED",
-      "createdAt": "2026-09-18T08:25:43.570Z"
+      "createdAt": "2026-09-18T10:50:19.181Z"
     }
   ],
   "charts": [
@@ -269,379 +253,35 @@
           "value": 0
         }
       ],
-      "createdAt": "2026-09-19T08:25:43.570Z"
+      "createdAt": "2026-09-19T10:50:19.182Z"
     }
   ],
   "conversations": [
     {
-      "id": "conv-turn-history-audit",
-      "title": "What is my current inventory status?",
-      "agentId": "supply-chain-agent",
-      "createdAt": "2026-09-22T08:25:57.846Z",
-      "messages": [
-        {
-          "id": "msg-user-1790065557846",
-          "sender": "USER",
-          "content": "What is my current inventory status?",
-          "createdAt": "2026-09-22T08:25:57.846Z"
-        },
-        {
-          "id": "msg-bot-1790065557846",
-          "sender": "AGENT",
-          "content": "Here is your current inventory overview:\n\n- **Total Inventory SKUs:** 5\n- **Healthy Stock:** 3 items\n- **Low Stock Alerts:** 1 items\n- **Out of Stock:** 1 items\n\n**Inventory SKUs:**\n• **Brushless Motor 24V High-Torque** (`MTR-BRSH-024`) — 42 in stock\n• **Lithium Polymer Pack 48V 20Ah** (`BAT-LIPO-4820`) — 6 in stock\n• **Optoelectronic Sensor 5V** (`SEN-OPTO-005`) — 110 in stock\n• **Titanium Hex Bolts M8x40 (Box 50)** (`FST-TI-M840`) — 0 in stock\n• **Carbon Fiber Plate 500x500mm** (`MAT-CF-5050`) — 18 in stock\n",
-          "sources": [],
-          "toolsUsed": [
-            "warehouse_inventory_scanner"
-          ],
-          "executionTimeMs": 1,
-          "requiresConfirmation": false,
-          "pendingAction": null,
-          "createdAt": "2026-09-22T08:25:57.846Z"
-        },
-        {
-          "id": "msg-user-1790065557864",
-          "sender": "USER",
-          "content": "Which leads are currently in Qualified stage?",
-          "createdAt": "2026-09-22T08:25:57.864Z"
-        },
-        {
-          "id": "msg-bot-1790065557864",
-          "sender": "AGENT",
-          "content": "You currently have **6 active lead(s)** totaling **$648,000** in pipeline value (1 won).\n\nThere are **2 pending follow-up task(s)**.\n\n• **gdgu bsjd** ($50,000 — *New*)\n• **National Courier Fleet Automation** ($120,000 — *Qualified*)\n• **Global Robotics Fleet Expansion** ($145,000 — *Qualified*)\n• **Autonomous Delivery Drone Supply** ($85,000 — *Proposal*)\n• **Solar Inverter Sensor Upgrade** ($38,000 — *Contacted*)",
-          "sources": [],
-          "toolsUsed": [
-            "crm_pipeline_aggregator"
-          ],
-          "executionTimeMs": 0,
-          "requiresConfirmation": false,
-          "pendingAction": null,
-          "createdAt": "2026-09-22T08:25:57.864Z"
-        }
-      ]
-    },
-    {
-      "id": "conv-turn-ex-d",
-      "title": "Restock product",
-      "agentId": "supply-chain-agent",
-      "createdAt": "2026-09-22T08:25:57.544Z",
-      "messages": [
-        {
-          "id": "msg-user-1790065557544",
-          "sender": "USER",
-          "content": "Restock product",
-          "createdAt": "2026-09-22T08:25:57.544Z"
-        },
-        {
-          "id": "msg-bot-1790065557544",
-          "sender": "AGENT",
-          "content": "Which product would you like to restock? Please specify the product name or SKU.",
-          "sources": [],
-          "toolsUsed": [
-            "inventory_restock_orchestrator"
-          ],
-          "executionTimeMs": 0,
-          "requiresConfirmation": false,
-          "pendingAction": null,
-          "createdAt": "2026-09-22T08:25:57.544Z"
-        },
-        {
-          "id": "msg-user-1790065557804",
-          "sender": "USER",
-          "content": "Brushless Motor",
-          "createdAt": "2026-09-22T08:25:57.804Z"
-        },
-        {
-          "id": "msg-bot-1790065557804",
-          "sender": "AGENT",
-          "content": "Hello Alex Reynolds! I am your supply chain assistant. You can ask me questions about your stock, leads, or tasks, or instruct me to move leads to new stages, renew stock, edit items, or delete records. I will always ask for your confirmation before making changes. How can I help you today?",
-          "sources": [],
-          "toolsUsed": [],
-          "executionTimeMs": 243,
-          "requiresConfirmation": false,
-          "pendingAction": null,
-          "createdAt": "2026-09-22T08:25:57.804Z"
-        }
-      ]
-    },
-    {
       "id": "conv-demo-1",
       "title": "Stock Audit & Reorder Recommendations",
       "agentId": "supply-chain-agent",
-      "createdAt": "2026-09-22T02:25:43.570Z",
+      "createdAt": "2026-09-22T04:50:19.182Z",
       "messages": [
         {
           "id": "msg-demo-1",
           "sender": "USER",
           "content": "Can you review our low stock items and give me a summary?",
-          "createdAt": "2026-09-22T02:25:43.570Z"
+          "createdAt": "2026-09-22T04:50:19.182Z"
         },
         {
           "id": "msg-demo-2",
           "sender": "AGENT",
           "content": "I have analyzed your warehouse inventory: **Titanium Hex Bolts M8x40** is currently **Out of Stock** (0 units vs. 12 reorder threshold). **Lithium Polymer Pack 48V** is also on **Low Stock Alert** with only 6 units remaining (min threshold 10).\n\nWould you like me to draft an autonomous purchase order or restock action for these items?",
-          "createdAt": "2026-09-22T02:25:45.570Z",
+          "createdAt": "2026-09-22T04:50:21.182Z",
           "sources": [
             "Warehouse Inventory Master",
             "Safety Stock Policy v2.4"
           ]
         }
       ]
-    },
-    {
-      "id": "conv-turn-ex-a",
-      "tenantId": "demo-tenant-id",
-      "userId": "demo-user-alex",
-      "title": "AI Assistant Conversation",
-      "messages": [
-        {
-          "id": "msg-user-1790065557199",
-          "sender": "USER",
-          "content": "Delete lead",
-          "createdAt": "2026-09-22T08:25:57.199Z"
-        },
-        {
-          "id": "msg-bot-1790065557199",
-          "sender": "AGENT",
-          "content": "Which lead would you like to delete? Please specify the lead title or ID.",
-          "sources": [],
-          "toolsUsed": [
-            "crm_lead_deleter"
-          ],
-          "executionTimeMs": 1,
-          "requiresConfirmation": false,
-          "pendingAction": null,
-          "createdAt": "2026-09-22T08:25:57.199Z"
-        },
-        {
-          "id": "msg-user-1790065557226",
-          "sender": "USER",
-          "content": "National Courier",
-          "createdAt": "2026-09-22T08:25:57.226Z"
-        },
-        {
-          "id": "msg-bot-1790065557226",
-          "sender": "AGENT",
-          "content": "I have prepared the request to delete lead **National Courier Fleet Automation** (ID: `lead-live-1`).\n\nPlease confirm below before I permanently remove it from your CRM pipeline.",
-          "sources": [],
-          "toolsUsed": [
-            "crm_lead_deleter"
-          ],
-          "executionTimeMs": 2,
-          "requiresConfirmation": true,
-          "pendingAction": {
-            "id": "act-demo-1790065557225-402",
-            "actionType": "DELETE_LEAD",
-            "title": "Delete Lead: National Courier Fleet Automation",
-            "summary": "Permanently delete lead \"National Courier Fleet Automation\" (ID: lead-live-1).",
-            "payload": {
-              "leadId": "lead-live-1",
-              "leadTitle": "National Courier Fleet Automation"
-            },
-            "status": "PENDING_CONFIRMATION",
-            "expiresAt": "2026-09-22T08:40:57.225Z",
-            "createdAt": "2026-09-22T08:25:57.225Z",
-            "executionMode": "DEMO"
-          },
-          "createdAt": "2026-09-22T08:25:57.226Z"
-        }
-      ],
-      "createdAt": "2026-09-22T08:25:57.199Z",
-      "updatedAt": "2026-09-22T08:25:57.227Z",
-      "workflowState": {
-        "pendingActionId": "act-demo-1790065557225-402"
-      }
-    },
-    {
-      "id": "conv-turn-ex-b",
-      "tenantId": "demo-tenant-id",
-      "userId": "demo-user-alex",
-      "title": "AI Assistant Conversation",
-      "messages": [
-        {
-          "id": "msg-user-1790065557342",
-          "sender": "USER",
-          "content": "National Courier",
-          "createdAt": "2026-09-22T08:25:57.342Z"
-        },
-        {
-          "id": "msg-bot-1790065557342",
-          "sender": "AGENT",
-          "content": "I have prepared the follow-up task for **National Courier Fleet Automation**:\n\n• **Task:** Follow-up meeting\n• **Associated Lead:** National Courier Fleet Automation (`lead-live-1`)\n• **Due Date:** 2026-09-23\n• **Priority:** HIGH\n\nPlease confirm below before I add this task to your CRM.",
-          "sources": [],
-          "toolsUsed": [
-            "crm_task_creator"
-          ],
-          "executionTimeMs": 1,
-          "requiresConfirmation": true,
-          "pendingAction": {
-            "id": "act-demo-1790065557342-117",
-            "actionType": "CREATE_TASK",
-            "title": "Create Task: Follow-up meeting",
-            "summary": "Create task \"Follow-up meeting\" for lead National Courier Fleet Automation due on 2026-09-23.",
-            "payload": {
-              "title": "Follow-up meeting",
-              "description": "Follow-up meeting",
-              "status": "PENDING",
-              "priority": "HIGH",
-              "dueDate": "2026-09-23",
-              "due_date": "2026-09-23",
-              "leadId": "lead-live-1",
-              "leadTitle": "National Courier Fleet Automation"
-            },
-            "status": "PENDING_CONFIRMATION",
-            "expiresAt": "2026-09-22T08:40:57.342Z",
-            "createdAt": "2026-09-22T08:25:57.342Z",
-            "executionMode": "DEMO"
-          },
-          "createdAt": "2026-09-22T08:25:57.342Z"
-        }
-      ],
-      "createdAt": "2026-09-22T08:25:57.278Z",
-      "updatedAt": "2026-09-22T08:25:57.343Z",
-      "workflowState": {
-        "intent": "CREATE_TASK",
-        "step": "AWAITING_CONFIRMATION",
-        "data": {
-          "title": "Follow-up meeting",
-          "description": "Follow-up meeting",
-          "status": "PENDING",
-          "priority": "HIGH",
-          "dueDate": "2026-09-23",
-          "due_date": "2026-09-23",
-          "leadId": "lead-live-1",
-          "leadTitle": "National Courier Fleet Automation"
-        },
-        "lastMentionedLeadId": "lead-live-1",
-        "lastMentionedLeadTitle": "National Courier Fleet Automation",
-        "pendingActionId": "act-demo-1790065557342-117"
-      }
-    },
-    {
-      "id": "conv-turn-ex-c",
-      "tenantId": "demo-tenant-id",
-      "userId": "demo-user-alex",
-      "title": "AI Assistant Conversation",
-      "messages": [
-        {
-          "id": "msg-user-1790065557432",
-          "sender": "USER",
-          "content": "Move lead to Won",
-          "createdAt": "2026-09-22T08:25:57.432Z"
-        },
-        {
-          "id": "msg-bot-1790065557432",
-          "sender": "AGENT",
-          "content": "Which lead would you like to move to **Won**? Please specify the lead title or ID.",
-          "sources": [],
-          "toolsUsed": [
-            "crm_lead_stage_updater"
-          ],
-          "executionTimeMs": 1,
-          "requiresConfirmation": false,
-          "pendingAction": null,
-          "createdAt": "2026-09-22T08:25:57.432Z"
-        },
-        {
-          "id": "msg-user-1790065557457",
-          "sender": "USER",
-          "content": "National Courier",
-          "createdAt": "2026-09-22T08:25:57.457Z"
-        },
-        {
-          "id": "msg-bot-1790065557457",
-          "sender": "AGENT",
-          "content": "I have prepared the update to move **National Courier Fleet Automation** from stage *Qualified* to **Won**.\n\nPlease confirm below to proceed with updating this lead.",
-          "sources": [],
-          "toolsUsed": [
-            "crm_lead_stage_updater"
-          ],
-          "executionTimeMs": 1,
-          "requiresConfirmation": true,
-          "pendingAction": {
-            "id": "act-demo-1790065557456-41",
-            "actionType": "EDIT_LEAD",
-            "title": "Move Lead: National Courier Fleet Automation",
-            "summary": "Move \"National Courier Fleet Automation\" from stage Qualified to Won.",
-            "payload": {
-              "leadId": "lead-live-1",
-              "leadTitle": "National Courier Fleet Automation",
-              "fromStage": "Qualified",
-              "toStage": "Won",
-              "updates": {
-                "stage": "Won"
-              }
-            },
-            "status": "PENDING_CONFIRMATION",
-            "expiresAt": "2026-09-22T08:40:57.456Z",
-            "createdAt": "2026-09-22T08:25:57.456Z",
-            "executionMode": "DEMO"
-          },
-          "createdAt": "2026-09-22T08:25:57.457Z"
-        }
-      ],
-      "createdAt": "2026-09-22T08:25:57.432Z",
-      "updatedAt": "2026-09-22T08:25:57.457Z",
-      "workflowState": {
-        "lastMentionedLeadId": "lead-live-1",
-        "lastMentionedLeadTitle": "National Courier Fleet Automation",
-        "pendingActionId": "act-demo-1790065557456-41"
-      }
     }
   ],
-  "pendingActions": [
-    {
-      "id": "act-demo-1790065557456-41",
-      "actionType": "EDIT_LEAD",
-      "title": "Move Lead: National Courier Fleet Automation",
-      "summary": "Move \"National Courier Fleet Automation\" from stage Qualified to Won.",
-      "payload": {
-        "leadId": "lead-live-1",
-        "leadTitle": "National Courier Fleet Automation",
-        "fromStage": "Qualified",
-        "toStage": "Won",
-        "updates": {
-          "stage": "Won"
-        }
-      },
-      "status": "PENDING_CONFIRMATION",
-      "expiresAt": "2026-09-22T08:40:57.456Z",
-      "createdAt": "2026-09-22T08:25:57.456Z",
-      "executionMode": "DEMO"
-    },
-    {
-      "id": "act-demo-1790065557342-117",
-      "actionType": "CREATE_TASK",
-      "title": "Create Task: Follow-up meeting",
-      "summary": "Create task \"Follow-up meeting\" for lead National Courier Fleet Automation due on 2026-09-23.",
-      "payload": {
-        "title": "Follow-up meeting",
-        "description": "Follow-up meeting",
-        "status": "PENDING",
-        "priority": "HIGH",
-        "dueDate": "2026-09-23",
-        "due_date": "2026-09-23",
-        "leadId": "lead-live-1",
-        "leadTitle": "National Courier Fleet Automation"
-      },
-      "status": "PENDING_CONFIRMATION",
-      "expiresAt": "2026-09-22T08:40:57.342Z",
-      "createdAt": "2026-09-22T08:25:57.342Z",
-      "executionMode": "DEMO"
-    },
-    {
-      "id": "act-demo-1790065557225-402",
-      "actionType": "DELETE_LEAD",
-      "title": "Delete Lead: National Courier Fleet Automation",
-      "summary": "Permanently delete lead \"National Courier Fleet Automation\" (ID: lead-live-1).",
-      "payload": {
-        "leadId": "lead-live-1",
-        "leadTitle": "National Courier Fleet Automation"
-      },
-      "status": "PENDING_CONFIRMATION",
-      "expiresAt": "2026-09-22T08:40:57.225Z",
-      "createdAt": "2026-09-22T08:25:57.225Z",
-      "executionMode": "DEMO"
-    }
-  ],
+  "pendingActions": [],
   "memories": {}
 }

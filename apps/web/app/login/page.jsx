@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/authContext";
+import { authAPI } from "@/lib/api";
 import { BackgroundBeams } from "@/components/aceternity/background-beams";
 import {
   Sparkles,
@@ -29,9 +30,26 @@ function LoginFormContent() {
   const [submitting, setSubmitting] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState("");
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
   const rawRedirect = searchParams ? searchParams.get("redirect") : null;
   const reason = searchParams ? searchParams.get("reason") : null;
+
+  // Countdown timer for lockout
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return;
+    const interval = setInterval(() => {
+      setLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setError("");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutSeconds]);
 
   // Safe redirect destination (prevent open redirects)
   const targetRedirect =
@@ -51,6 +69,8 @@ function LoginFormContent() {
 
   const handleSignIn = async (e) => {
     e?.preventDefault();
+    if (lockoutSeconds > 0) return;
+
     if (!email || !password) {
       setError("Invalid email or password");
       return;
@@ -63,9 +83,29 @@ function LoginFormContent() {
       await login(email.trim(), password);
       router.replace(targetRedirect);
     } catch (err) {
+      if (err.remainingSeconds) {
+        setLockoutSeconds(err.remainingSeconds);
+      } else if (err.lockedUntil) {
+        const diff = Math.max(1, Math.ceil((err.lockedUntil - Date.now()) / 1000));
+        setLockoutSeconds(diff);
+      } else if (err.status === 429 || (err.message && err.message.toLowerCase().includes("15 minutes"))) {
+        setLockoutSeconds(15 * 60);
+      }
       setError(err.message || "Invalid email or password");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleEmailBlur = async () => {
+    if (!email || !email.includes("@")) return;
+    try {
+      const res = await authAPI.checkLockout(email.trim());
+      if (res?.isLocked && res?.remainingSeconds) {
+        setLockoutSeconds(res.remainingSeconds);
+      }
+    } catch {
+      // Ignore background check errors
     }
   };
 
@@ -84,9 +124,175 @@ function LoginFormContent() {
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center bg-zinc-950 p-4 font-sans text-zinc-100 selection:bg-indigo-600 selection:text-white">
-      {/* Background Subtle Ambience */}
-      <div className="absolute inset-0 w-full h-full pointer-events-none z-0">
-        <BackgroundBeams className="opacity-35" />
+      {/* Background Subtle Ambience & Dynamic Growing Circles */}
+      <div className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-hidden">
+        <BackgroundBeams className="opacity-40" />
+
+        {/* Ambient Growing and Pulsing Circles */}
+        {/* Circle 1: Top Left Glowing Radial Orb */}
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0.3 }}
+          animate={{
+            scale: [0.8, 1.4, 0.8],
+            opacity: [0.25, 0.55, 0.25],
+            x: [0, 30, 0],
+            y: [0, -20, 0],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-indigo-600/20 blur-3xl"
+        />
+
+        {/* Circle 2: Bottom Right Violet Growing Orb */}
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0.25 }}
+          animate={{
+            scale: [0.9, 1.5, 0.9],
+            opacity: [0.2, 0.5, 0.2],
+            x: [0, -40, 0],
+            y: [0, 30, 0],
+          }}
+          transition={{
+            duration: 12,
+            repeat: Infinity,
+            delay: 1.5,
+            ease: "easeInOut",
+          }}
+          className="absolute -bottom-28 -right-28 w-[420px] h-[420px] rounded-full bg-purple-600/20 blur-3xl"
+        />
+
+        {/* Circle 3: Center Cyan Ambient Pulse */}
+        <motion.div
+          initial={{ scale: 0.7, opacity: 0.15 }}
+          animate={{
+            scale: [0.7, 1.35, 0.7],
+            opacity: [0.15, 0.4, 0.15],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            delay: 3,
+            ease: "easeInOut",
+          }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-cyan-500/10 blur-[120px]"
+        />
+
+        {/* Circle 4: Mid-Right Floating Sky Blue Orb */}
+        <motion.div
+          initial={{ scale: 0.85, opacity: 0.2 }}
+          animate={{
+            scale: [0.85, 1.45, 0.85],
+            opacity: [0.2, 0.45, 0.2],
+            y: [0, -35, 0],
+          }}
+          transition={{
+            duration: 9,
+            repeat: Infinity,
+            delay: 2,
+            ease: "easeInOut",
+          }}
+          className="absolute top-1/4 right-10 w-72 h-72 rounded-full bg-sky-500/15 blur-2xl"
+        />
+
+        {/* Circle 5: Mid-Left Deep Indigo Expanding Circle */}
+        <motion.div
+          initial={{ scale: 0.75, opacity: 0.2 }}
+          animate={{
+            scale: [0.75, 1.3, 0.75],
+            opacity: [0.15, 0.45, 0.15],
+            y: [0, 40, 0],
+          }}
+          transition={{
+            duration: 11,
+            repeat: Infinity,
+            delay: 4,
+            ease: "easeInOut",
+          }}
+          className="absolute bottom-1/3 left-12 w-80 h-80 rounded-full bg-indigo-500/15 blur-2xl"
+        />
+
+        {/* Geometric Expanding Concentric Radar Rings (Centered) */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+          {/* Ring 1 */}
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0.4 }}
+            animate={{
+              scale: [0.5, 1.6, 2.4],
+              opacity: [0.4, 0.2, 0],
+            }}
+            transition={{
+              duration: 6,
+              repeat: Infinity,
+              ease: "easeOut",
+            }}
+            className="absolute -top-48 -left-48 w-96 h-96 rounded-full border border-indigo-500/30"
+          />
+          {/* Ring 2 (Staggered) */}
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0.4 }}
+            animate={{
+              scale: [0.5, 1.6, 2.4],
+              opacity: [0.4, 0.2, 0],
+            }}
+            transition={{
+              duration: 6,
+              repeat: Infinity,
+              delay: 2,
+              ease: "easeOut",
+            }}
+            className="absolute -top-48 -left-48 w-96 h-96 rounded-full border border-purple-500/25"
+          />
+          {/* Ring 3 (Staggered) */}
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0.4 }}
+            animate={{
+              scale: [0.5, 1.6, 2.4],
+              opacity: [0.4, 0.2, 0],
+            }}
+            transition={{
+              duration: 6,
+              repeat: Infinity,
+              delay: 4,
+              ease: "easeOut",
+            }}
+            className="absolute -top-48 -left-48 w-96 h-96 rounded-full border border-cyan-500/20"
+          />
+
+          {/* Additional Floating Rings: Top Right */}
+          <motion.div
+            initial={{ scale: 0.7, opacity: 0.2 }}
+            animate={{
+              scale: [0.7, 1.3, 0.7],
+              opacity: [0.15, 0.35, 0.15],
+              rotate: [0, 180, 360],
+            }}
+            transition={{
+              duration: 14,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+            className="absolute -top-96 right-32 w-64 h-64 rounded-full border border-dashed border-indigo-400/25"
+          />
+
+          {/* Additional Floating Rings: Bottom Left */}
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0.2 }}
+            animate={{
+              scale: [0.8, 1.35, 0.8],
+              opacity: [0.15, 0.35, 0.15],
+              rotate: [360, 180, 0],
+            }}
+            transition={{
+              duration: 16,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+            className="absolute top-48 -left-96 w-72 h-72 rounded-full border border-dashed border-purple-400/20"
+          />
+        </div>
       </div>
 
       <motion.div
@@ -132,13 +338,38 @@ function LoginFormContent() {
           )}
 
           {/* Error Banner */}
-          {error && (
+          {error && lockoutSeconds <= 0 && (
             <div
               id="login-error-notice"
               className="mb-5 p-3 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs flex items-center gap-2.5"
             >
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{error}</span>
+            </div>
+          )}
+
+          {/* Security Lockout Banner (10 failed attempts -> 15 min wait) */}
+          {lockoutSeconds > 0 && (
+            <div
+              id="account-lockout-notice"
+              className="mb-5 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 text-xs space-y-2.5 shadow-inner"
+            >
+              <div className="flex items-center gap-2 font-medium text-rose-300">
+                <Lock className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>Account Temporarily Locked (10 Failed Attempts)</span>
+              </div>
+              <p className="text-zinc-300 text-[11px] leading-relaxed">
+                Too many failed login attempts. For security, please wait 15 minutes before trying again.
+              </p>
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-950/80 border border-zinc-800">
+                <span className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-rose-400" />
+                  Remaining wait time:
+                </span>
+                <span className="font-mono text-xs font-semibold text-rose-300">
+                  {Math.floor(lockoutSeconds / 60)}:{(lockoutSeconds % 60).toString().padStart(2, "0")}
+                </span>
+              </div>
             </div>
           )}
 
@@ -160,6 +391,7 @@ function LoginFormContent() {
                   autoComplete="email"
                   required
                   value={email}
+                  onBlur={handleEmailBlur}
                   onChange={(e) => {
                     setEmail(e.target.value);
                     if (error) setError("");
@@ -214,13 +446,20 @@ function LoginFormContent() {
             <button
               id="submit-signin-btn"
               type="submit"
-              disabled={submitting || demoLoading}
-              className="w-full py-2.5 px-4 rounded-lg font-medium bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white transition-all shadow-sm text-xs flex items-center justify-center gap-2 mt-2 disabled:opacity-60 cursor-pointer"
+              disabled={submitting || demoLoading || lockoutSeconds > 0}
+              className="w-full py-2.5 px-4 rounded-lg font-medium bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white transition-all shadow-sm text-xs flex items-center justify-center gap-2 mt-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
             >
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Signing in...</span>
+                </>
+              ) : lockoutSeconds > 0 ? (
+                <>
+                  <Lock className="w-4 h-4 text-rose-300" />
+                  <span>
+                    Locked ({Math.floor(lockoutSeconds / 60)}:{(lockoutSeconds % 60).toString().padStart(2, "0")})
+                  </span>
                 </>
               ) : (
                 <>

@@ -50,7 +50,18 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
   const [actionLoading, setActionLoading] = useState(null);
   const [expandedSources, setExpandedSources] = useState({});
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  // Auto-expand textarea dynamically based on content height
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = "auto";
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+    }
+  }, [inputMessage]);
 
   const handleApproveAction = async (actionId, msgIndex) => {
     setActionLoading(actionId);
@@ -233,7 +244,6 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
       };
 
       setMessages((prev) => {
-        // If an action was just approved conversational-style, mark any older pending actions as approved too
         if (response.executedAction || response.pendingAction?.status === "APPROVED") {
           return prev.map((m) =>
             m.pendingAction && (m.pendingAction.status === "PENDING" || m.pendingAction.status === "PENDING_CONFIRMATION")
@@ -255,6 +265,13 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
   };
 
@@ -332,8 +349,6 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
                   </span>
                 </div>
               </div>
-
-              
 
               {/* Chat Messages Body */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -522,20 +537,22 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
                 ))}
               </div>
 
-              {/* Drawer Footer Input */}
-              <form onSubmit={handleSendMessage} className="p-3 border-t border-zinc-800 bg-zinc-900 flex gap-2">
-                <input
-                  type="text"
+              {/* Drawer Expandable Footer Input Form */}
+              <form onSubmit={handleSendMessage} className="p-3 border-t border-zinc-800 bg-zinc-900 flex items-end gap-2">
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   placeholder={`Ask ${AGENT_OPTIONS.find(a => a.id === selectedAgent)?.name}...`}
                   disabled={loading}
-                  className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+                  className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 resize-none overflow-y-auto max-h-40 leading-relaxed transition-all"
                 />
                 <button
                   type="submit"
                   disabled={!inputMessage.trim() || loading}
-                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition-colors"
+                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition-colors shrink-0 mb-0.5"
                 >
                   <Send className="h-3.5 w-3.5" />
                 </button>

@@ -166,6 +166,25 @@ export function AppLayout({ children }) {
       {/* Top Header Bar */}
       <header className="sticky top-0 z-40 h-14 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md flex items-center justify-between px-4 lg:px-6 transition-all">
         <div className="flex items-center gap-3">
+          {/* Mobile Menu Button (Visible on Small Screens) */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="lg:hidden p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-zinc-800 transition-all"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
+
+          {/* 1. App Brand FIRST */}
+          <Link href="/" prefetch={true} className="flex items-center gap-2.5 group">
+            <div className="h-7 w-7 rounded-lg bg-indigo-600 border border-indigo-500/40 flex items-center justify-center text-white font-bold text-xs shadow-sm group-hover:bg-indigo-500 transition-colors">
+              S
+            </div>
+            <span className="font-semibold text-sm tracking-tight text-zinc-100 group-hover:text-white transition-colors">
+              SmartSupply
+            </span>
+          </Link>
+
+          {/* 2. Desktop Collapsible Sidebar Button SECOND */}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="hidden lg:flex p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/80 border border-transparent hover:border-zinc-800 transition-all"
@@ -177,30 +196,13 @@ export function AppLayout({ children }) {
               <PanelLeft className="h-4 w-4" />
             )}
           </button>
-          
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-zinc-800 transition-all"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
-
-          {/* App Brand */}
-          <Link href="/" prefetch={true} className="flex items-center gap-2.5 group">
-            <div className="h-7 w-7 rounded-lg bg-indigo-600 border border-indigo-500/40 flex items-center justify-center text-white font-bold text-xs shadow-sm group-hover:bg-indigo-500 transition-colors">
-              S
-            </div>
-            <span className="font-semibold text-sm tracking-tight text-zinc-100 group-hover:text-white transition-colors">
-              SmartSupply
-            </span>
-          </Link>
 
           {/* Tenant Badge */}
           <div className="hidden sm:flex items-center gap-2 pl-3 ml-1 border-l border-zinc-800 text-xs">
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800/80 text-zinc-300">
               <Building2 className="h-3 w-3 text-indigo-400" />
               <span className="font-medium text-[11px] truncate max-w-[140px]">
-                {user?.tenantName || (isDemo ? "Demo Sandbox" : "Enterprise Workspace")}
+                {isDemo ? "Demo Account" : (user?.tenantName || "Enterprise Workspace")}
               </span>
             </div>
           </div>
@@ -508,7 +510,7 @@ export function AppLayout({ children }) {
           </p>
           <Input
             label="Full User Name"
-            placeholder="e.g. Hafsa Tahir"
+            placeholder="e.g. Alex Reynolds"
             required
             value={profileNameInput}
             onChange={(e) => setProfileNameInput(e.target.value)}

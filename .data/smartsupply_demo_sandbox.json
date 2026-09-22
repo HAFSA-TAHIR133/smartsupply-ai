@@ -10,8 +10,8 @@
       "quantity": 42,
       "reorderPoint": 15,
       "description": "Industrial grade 24V brushless motor for conveyor assemblies",
-      "createdAt": "2026-09-12T08:04:22.536Z",
-      "updatedAt": "2026-09-22T08:04:22.536Z"
+      "createdAt": "2026-09-12T09:51:09.101Z",
+      "updatedAt": "2026-09-22T09:51:09.102Z"
     },
     {
       "id": "prod-demo-2",
@@ -23,8 +23,8 @@
       "quantity": 6,
       "reorderPoint": 10,
       "description": "High-density energy storage pack with thermal safeguard",
-      "createdAt": "2026-09-14T08:04:22.536Z",
-      "updatedAt": "2026-09-22T08:04:22.536Z"
+      "createdAt": "2026-09-14T09:51:09.102Z",
+      "updatedAt": "2026-09-22T09:51:09.102Z"
     },
     {
       "id": "prod-demo-3",
@@ -36,8 +36,8 @@
       "quantity": 110,
       "reorderPoint": 25,
       "description": "Precision photoelectric proximity beam sensor",
-      "createdAt": "2026-09-17T08:04:22.536Z",
-      "updatedAt": "2026-09-22T08:04:22.536Z"
+      "createdAt": "2026-09-17T09:51:09.102Z",
+      "updatedAt": "2026-09-22T09:51:09.102Z"
     },
     {
       "id": "prod-demo-4",
@@ -49,8 +49,8 @@
       "quantity": 0,
       "reorderPoint": 12,
       "description": "Aerospace grade grade-5 titanium corrosion-resistant fasteners",
-      "createdAt": "2026-09-18T08:04:22.536Z",
-      "updatedAt": "2026-09-22T08:04:22.536Z"
+      "createdAt": "2026-09-18T09:51:09.102Z",
+      "updatedAt": "2026-09-22T09:51:09.102Z"
     },
     {
       "id": "prod-demo-5",
@@ -62,8 +62,8 @@
       "quantity": 18,
       "reorderPoint": 8,
       "description": "High tensile 3K weave structural plate",
-      "createdAt": "2026-09-20T08:04:22.536Z",
-      "updatedAt": "2026-09-22T08:04:22.536Z"
+      "createdAt": "2026-09-20T09:51:09.102Z",
+      "updatedAt": "2026-09-22T09:51:09.102Z"
     }
   ],
   "stockLogs": [
@@ -78,7 +78,7 @@
       "newQuantity": 42,
       "reason": "Supplier batch delivery #PO-9812",
       "executedBy": "Alex Reynolds (Demo)",
-      "createdAt": "2026-09-22T03:04:22.536Z"
+      "createdAt": "2026-09-22T04:51:09.102Z"
     },
     {
       "id": "log-demo-2",
@@ -91,26 +91,10 @@
       "newQuantity": 6,
       "reason": "Customer order shipment #ORD-5011",
       "executedBy": "Alex Reynolds (Demo)",
-      "createdAt": "2026-09-21T20:04:22.536Z"
+      "createdAt": "2026-09-21T21:51:09.102Z"
     }
   ],
   "leads": [
-    {
-      "id": "lead-gdgu-bsjd",
-      "tenantId": "demo-tenant-id",
-      "title": "gdgu bsjd",
-      "name": "gdgu bsjd",
-      "companyName": "gdgu bsjd",
-      "contactName": "gdgu bsjd",
-      "contactEmail": "contact@gdgubsjd.com",
-      "contactPhone": "+1 (555) 019-2834",
-      "value": 50000,
-      "stage": "New",
-      "priority": "HIGH",
-      "notes": "Equipment and component supply deal",
-      "createdAt": "2026-09-20T08:04:22.536Z",
-      "updatedAt": "2026-09-22T08:04:22.536Z"
-    },
     {
       "id": "lead-live-1",
       "tenantId": "demo-tenant-id",
@@ -124,8 +108,8 @@
       "stage": "Qualified",
       "priority": "HIGH",
       "notes": "Evaluating linear actuators and servo amplifiers for conveyor line.",
-      "createdAt": "2026-09-19T08:04:22.536Z",
-      "updatedAt": "2026-09-22T08:04:22.536Z"
+      "createdAt": "2026-09-19T09:51:09.102Z",
+      "updatedAt": "2026-09-22T09:51:09.102Z"
     },
     {
       "id": "lead-demo-1",
@@ -139,8 +123,8 @@
       "stage": "Qualified",
       "priority": "HIGH",
       "notes": "Urgent need for 24V motors and battery packs before Q4 delivery.",
-      "createdAt": "2026-09-15T08:04:22.536Z",
-      "updatedAt": "2026-09-22T08:04:22.536Z"
+      "createdAt": "2026-09-15T09:51:09.102Z",
+      "updatedAt": "2026-09-22T09:51:09.102Z"
     },
     {
       "id": "lead-demo-2",
@@ -154,8 +138,8 @@
       "stage": "Proposal",
       "priority": "HIGH",
       "notes": "Proposal submitted for 200 high-density 48V battery units.",
-      "createdAt": "2026-09-17T08:04:22.536Z",
-      "updatedAt": "2026-09-22T08:04:22.536Z"
+      "createdAt": "2026-09-17T09:51:09.102Z",
+      "updatedAt": "2026-09-22T09:51:09.102Z"
     },
     {
       "id": "lead-demo-3",
@@ -169,8 +153,8 @@
       "stage": "Contacted",
       "priority": "MEDIUM",
       "notes": "Requested technical specification sheet for optoelectronic sensors.",
-      "createdAt": "2026-09-19T08:04:22.536Z",
-      "updatedAt": "2026-09-22T08:04:22.536Z"
+      "createdAt": "2026-09-19T09:51:09.102Z",
+      "updatedAt": "2026-09-22T09:51:09.102Z"
     },
     {
       "id": "lead-demo-4",
@@ -184,8 +168,8 @@
       "stage": "Won",
       "priority": "HIGH",
       "notes": "Contract signed for annual fastener and motor fulfillment.",
-      "createdAt": "2026-09-10T08:04:22.536Z",
-      "updatedAt": "2026-09-22T08:04:22.536Z"
+      "createdAt": "2026-09-10T09:51:09.102Z",
+      "updatedAt": "2026-09-22T09:51:09.102Z"
     }
   ],
   "customers": [
@@ -218,7 +202,7 @@
       "dueDate": "2026-09-24",
       "priority": "HIGH",
       "status": "PENDING",
-      "createdAt": "2026-09-21T08:04:22.536Z"
+      "createdAt": "2026-09-21T09:51:09.102Z"
     },
     {
       "id": "task-demo-2",
@@ -227,7 +211,7 @@
       "dueDate": "2026-09-23",
       "priority": "HIGH",
       "status": "PENDING",
-      "createdAt": "2026-09-20T08:04:22.536Z"
+      "createdAt": "2026-09-20T09:51:09.102Z"
     },
     {
       "id": "task-demo-3",
@@ -236,7 +220,7 @@
       "dueDate": "2026-09-26",
       "priority": "MEDIUM",
       "status": "COMPLETED",
-      "createdAt": "2026-09-18T08:04:22.536Z"
+      "createdAt": "2026-09-18T09:51:09.102Z"
     }
   ],
   "charts": [
@@ -269,7 +253,7 @@
           "value": 0
         }
       ],
-      "createdAt": "2026-09-19T08:04:22.536Z"
+      "createdAt": "2026-09-19T09:51:09.102Z"
     }
   ],
   "conversations": [
@@ -277,19 +261,19 @@
       "id": "conv-demo-1",
       "title": "Stock Audit & Reorder Recommendations",
       "agentId": "supply-chain-agent",
-      "createdAt": "2026-09-22T02:04:22.536Z",
+      "createdAt": "2026-09-22T03:51:09.102Z",
       "messages": [
         {
           "id": "msg-demo-1",
           "sender": "USER",
           "content": "Can you review our low stock items and give me a summary?",
-          "createdAt": "2026-09-22T02:04:22.536Z"
+          "createdAt": "2026-09-22T03:51:09.102Z"
         },
         {
           "id": "msg-demo-2",
           "sender": "AGENT",
           "content": "I have analyzed your warehouse inventory: **Titanium Hex Bolts M8x40** is currently **Out of Stock** (0 units vs. 12 reorder threshold). **Lithium Polymer Pack 48V** is also on **Low Stock Alert** with only 6 units remaining (min threshold 10).\n\nWould you like me to draft an autonomous purchase order or restock action for these items?",
-          "createdAt": "2026-09-22T02:04:24.536Z",
+          "createdAt": "2026-09-22T03:51:11.102Z",
           "sources": [
             "Warehouse Inventory Master",
             "Safety Stock Policy v2.4"

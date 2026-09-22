@@ -50,7 +50,15 @@ export async function apiRequest(endpoint, options = {}) {
           window.location.href = `/login?reason=session_expired&redirect=${encodeURIComponent(currentPath)}`;
         }
       }
-      throw new Error(data.message || data.error?.message || `HTTP Error ${res.status}`);
+      const err = new Error(data.message || data.error?.message || `HTTP Error ${res.status}`);
+      err.status = res.status;
+      err.code = data.error?.code || data.code;
+      err.remainingMinutes = data.remainingMinutes || data.error?.remainingMinutes;
+      err.remainingSeconds = data.remainingSeconds || data.error?.remainingSeconds;
+      err.lockedUntil = data.lockedUntil || data.error?.lockedUntil;
+      err.isLocked = Boolean(data.isLocked || data.error?.isLocked);
+      err.data = data;
+      throw err;
     }
 
     if (typeof window !== "undefined" && token) {
@@ -66,6 +74,7 @@ export async function apiRequest(endpoint, options = {}) {
 
 export const authAPI = {
   login: (email, password) => apiRequest("/auth/login", { method: "POST", body: { email, password } }),
+  checkLockout: (email) => apiRequest("/auth/lockout", { params: { email } }),
   signup: (payload) => apiRequest("/auth/signup", { method: "POST", body: payload }),
   demo: () => apiRequest("/auth/demo", { method: "POST" }),
   getMe: () => apiRequest("/auth/me"),
