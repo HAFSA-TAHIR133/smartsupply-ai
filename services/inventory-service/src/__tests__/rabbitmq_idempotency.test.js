@@ -33,16 +33,6 @@ jest.unstable_mockModule("../utils/newrelicHelper.js", () => ({
 // the correct ack / nack / processing logic fires per message.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Mock newrelicHelper
-jest.mock("../utils/newrelicHelper.js", () => ({
-  newrelicHelper: {
-    startBackgroundTransaction: jest.fn((_name, fn) => fn()),
-    recordAgentTaskEvent: jest.fn(),
-    recordRabbitMQDLQEvent: jest.fn(),
-    noticeError: jest.fn(),
-  },
-}));
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Creates a fake AMQP message with the given payload and routing key. */

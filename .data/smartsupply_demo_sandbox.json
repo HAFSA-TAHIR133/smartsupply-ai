@@ -10,8 +10,8 @@
       "quantity": 42,
       "reorderPoint": 15,
       "description": "Industrial grade 24V brushless motor for conveyor assemblies",
-      "createdAt": "2026-09-09T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-12T08:04:22.536Z",
+      "updatedAt": "2026-09-22T08:04:22.536Z"
     },
     {
       "id": "prod-demo-2",
@@ -23,8 +23,8 @@
       "quantity": 6,
       "reorderPoint": 10,
       "description": "High-density energy storage pack with thermal safeguard",
-      "createdAt": "2026-09-11T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-14T08:04:22.536Z",
+      "updatedAt": "2026-09-22T08:04:22.536Z"
     },
     {
       "id": "prod-demo-3",
@@ -36,8 +36,8 @@
       "quantity": 110,
       "reorderPoint": 25,
       "description": "Precision photoelectric proximity beam sensor",
-      "createdAt": "2026-09-14T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-17T08:04:22.536Z",
+      "updatedAt": "2026-09-22T08:04:22.536Z"
     },
     {
       "id": "prod-demo-4",
@@ -49,8 +49,8 @@
       "quantity": 0,
       "reorderPoint": 12,
       "description": "Aerospace grade grade-5 titanium corrosion-resistant fasteners",
-      "createdAt": "2026-09-15T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-18T08:04:22.536Z",
+      "updatedAt": "2026-09-22T08:04:22.536Z"
     },
     {
       "id": "prod-demo-5",
@@ -62,8 +62,8 @@
       "quantity": 18,
       "reorderPoint": 8,
       "description": "High tensile 3K weave structural plate",
-      "createdAt": "2026-09-17T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-20T08:04:22.536Z",
+      "updatedAt": "2026-09-22T08:04:22.536Z"
     }
   ],
   "stockLogs": [
@@ -78,7 +78,7 @@
       "newQuantity": 42,
       "reason": "Supplier batch delivery #PO-9812",
       "executedBy": "Alex Reynolds (Demo)",
-      "createdAt": "2026-09-19T05:13:21.295Z"
+      "createdAt": "2026-09-22T03:04:22.536Z"
     },
     {
       "id": "log-demo-2",
@@ -91,7 +91,7 @@
       "newQuantity": 6,
       "reason": "Customer order shipment #ORD-5011",
       "executedBy": "Alex Reynolds (Demo)",
-      "createdAt": "2026-09-18T22:13:21.295Z"
+      "createdAt": "2026-09-21T20:04:22.536Z"
     }
   ],
   "leads": [
@@ -104,12 +104,12 @@
       "contactName": "gdgu bsjd",
       "contactEmail": "contact@gdgubsjd.com",
       "contactPhone": "+1 (555) 019-2834",
-      "value": 30000,
+      "value": 50000,
       "stage": "New",
       "priority": "HIGH",
       "notes": "Equipment and component supply deal",
-      "createdAt": "2026-09-19T08:00:00.000Z",
-      "updatedAt": "2026-09-19T10:49:58.701Z"
+      "createdAt": "2026-09-20T08:04:22.536Z",
+      "updatedAt": "2026-09-22T08:04:22.536Z"
     },
     {
       "id": "lead-live-1",
@@ -124,8 +124,8 @@
       "stage": "Qualified",
       "priority": "HIGH",
       "notes": "Evaluating linear actuators and servo amplifiers for conveyor line.",
-      "createdAt": "2026-09-19T09:00:06.372Z",
-      "updatedAt": "2026-09-19T09:00:06.372Z"
+      "createdAt": "2026-09-19T08:04:22.536Z",
+      "updatedAt": "2026-09-22T08:04:22.536Z"
     },
     {
       "id": "lead-demo-1",
@@ -139,8 +139,8 @@
       "stage": "Qualified",
       "priority": "HIGH",
       "notes": "Urgent need for 24V motors and battery packs before Q4 delivery.",
-      "createdAt": "2026-09-12T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-15T08:04:22.536Z",
+      "updatedAt": "2026-09-22T08:04:22.536Z"
     },
     {
       "id": "lead-demo-2",
@@ -154,8 +154,8 @@
       "stage": "Proposal",
       "priority": "HIGH",
       "notes": "Proposal submitted for 200 high-density 48V battery units.",
-      "createdAt": "2026-09-14T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-17T08:04:22.536Z",
+      "updatedAt": "2026-09-22T08:04:22.536Z"
     },
     {
       "id": "lead-demo-3",
@@ -169,8 +169,8 @@
       "stage": "Contacted",
       "priority": "MEDIUM",
       "notes": "Requested technical specification sheet for optoelectronic sensors.",
-      "createdAt": "2026-09-16T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-19T08:04:22.536Z",
+      "updatedAt": "2026-09-22T08:04:22.536Z"
     },
     {
       "id": "lead-demo-4",
@@ -184,54 +184,30 @@
       "stage": "Won",
       "priority": "HIGH",
       "notes": "Contract signed for annual fastener and motor fulfillment.",
-      "createdAt": "2026-09-07T10:13:21.295Z",
-      "updatedAt": "2026-09-19T10:13:21.295Z"
+      "createdAt": "2026-09-10T08:04:22.536Z",
+      "updatedAt": "2026-09-22T08:04:22.536Z"
     }
   ],
   "customers": [
     {
-      "id": "cust-12",
-      "tenantId": "demo-tenant-id",
-      "accountNo": "12",
-      "name": "Aeropax Industries",
-      "company": "Aeropax Industries",
-      "industry": "Aeropax Industries",
-      "contactName": "Primary Contact",
-      "email": "contact@aeropax.com",
-      "phone": "03001254165",
-      "status": "ACTIVE",
-      "isActive": true,
-      "totalSpend": 95000,
-      "createdAt": "2026-12-01T00:00:00.000Z",
-      "updatedAt": "2026-12-01T00:00:00.000Z"
-    },
-    {
       "id": "cust-demo-1",
       "tenantId": "demo-tenant-id",
-      "accountNo": "101",
       "name": "Apex Heavy Industries",
       "email": "procurement@apexheavy.com",
       "phone": "+1 (555) 609-3382",
       "company": "Apex Heavy Industries",
-      "industry": "Heavy Machinery & Logistics",
       "totalSpend": 210000,
-      "status": "ACTIVE",
-      "isActive": true,
-      "createdAt": "2026-08-15T09:00:00.000Z"
+      "status": "ACTIVE"
     },
     {
       "id": "cust-demo-2",
       "tenantId": "demo-tenant-id",
-      "accountNo": "102",
       "name": "Vanguard Marine Systems",
       "email": "supplies@vanguard-marine.com",
       "phone": "+1 (555) 881-4412",
       "company": "Vanguard Marine Systems",
-      "industry": "Maritime Navigation",
       "totalSpend": 74500,
-      "status": "ACTIVE",
-      "isActive": true,
-      "createdAt": "2026-08-20T10:30:00.000Z"
+      "status": "ACTIVE"
     }
   ],
   "tasks": [
@@ -239,28 +215,28 @@
       "id": "task-demo-1",
       "tenantId": "demo-tenant-id",
       "title": "Follow up with Marcus Vance on AeroTech quotation",
-      "dueDate": "2026-09-21",
+      "dueDate": "2026-09-24",
       "priority": "HIGH",
       "status": "PENDING",
-      "createdAt": "2026-09-18T10:13:21.295Z"
+      "createdAt": "2026-09-21T08:04:22.536Z"
     },
     {
       "id": "task-demo-2",
       "tenantId": "demo-tenant-id",
       "title": "Restock PO for Titanium Hex Bolts M8x40",
-      "dueDate": "2026-09-20",
+      "dueDate": "2026-09-23",
       "priority": "HIGH",
       "status": "PENDING",
-      "createdAt": "2026-09-17T10:13:21.295Z"
+      "createdAt": "2026-09-20T08:04:22.536Z"
     },
     {
       "id": "task-demo-3",
       "tenantId": "demo-tenant-id",
       "title": "Send battery compliance specs to SkyGlide Deliveries",
-      "dueDate": "2026-09-23",
+      "dueDate": "2026-09-26",
       "priority": "MEDIUM",
       "status": "COMPLETED",
-      "createdAt": "2026-09-15T10:13:21.295Z"
+      "createdAt": "2026-09-18T08:04:22.536Z"
     }
   ],
   "charts": [
@@ -293,88 +269,27 @@
           "value": 0
         }
       ],
-      "createdAt": "2026-09-16T10:13:21.295Z"
+      "createdAt": "2026-09-19T08:04:22.536Z"
     }
   ],
   "conversations": [
     {
-      "id": "conv-demo-1789814998577",
-      "title": "Update the lead amount of gdgu bsjd from...",
-      "agentId": "agent-crm",
-      "createdAt": "2026-09-19T10:49:58.577Z",
-      "messages": [
-        {
-          "id": "msg-user-1789814998577",
-          "sender": "USER",
-          "content": "Update the lead amount of gdgu bsjd from 50,000 to 30,000",
-          "createdAt": "2026-09-19T10:49:58.577Z"
-        },
-        {
-          "id": "msg-bot-1789814998577",
-          "sender": "AGENT",
-          "content": "I have prepared the update for lead **gdgu bsjd** (Amount to $30,000).\n\nPlease confirm below and I will immediately save this to the database and update your CRM view.",
-          "sources": [],
-          "toolsUsed": [
-            "crm_lead_updater"
-          ],
-          "executionTimeMs": 25,
-          "requiresConfirmation": true,
-          "pendingAction": {
-            "id": "act-demo-1789814998576-493",
-            "actionType": "EDIT_LEAD",
-            "title": "Edit Lead: gdgu bsjd",
-            "summary": "Update lead \"gdgu bsjd\": Set Amount to $30,000.",
-            "payload": {
-              "leadId": "lead-gdgu-bsjd",
-              "leadTitle": "gdgu bsjd",
-              "updates": {
-                "value": 30000
-              }
-            },
-            "status": "APPROVED",
-            "expiresAt": "2026-09-19T11:04:58.576Z",
-            "createdAt": "2026-09-19T10:49:58.576Z",
-            "executionMode": "DEMO",
-            "approvedAt": "2026-09-19T10:49:58.702Z",
-            "result": {
-              "id": "lead-gdgu-bsjd",
-              "tenantId": "demo-tenant-id",
-              "title": "gdgu bsjd",
-              "name": "gdgu bsjd",
-              "companyName": "gdgu bsjd",
-              "contactName": "gdgu bsjd",
-              "contactEmail": "contact@gdgubsjd.com",
-              "contactPhone": "+1 (555) 019-2834",
-              "value": 30000,
-              "stage": "New",
-              "priority": "HIGH",
-              "notes": "Equipment and component supply deal",
-              "createdAt": "2026-09-19T08:00:00.000Z",
-              "updatedAt": "2026-09-19T10:49:58.701Z",
-              "_executionMode": "DEMO"
-            }
-          },
-          "createdAt": "2026-09-19T10:49:58.577Z"
-        }
-      ]
-    },
-    {
       "id": "conv-demo-1",
       "title": "Stock Audit & Reorder Recommendations",
       "agentId": "supply-chain-agent",
-      "createdAt": "2026-09-19T04:13:21.295Z",
+      "createdAt": "2026-09-22T02:04:22.536Z",
       "messages": [
         {
           "id": "msg-demo-1",
           "sender": "USER",
           "content": "Can you review our low stock items and give me a summary?",
-          "createdAt": "2026-09-19T04:13:21.295Z"
+          "createdAt": "2026-09-22T02:04:22.536Z"
         },
         {
           "id": "msg-demo-2",
           "sender": "AGENT",
           "content": "I have analyzed your warehouse inventory: **Titanium Hex Bolts M8x40** is currently **Out of Stock** (0 units vs. 12 reorder threshold). **Lithium Polymer Pack 48V** is also on **Low Stock Alert** with only 6 units remaining (min threshold 10).\n\nWould you like me to draft an autonomous purchase order or restock action for these items?",
-          "createdAt": "2026-09-19T04:13:23.295Z",
+          "createdAt": "2026-09-22T02:04:24.536Z",
           "sources": [
             "Warehouse Inventory Master",
             "Safety Stock Policy v2.4"
@@ -383,42 +298,6 @@
       ]
     }
   ],
-  "pendingActions": [
-    {
-      "id": "act-demo-1789814998576-493",
-      "actionType": "EDIT_LEAD",
-      "title": "Edit Lead: gdgu bsjd",
-      "summary": "Update lead \"gdgu bsjd\": Set Amount to $30,000.",
-      "payload": {
-        "leadId": "lead-gdgu-bsjd",
-        "leadTitle": "gdgu bsjd",
-        "updates": {
-          "value": 30000
-        }
-      },
-      "status": "APPROVED",
-      "expiresAt": "2026-09-19T11:04:58.576Z",
-      "createdAt": "2026-09-19T10:49:58.576Z",
-      "executionMode": "DEMO",
-      "approvedAt": "2026-09-19T10:49:58.702Z",
-      "result": {
-        "id": "lead-gdgu-bsjd",
-        "tenantId": "demo-tenant-id",
-        "title": "gdgu bsjd",
-        "name": "gdgu bsjd",
-        "companyName": "gdgu bsjd",
-        "contactName": "gdgu bsjd",
-        "contactEmail": "contact@gdgubsjd.com",
-        "contactPhone": "+1 (555) 019-2834",
-        "value": 30000,
-        "stage": "New",
-        "priority": "HIGH",
-        "notes": "Equipment and component supply deal",
-        "createdAt": "2026-09-19T08:00:00.000Z",
-        "updatedAt": "2026-09-19T10:49:58.701Z",
-        "_executionMode": "DEMO"
-      }
-    }
-  ],
+  "pendingActions": [],
   "memories": {}
 }

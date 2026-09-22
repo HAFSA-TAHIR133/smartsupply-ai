@@ -1,6 +1,7 @@
 import "./env.js";
 import { storeAdapter, getDemoDb, saveDemoDb, getLiveDb, saveLiveDb } from "./store.js";
 import * as neonDb from "./neonDb.js";
+import memoryService from "./memory.js";
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const LLM_MODEL = process.env.LLM_MODEL || "groq/compound";
@@ -14,7 +15,7 @@ export const CRM_VALID_STAGES = ["New", "Contacted", "Qualified", "Proposal", "W
  */
 async function callLLM(systemPrompt, userMessage) {
   if (GROQ_API_KEY) {
-    // 1. Try Primary Configured Model (e.g. groq/compound)
+    // 1. Try Primary Configured Model
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -44,7 +45,7 @@ async function callLLM(systemPrompt, userMessage) {
       console.warn("Primary LLM call failed, trying fallback model:", e.message);
     }
 
-    // 2. Try Fallback Model (e.g. qwen/qwen3.6-27b or groq/compound-mini)
+    // 2. Try Fallback Model
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -102,28 +103,54 @@ async function callLLM(systemPrompt, userMessage) {
   return null;
 }
 
-// Helper: match product from message text
+// -------------------------------------------------------------
+// ENTITY MATCHERS & PARSERS
+// -------------------------------------------------------------
+
+/**
+ * Matches a product from message text by SKU, name, or tokens.
+ */
 function matchProductFromText(text, products) {
   if (!products || products.length === 0) return null;
-  const lower = text.toLowerCase();
+  const lower = text.toLowerCase().trim();
 
   // 1. Try exact or partial SKU match
   for (const p of products) {
     if (p.sku && lower.includes(p.sku.toLowerCase())) return p;
   }
 
-  // 2. Try product name match
+  // 2. Exact name match
   for (const p of products) {
     if (p.name && lower.includes(p.name.toLowerCase())) return p;
   }
 
-  // 3. Try name tokens
-  for (const p of products) {
-    const tokens = p.name.toLowerCase().split(/\s+/).filter((t) => t.length > 3);
-    for (const token of tokens) {
-      if (lower.includes(token)) return p;
+  // 3. Extract candidate product name from command
+  const prodMatch = text.match(/(?:product|item|stock of|stock for)\s+([a-zA-Z0-9_\-\s]+?)(?:\s+by|\s+to|\s+from|\s+with|\s+units|\s+at|$)/i);
+  if (prodMatch && prodMatch[1]) {
+    const cand = prodMatch[1].trim().toLowerCase();
+    if (cand && !["the", "a", "this", "my"].includes(cand)) {
+      for (const p of products) {
+        const pName = p.name.toLowerCase();
+        if (pName.includes(cand) || cand.includes(pName)) return p;
+      }
     }
   }
+
+  // 4. Token match: check how many significant tokens (>2 chars) match
+  let bestProduct = null;
+  let maxScore = 0;
+  for (const p of products) {
+    const tokens = p.name.toLowerCase().split(/[\s,._\-/]+/).filter((t) => t.length > 2);
+    let score = 0;
+    for (const t of tokens) {
+      if (lower.includes(t)) score += t.length;
+    }
+    if (score > maxScore && score >= 4) {
+      maxScore = score;
+      bestProduct = p;
+    }
+  }
+  if (bestProduct) return bestProduct;
 
   if (
     lower.includes(" it ") ||
@@ -137,26 +164,70 @@ function matchProductFromText(text, products) {
   return null;
 }
 
-// Helper: match lead from message text
-function matchLeadFromText(text, leads) {
-  if (!leads || leads.length === 0) return null;
-  const lower = text.toLowerCase();
+/**
+ * Extracts a candidate lead identifier (ID, accountNo, or title) from text.
+ */
+function extractLeadIdentifierCandidate(text) {
+  // Check for #L-2357, L-2357, lead-live-1, #123, etc.
+  const idMatch = text.match(/(?:#?L[-\s]?\d+|lead-[a-zA-Z0-9_\-]+|#[a-zA-Z0-9_\-]+)/i);
+  if (idMatch) return idMatch[0].trim();
 
-  // 1. Check title, name, companyName exact containment in text
-  for (const l of leads) {
-    const title = (l.title || l.name || "").toLowerCase().trim();
-    if (title && lower.includes(title)) return l;
-    const company = (l.companyName || l.company || "").toLowerCase().trim();
-    if (company && lower.includes(company)) return l;
-    const contact = (l.contactName || "").toLowerCase().trim();
-    if (contact && lower.includes(contact)) return l;
+  // Check quoted strings
+  const quoted = text.match(/["']([^"']+)["']/);
+  if (quoted) return quoted[1].trim();
+
+  // Check "lead <identifier>"
+  const leadMatch = text.match(/(?:lead|deal|opportunity)\s+([a-zA-Z0-9_\-\s#]+?)(?:\s+from|\s+to|\s+value|\s+amount|\s+stage|$)/i);
+  if (leadMatch && leadMatch[1]) {
+    const cand = leadMatch[1].trim();
+    if (!["the", "a", "this", "my", "that"].includes(cand.toLowerCase())) {
+      return cand;
+    }
   }
 
-  // 2. Check quoted strings e.g. "National Courier Fleet Automation"
+  return null;
+}
+
+/**
+ * Matches a lead from message text by ID, account number, company, or title.
+ */
+function matchLeadFromText(text, leads) {
+  if (!leads || leads.length === 0) return null;
+  const lower = text.toLowerCase().trim();
+
+  // 1. Exact ID match (e.g. "lead-live-1", "lead-demo-1", "L-2357", "#L-2357")
+  const idCandidate = extractLeadIdentifierCandidate(text);
+  if (idCandidate) {
+    const cleanCand = idCandidate.replace(/^#/g, "").toLowerCase().trim();
+    for (const l of leads) {
+      if (l.id && l.id.toLowerCase() === cleanCand) return l;
+      if (l.id && l.id.toLowerCase().includes(cleanCand)) return l;
+      if (l.accountNo && l.accountNo.toLowerCase() === cleanCand) return l;
+      if (l.accountNo && l.accountNo.toLowerCase().includes(cleanCand)) return l;
+      // Strip prefix "lead-"
+      const strippedId = String(l.id).replace(/^lead-/i, "").toLowerCase();
+      if (strippedId && cleanCand.includes(strippedId)) return l;
+      // Match numeric part e.g. "2357"
+      const numMatch = cleanCand.match(/\d+/);
+      if (numMatch && (String(l.id).includes(numMatch[0]) || String(l.accountNo).includes(numMatch[0]))) {
+        return l;
+      }
+    }
+  }
+
+  // 2. Direct exact title or company match (critical for follow-up turns)
+  for (const l of leads) {
+    const title = (l.title || l.name || "").toLowerCase().trim();
+    if (title && (lower === title || lower.includes(title))) return l;
+    const company = (l.companyName || l.company || "").toLowerCase().trim();
+    if (company && (lower === company || lower.includes(company))) return l;
+  }
+
+  // 3. Quoted strings
   const quoted = text.match(/["']([^"']+)["']/);
   if (quoted) {
     const q = quoted[1].toLowerCase().trim();
-    const found = leads.find((l) => 
+    const found = leads.find((l) =>
       (l.title && l.title.toLowerCase().includes(q)) ||
       (l.name && l.name.toLowerCase().includes(q)) ||
       (l.companyName && l.companyName.toLowerCase().includes(q))
@@ -164,37 +235,24 @@ function matchLeadFromText(text, leads) {
     if (found) return found;
   }
 
-  // 3. Pattern matches for action commands:
-  // e.g. "move the [name] to", "move [name] to", "advance [name] to", "lead [name] to"
-  const actionLeadMatch = text.match(/(?:move|advance|shift|transfer|transition|put|promote|change|update|edit)\s+(?:the\s+)?(?:lead\s+)?([a-zA-Z0-9_\-\s]+?)(?:\s+to\s+stage|\s+to|\s+into|\s+in\s+stage|\s+in|$)/i);
+  // 4. Action commands: "move the [name] to", "delete lead [name]"
+  const actionLeadMatch = text.match(/(?:move|advance|shift|transfer|transition|put|promote|change|update|edit|delete|remove|erase|drop)\s+(?:the\s+)?(?:lead\s+)?([a-zA-Z0-9_\-\s#]+?)(?:\s+to\s+stage|\s+to|\s+into|\s+in\s+stage|\s+in|$)/i);
   if (actionLeadMatch && actionLeadMatch[1]) {
-    const cand = actionLeadMatch[1].trim().toLowerCase();
-    if (cand && cand !== "the" && cand !== "a" && cand !== "lead") {
+    const cand = actionLeadMatch[1].trim().toLowerCase().replace(/^#/g, "");
+    if (cand && !["the", "a", "this", "my", "lead", "item"].includes(cand)) {
       const found = leads.find((l) =>
         (l.title && l.title.toLowerCase().includes(cand)) ||
         (l.name && l.name.toLowerCase().includes(cand)) ||
         (l.companyName && l.companyName.toLowerCase().includes(cand)) ||
+        (l.id && l.id.toLowerCase().includes(cand)) ||
+        (l.accountNo && l.accountNo.toLowerCase().includes(cand)) ||
         cand.includes((l.title || l.name || "").toLowerCase())
       );
       if (found) return found;
     }
   }
 
-  // 4. Check general pattern: lead [name]
-  const patternMatch = text.match(/(?:lead\s+amount\s+of|lead\s+value\s+of|lead\s+of|lead\s+named|lead)\s+([a-zA-Z0-9_\-\s]+?)(?:\s+from|\s+to|\s+value|\s+amount|\s+stage|$)/i);
-  if (patternMatch && patternMatch[1]) {
-    const cand = patternMatch[1].trim().toLowerCase();
-    if (cand && cand !== "the" && cand !== "a") {
-      const found = leads.find((l) =>
-        (l.title && l.title.toLowerCase().includes(cand)) ||
-        (l.name && l.name.toLowerCase().includes(cand)) ||
-        (l.companyName && l.companyName.toLowerCase().includes(cand))
-      );
-      if (found) return found;
-    }
-  }
-
-  // 5. Multi-token matches (all significant tokens >= 3 chars contained in message)
+  // 5. Multi-token matches
   for (const l of leads) {
     const tokens = (l.title || l.name || "").toLowerCase().split(/\s+/).filter((t) => t.length > 2);
     if (tokens.length > 0 && tokens.every((t) => lower.includes(t))) {
@@ -202,7 +260,7 @@ function matchLeadFromText(text, leads) {
     }
   }
 
-  // 6. Partial token matches (e.g. 2 or more significant tokens match)
+  // 6. Partial token matches (>=2 significant tokens)
   for (const l of leads) {
     const tokens = (l.title || l.name || "").toLowerCase().split(/\s+/).filter((t) => t.length > 3);
     const matches = tokens.filter((t) => lower.includes(t));
@@ -214,21 +272,24 @@ function matchLeadFromText(text, leads) {
   return null;
 }
 
-// Helper: match task from message text
+/**
+ * Matches a task from message text by title.
+ */
 function matchTaskFromText(text, tasks) {
   if (!tasks || tasks.length === 0) return null;
-  const lower = text.toLowerCase();
+  const lower = text.toLowerCase().trim();
   for (const t of tasks) {
     if (t.title && lower.includes(t.title.toLowerCase())) return t;
   }
   return tasks[0];
 }
 
-// Helper: extract target stage from text
+/**
+ * Extracts target CRM stage from text.
+ */
 function extractStageFromText(text) {
   const lower = text.toLowerCase();
 
-  // 1. Check for explicit "to [stage]" or "to stage [stage]" or "stage [stage]"
   const stagePattern = /(?:to|into|in)?\s*(?:stage|status)\s*[:=]?\s*["']?([a-zA-Z0-9_\-]+)["']?/i;
   const match1 = text.match(stagePattern);
   if (match1 && match1[1]) {
@@ -247,7 +308,6 @@ function extractStageFromText(text) {
     }
   }
 
-  // 2. Check for presence of valid stage names anywhere in text
   for (const stage of CRM_VALID_STAGES) {
     const reg = new RegExp(`\\b${stage}\\b`, "i");
     if (reg.test(lower)) {
@@ -258,30 +318,168 @@ function extractStageFromText(text) {
   return null;
 }
 
-// Helper: check if message is an affirmative confirmation for HITL
+/**
+ * Parses date phrases like "30 sep 2026", "2026-09-30", "tomorrow".
+ */
+function extractDueDateFromText(text) {
+  const monthNames = {
+    jan: 1, january: 1,
+    feb: 2, february: 2,
+    mar: 3, march: 3,
+    apr: 4, april: 4,
+    may: 5,
+    jun: 6, june: 6,
+    jul: 7, july: 7,
+    aug: 8, august: 8,
+    sep: 9, sept: 9, september: 9,
+    oct: 10, october: 10,
+    nov: 11, november: 11,
+    dec: 12, december: 12,
+  };
+
+  // e.g. "30 sep 2026" or "30th september 2026"
+  const dmyMatch = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+(\d{4})\b/i);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = monthNames[dmyMatch[2].toLowerCase()];
+    const year = parseInt(dmyMatch[3], 10);
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return { dateStr, rawMatched: dmyMatch[0] };
+  }
+
+  // e.g. "september 30 2026" or "sep 30, 2026"
+  const mdyMatch = text.match(/\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,)?\s+(\d{4})\b/i);
+  if (mdyMatch) {
+    const month = monthNames[mdyMatch[1].toLowerCase()];
+    const day = parseInt(mdyMatch[2], 10);
+    const year = parseInt(mdyMatch[3], 10);
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return { dateStr, rawMatched: mdyMatch[0] };
+  }
+
+  // ISO date e.g. 2026-09-30
+  const isoMatch = text.match(/\b(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})\b/);
+  if (isoMatch) {
+    const dateStr = `${isoMatch[1]}-${String(parseInt(isoMatch[2], 10)).padStart(2, "0")}-${String(parseInt(isoMatch[3], 10)).padStart(2, "0")}`;
+    return { dateStr, rawMatched: isoMatch[0] };
+  }
+
+  // "tomorrow"
+  if (/\btomorrow\b/i.test(text)) {
+    const d = new Date(Date.now() + 86400000);
+    return { dateStr: d.toISOString().split("T")[0], rawMatched: "tomorrow" };
+  }
+
+  // "next week"
+  if (/\bnext week\b/i.test(text)) {
+    const d = new Date(Date.now() + 7 * 86400000);
+    return { dateStr: d.toISOString().split("T")[0], rawMatched: "next week" };
+  }
+
+  return null;
+}
+
+// -------------------------------------------------------------
+// INTENT CLASSIFICATION HELPERS
+// -------------------------------------------------------------
+
 function isAffirmativeConfirmation(text) {
-  const trimmed = text.trim().toLowerCase().replace(/[.!?,]/g, "");
-  return /^(yes|confirm|confirmed|proceed|approve|approved|do it|go ahead|sure|yep|yeah|ok|okay|yes please|please do|execute)$/i.test(trimmed) ||
-    trimmed === "yes" ||
-    trimmed === "confirm" ||
-    trimmed === "proceed";
+  const trimmed = text.trim().toLowerCase().replace(/[.,!?:;]/g, " ").replace(/\s+/g, " ").trim();
+  if (/^(yes|confirm|confirmed|proceed|approve|approved|do it|go ahead|sure|yep|yeah|ok|okay|yes please|please do|execute)$/i.test(trimmed)) {
+    return true;
+  }
+  if (
+    /^(?:yes|yep|yeah|sure|ok|okay)\b/i.test(trimmed) ||
+    /\b(?:please\s+confirm|confirm\s+(?:this|that|it|action|request)|proceed|go\s+ahead|approve\s+(?:this|that|it))\b/i.test(trimmed)
+  ) {
+    if (!/\b(?:no|not|dont|don't|cancel|abort|stop)\b/i.test(trimmed)) {
+      return true;
+    }
+  }
+  return false;
 }
 
-// Helper: check if message is a cancellation for HITL
 function isNegativeCancellation(text) {
-  const trimmed = text.trim().toLowerCase().replace(/[.!?,]/g, "");
-  return /^(no|cancel|cancelled|reject|rejected|abort|don't|stop|never mind|no thanks|do not)$/i.test(trimmed) ||
-    trimmed === "no" ||
-    trimmed === "cancel";
+  const trimmed = text.trim().toLowerCase().replace(/[.,!?:;]/g, " ").replace(/\s+/g, " ").trim();
+  if (/^(no|cancel|cancelled|reject|rejected|abort|don't|stop|never mind|no thanks|do not|nevermind)$/i.test(trimmed)) {
+    return true;
+  }
+  if (
+    /^(?:no|cancel|stop|abort)\b/i.test(trimmed) ||
+    /\b(?:cancel\s+(?:this|that|it|action|request)|do\s+not|never\s*mind|no\s+thanks|keep\s+it)\b/i.test(trimmed)
+  ) {
+    return true;
+  }
+  return false;
 }
 
-// Helper: check if message is an inquiry (read-only)
-function isQuestionOrInquiry(lowerMsg) {
-  // If it's a mutation command (move, restock, delete, renew, edit), it is NOT a read-only inquiry!
+/**
+ * Robust check for Task creation intent.
+ * CRITICAL: Must return true for "Add a follow up task of meeting with the lead schedule on 30 sep 2026"
+ * and prevent Lead creation from firing.
+ */
+function isTaskCreationIntent(lowerMsg, message) {
+  const hasTaskKeyword = lowerMsg.includes("task") || lowerMsg.includes("follow up") || lowerMsg.includes("follow-up");
+  if (!hasTaskKeyword) return false;
+
+  const hasCreateVerb = /(?:add|create|new|schedule|set up|register|insert|put)\b/i.test(message);
+  const hasTaskNoun = /\b(?:task|follow\s*-?\s*up)\b/i.test(message);
+
+  if (hasCreateVerb && hasTaskNoun) return true;
+  if (/^task\s+(?:to|for|of|about)\b/i.test(message)) return true;
+  if (/follow\s*-?\s*up\s+task\b/i.test(message)) return true;
+  if (/\badd\s+(?:a\s+)?follow\s*-?\s*up\b/i.test(message)) return true;
+
+  return false;
+}
+
+/**
+ * Robust check for Lead creation intent.
+ * CRITICAL: Must NEVER return true if isTaskCreationIntent is true!
+ */
+function isLeadCreationIntent(lowerMsg, message) {
+  if (isTaskCreationIntent(lowerMsg, message)) return false;
+
+  const hasCreateVerb = /(?:add|create|new|register|insert|open)\b/i.test(message);
+  const hasLeadNoun = /\b(?:lead|deal|opportunity|prospect)\b/i.test(message);
+
+  return hasCreateVerb && hasLeadNoun;
+}
+
+/**
+ * Robust check for Customer creation intent.
+ */
+function isCustomerCreationIntent(lowerMsg, message) {
+  const hasCreateVerb = /(?:add|create|new|register|insert|open)\b/i.test(message);
+  const hasCustomerNoun = /\b(?:customer|account|client)\b/i.test(message);
+  return hasCreateVerb && hasCustomerNoun;
+}
+
+/**
+ * Robust check for Delete intent.
+ */
+function isDeleteIntent(lowerMsg, message) {
+  return /(?:delete|remove|erase|drop|destroy)\b/i.test(message);
+}
+
+/**
+ * Robust check for Restock intent.
+ */
+function isRestockIntent(lowerMsg, message) {
+  return (
+    /(?:restock|re-stock|replenish)\b/i.test(message) ||
+    /renew(?:\s+the)?\s+stock\b/i.test(message) ||
+    /(?:add|order|increase)\s+stock\b/i.test(message)
+  );
+}
+
+/**
+ * Robust check for Read-only questions.
+ */
+function isQuestionOrInquiry(lowerMsg, message) {
   if (
     lowerMsg.includes("move ") ||
-    lowerMsg.includes("restock") ||
-    lowerMsg.includes("renew stock") ||
+    isRestockIntent(lowerMsg, message || lowerMsg) ||
     lowerMsg.includes("delete ") ||
     lowerMsg.includes("edit ") ||
     lowerMsg.includes("create ") ||
@@ -299,252 +497,706 @@ function isQuestionOrInquiry(lowerMsg) {
     lowerMsg.includes("show") ||
     lowerMsg.includes("list") ||
     lowerMsg.includes("tell me") ||
-    lowerMsg.includes("check") ||
-    lowerMsg.includes("status") ||
-    lowerMsg.includes("is there") ||
-    lowerMsg.includes("are there") ||
-    lowerMsg.includes("overview") ||
-    lowerMsg.includes("report") ||
+    lowerMsg.includes("who") ||
+    lowerMsg.includes("can you check") ||
+    lowerMsg.includes("view") ||
     lowerMsg.endsWith("?")
   );
 }
 
-/**
- * Core agent chat orchestrator with mode-aware execution & HITL detection
- */
+// -------------------------------------------------------------
+// MAIN CHAT AGENT EXECUTION
+// -------------------------------------------------------------
+
 export async function executeAgentChat(context, { agentId, message, conversationId }) {
   const startTime = Date.now();
-  const lowerMsg = message.toLowerCase().trim();
+  const lowerMsg = (message || "").toLowerCase().trim();
 
-  // Load current mode's data from isolated store
-  const products = await storeAdapter.getProducts(context);
-  const leads = await storeAdapter.getLeads(context);
-  const tasks = await storeAdapter.getTasks(context);
+  // Load existing records strictly scoped by tenant
+  const [products, leads, tasks, customers] = await Promise.all([
+    storeAdapter.getProducts(context),
+    storeAdapter.getLeads(context),
+    storeAdapter.getTasks(context),
+    storeAdapter.getCustomers(context),
+  ]);
 
+  let answer = "";
+  const sources = [];
+  const toolsUsed = [];
   let requiresConfirmation = false;
   let pendingAction = null;
   let executedAction = false;
-  let toolsUsed = [];
-  let answer = "";
-  let sources = [];
+
+  // Retrieve active conversation & workflow state for multi-turn continuity
+  let currentWorkflow = null;
+  if (conversationId) {
+    currentWorkflow = await storeAdapter.getConversationState(context, conversationId);
+  }
+
+  // Check for active pending actions awaiting HITL confirmation
+  const activePendingActions = await storeAdapter.getPendingActions(context);
+  let activePending = null;
+  if (conversationId) {
+    if (currentWorkflow?.pendingActionId) {
+      activePending = activePendingActions.find((a) => a.id === currentWorkflow.pendingActionId);
+    }
+  } else {
+    activePending = activePendingActions.length > 0 ? activePendingActions[0] : null;
+  }
 
   // =============================================================
-  // STEP 1: CONVERSATIONAL HITL CONFIRMATION OR CANCELLATION
+  // STEP 1: HANDLE HITL CONFIRMATION / CANCELLATION
   // =============================================================
-  if (isAffirmativeConfirmation(lowerMsg)) {
-    const activeActions = await storeAdapter.getPendingActions(context);
-    if (activeActions && activeActions.length > 0) {
-      const actionToApprove = activeActions[0];
-      toolsUsed.push("hitl_confirmation_executor");
-      const result = await storeAdapter.approvePendingAction(context, actionToApprove.id);
-      executedAction = true;
-      pendingAction = {
-        ...actionToApprove,
-        status: "APPROVED",
-        result,
-      };
+  if (isAffirmativeConfirmation(lowerMsg) || isNegativeCancellation(lowerMsg)) {
+    if (!activePending) {
+      executedAction = false;
+      requiresConfirmation = false;
+      answer = "There are no pending actions awaiting your confirmation.";
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, null);
+      }
+    } else if (isAffirmativeConfirmation(lowerMsg)) {
+      toolsUsed.push("action_approver");
+      try {
+        const approvalRes = await storeAdapter.approvePendingAction(context, activePending.id);
+        executedAction = true;
+        requiresConfirmation = false;
+        pendingAction = { ...activePending, status: "APPROVED" };
 
-      if (actionToApprove.actionType === "EDIT_LEAD") {
-        const leadTitle = actionToApprove.payload?.leadTitle || "Lead";
-        const destStage = actionToApprove.payload?.toStage || actionToApprove.payload?.updates?.stage;
-        if (destStage) {
-          answer = `Done. The lead "${leadTitle}" has been moved to ${destStage}.`;
-        } else {
-          answer = `Done. Lead "${leadTitle}" has been updated successfully.`;
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, null);
         }
-      } else if (actionToApprove.actionType === "CREATE_CUSTOMER") {
-        const custName = actionToApprove.payload?.name || "Customer Account";
-        const acctNo = actionToApprove.payload?.accountNo ? ` (#${actionToApprove.payload.accountNo})` : "";
-        answer = `Done. Customer account "${custName}"${acctNo} has been created and is now active in your CRM.`;
-      } else if (actionToApprove.actionType === "CREATE_LEAD") {
-        const leadTitle = actionToApprove.payload?.title || "Lead";
-        answer = `Done. Lead "${leadTitle}" has been created in your CRM pipeline.`;
-      } else if (actionToApprove.actionType === "CREATE_TASK") {
-        const taskTitle = actionToApprove.payload?.title || "Task";
-        answer = `Done. Task "${taskTitle}" has been created in your tasks.`;
-      } else if (actionToApprove.actionType === "RESTOCK_PRODUCT") {
-        const prodName = actionToApprove.payload?.productName || "Product";
-        const delta = actionToApprove.payload?.quantityDelta || 0;
-        answer = `Done. Restocked ${prodName} by +${delta} units.`;
-      } else if (actionToApprove.actionType === "DELETE_LEAD") {
-        answer = `Done. Lead "${actionToApprove.payload?.leadTitle || "Lead"}" has been deleted.`;
-      } else if (actionToApprove.actionType === "DELETE_PRODUCT") {
-        answer = `Done. Product "${actionToApprove.payload?.productName || "Product"}" has been deleted.`;
-      } else if (actionToApprove.actionType === "DELETE_TASK") {
-        answer = `Done. Task "${actionToApprove.payload?.taskTitle || "Task"}" has been deleted.`;
-      } else {
-        answer = `Done. Confirmed and executed ${actionToApprove.title || "operation"}.`;
+
+        const actionType = activePending.actionType;
+        const payload = activePending.payload || {};
+
+        if (actionType === "CREATE_TASK") {
+          answer = `Done. Task **${payload.title}** has been created in your CRM${payload.dueDate ? ` (Due: ${payload.dueDate})` : ""}.`;
+        } else if (actionType === "CREATE_LEAD") {
+          answer = `Done. Lead **${payload.title}** has been added to your CRM pipeline in stage *${payload.stage}*.`;
+        } else if (actionType === "CREATE_CUSTOMER") {
+          answer = `Done. Customer account #${payload.accountNo} (**${payload.name}**) has been created.`;
+        } else if (actionType === "DELETE_LEAD") {
+          answer = `Done. Lead **${payload.leadTitle || payload.title || "record"}** has been deleted from your CRM pipeline.`;
+        } else if (actionType === "DELETE_PRODUCT") {
+          answer = `Done. Product **${payload.productName || payload.name || "item"}** has been deleted from inventory.`;
+        } else if (actionType === "DELETE_TASK") {
+          answer = `Done. Task **${payload.taskTitle || payload.title || "task"}** has been deleted.`;
+        } else if (actionType === "EDIT_LEAD") {
+          const stageDesc = payload.toStage ? `moved to **${payload.toStage}**` : `updated`;
+          answer = `Done. Lead **${payload.leadTitle}** has been ${stageDesc}.`;
+        } else if (actionType === "RESTOCK_PRODUCT") {
+          const newQty = approvalRes?.result?.product?.quantity ?? "updated";
+          answer = `Done. Restocked **${payload.productName}** by **+${payload.quantityDelta} units**. Current stock is now **${newQty} units**.`;
+        } else if (actionType === "EDIT_PRODUCT") {
+          answer = `Done. Product **${payload.productName}** has been updated.`;
+        } else {
+          answer = `Done. The requested action (${actionType}) was approved and executed successfully.`;
+        }
+      } catch (err) {
+        answer = `Failed to execute action: ${err.message}`;
       }
     } else {
-      answer = "There are no pending actions awaiting your confirmation.";
-    }
-  } else if (isNegativeCancellation(lowerMsg)) {
-    const activeActions = await storeAdapter.getPendingActions(context);
-    if (activeActions && activeActions.length > 0) {
-      const actionToReject = activeActions[0];
-      toolsUsed.push("hitl_cancellation_executor");
-      await storeAdapter.rejectPendingAction(context, actionToReject.id);
-      pendingAction = {
-        ...actionToReject,
-        status: "REJECTED",
-      };
-      answer = `Understood. The action "${actionToReject.title || "operation"}" was cancelled and no changes were made.`;
-    } else {
-      answer = "No pending action was found to cancel.";
+      toolsUsed.push("action_rejector");
+      await storeAdapter.rejectPendingAction(context, activePending.id);
+      executedAction = false;
+      requiresConfirmation = false;
+      pendingAction = { ...activePending, status: "REJECTED" };
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, null);
+      }
+      answer = "Understood. I have cancelled the pending request. No changes were made.";
     }
   }
 
   // =============================================================
-  // STEP 2: LEAD STAGE MOVE / UPDATE FLOW (ACTION REQUEST)
-  // e.g. "Please move the National Courier Fleet Automation to stage Contacted"
+  // STEP 2: HANDLE ONGOING CONVERSATION WORKFLOW
+  // (e.g. User was asked "Which lead would you like to delete?" and now provides title/ID)
+  // =============================================================
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "DELETE_LEAD" &&
+    currentWorkflow.step === "AWAITING_LEAD_IDENTIFIER" &&
+    !isTaskCreationIntent(lowerMsg, message) &&
+    !isLeadCreationIntent(lowerMsg, message) &&
+    !isQuestionOrInquiry(lowerMsg)
+  ) {
+    toolsUsed.push("crm_lead_deleter");
+    const matchedLead = matchLeadFromText(message, leads);
+
+    if (matchedLead) {
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "DELETE_LEAD",
+        title: `Delete Lead: ${matchedLead.title}`,
+        summary: `Permanently delete lead "${matchedLead.title}" (ID: ${matchedLead.id}).`,
+        payload: {
+          leadId: matchedLead.id,
+          leadTitle: matchedLead.title,
+        },
+      });
+      answer = `I have prepared the request to delete lead **${matchedLead.title}** (ID: \`${matchedLead.id}\`).\n\nPlease confirm below before I permanently remove it from your CRM pipeline.`;
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, null);
+      }
+    } else {
+      const activeLeadsList = leads.length > 0
+        ? leads.slice(0, 5).map((l) => `• **${l.title}** (ID: \`${l.id}\`)`).join("\n")
+        : "None";
+      answer = `I could not find a lead matching "${message}" in your CRM pipeline.\n\nHere are your current active leads:\n${activeLeadsList}\n\nPlease specify the exact lead title or ID to delete.`;
+    }
+  }
+
+  // 2B. Awaiting Lead for Task Creation (Multi-turn Example B)
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "CREATE_TASK" &&
+    currentWorkflow.step === "AWAITING_LEAD" &&
+    !isQuestionOrInquiry(lowerMsg)
+  ) {
+    toolsUsed.push("crm_task_creator");
+    const matchedLead = matchLeadFromText(message, leads);
+
+    if (matchedLead) {
+      requiresConfirmation = true;
+      const dueDate = currentWorkflow.dueDate || new Date(Date.now() + 86400000).toISOString().split("T")[0];
+      const taskTitle = currentWorkflow.taskTitle || `Follow-up meeting with ${matchedLead.title}`;
+
+      const payload = {
+        title: taskTitle,
+        description: taskTitle,
+        status: "PENDING",
+        priority: "HIGH",
+        dueDate,
+        due_date: dueDate,
+        leadId: matchedLead.id,
+        leadTitle: matchedLead.title,
+      };
+
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "CREATE_TASK",
+        title: `Create Task: ${taskTitle}`,
+        summary: `Create task "${taskTitle}" for lead ${matchedLead.title} due on ${dueDate}.`,
+        payload,
+      });
+
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_TASK",
+          step: "AWAITING_CONFIRMATION",
+          data: payload,
+          lastMentionedLeadId: matchedLead.id,
+          lastMentionedLeadTitle: matchedLead.title,
+        });
+      }
+
+      answer = `I have prepared the follow-up task for **${matchedLead.title}**:\n\n` +
+        `• **Task:** ${taskTitle}\n` +
+        `• **Associated Lead:** ${matchedLead.title} (\`${matchedLead.id}\`)\n` +
+        `• **Due Date:** ${dueDate}\n` +
+        `• **Priority:** HIGH\n\nPlease confirm below before I add this task to your CRM.`;
+    } else {
+      const activeLeadsList = leads.length > 0
+        ? leads.slice(0, 5).map((l) => `• **${l.title}** (ID: \`${l.id}\`)`).join("\n")
+        : "None";
+      answer = `I could not find a lead matching "${message}".\n\nActive leads:\n${activeLeadsList}\n\nPlease specify which lead to associate with this task.`;
+    }
+  }
+
+  // 2C. Awaiting Lead for Moving Stage (Multi-turn)
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "MOVE_LEAD" &&
+    currentWorkflow.step === "AWAITING_LEAD" &&
+    !isQuestionOrInquiry(lowerMsg)
+  ) {
+    toolsUsed.push("crm_lead_stage_updater");
+    const matchedLead = matchLeadFromText(message, leads);
+
+    if (matchedLead) {
+      const targetStage = currentWorkflow.targetStage || "Contacted";
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "EDIT_LEAD",
+        title: `Move Lead: ${matchedLead.title}`,
+        summary: `Move "${matchedLead.title}" from stage ${matchedLead.stage} to ${targetStage}.`,
+        payload: {
+          leadId: matchedLead.id,
+          leadTitle: matchedLead.title,
+          fromStage: matchedLead.stage,
+          toStage: targetStage,
+          updates: { stage: targetStage },
+        },
+      });
+
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          lastMentionedLeadId: matchedLead.id,
+          lastMentionedLeadTitle: matchedLead.title,
+        });
+      }
+
+      answer = `I have prepared the update to move **${matchedLead.title}** from stage *${matchedLead.stage}* to **${targetStage}**.\n\nPlease confirm below to proceed with updating this lead.`;
+    } else {
+      answer = `I could not find a lead matching "${message}". Please specify the lead title or ID.`;
+    }
+  }
+
+  // 2D. Awaiting Quantity for Restock (Multi-turn)
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "RESTOCK_PRODUCT" &&
+    currentWorkflow.step === "AWAITING_QUANTITY" &&
+    !isQuestionOrInquiry(lowerMsg)
+  ) {
+    toolsUsed.push("inventory_restock_orchestrator");
+    const qtyMatch = message.match(/\b(\d+)\b/);
+    const quantity = qtyMatch ? parseInt(qtyMatch[1], 10) : 0;
+    const matchedProduct = products.find((p) => p.id === currentWorkflow.productId) ||
+      matchProductFromText(currentWorkflow.productName || "", products);
+
+    if (matchedProduct && quantity > 0) {
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "RESTOCK_PRODUCT",
+        title: `Restock: ${matchedProduct.name}`,
+        summary: `Renew stock for ${matchedProduct.name} (${matchedProduct.sku}) by +${quantity} units.`,
+        payload: {
+          productId: matchedProduct.id,
+          sku: matchedProduct.sku,
+          productName: matchedProduct.name,
+          quantityDelta: quantity,
+          changeType: "IN",
+          reason: "User specified restocking quantity via AI assistant",
+        },
+      });
+
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, null);
+      }
+
+      answer = `I have prepared the request to renew the stock of **${matchedProduct.name}** (**${matchedProduct.sku}**) by **+${quantity} units** (current stock: ${matchedProduct.quantity} units).\n\nPlease confirm below before I proceed.`;
+    } else {
+      answer = `Please specify a valid numeric quantity of units to restock.`;
+    }
+  }
+
+  // =============================================================
+  // STEP 3: CREATE TASK (CRITICAL FIX: Task vs Lead Confusion)
+  // e.g. "Add a follow up task of meeting with the lead schedule on 30 sep 2026"
+  // =============================================================
+  else if (isTaskCreationIntent(lowerMsg, message)) {
+    toolsUsed.push("crm_task_creator");
+
+    // 1. Extract Due Date
+    const dateInfo = extractDueDateFromText(message);
+    const dueDate = dateInfo ? dateInfo.dateStr : new Date(Date.now() + 86400000).toISOString().split("T")[0];
+
+    // 2. Extract Task Title / Description
+    let titleCandidate = message
+      .replace(/^(?:please\s+)?(?:can you\s+)?(?:add|create|new|schedule|set up|register|insert)\s+(?:a\s+)?(?:follow\s*-?\s*up\s+)?task\s+(?:to|for|of|named|about)?\s*/i, "")
+      .trim();
+
+    if (dateInfo) {
+      // Remove date phrase including "schedule on", "scheduled on", "due on", "on"
+      titleCandidate = titleCandidate
+        .replace(new RegExp(`(?:schedule(?:d)?\\s+)?(?:on|by|due|for)?\\s*${dateInfo.rawMatched}`, "i"), "")
+        .replace(/(?:schedule(?:d)?\s+on|due\s+on|on\s*$)/i, "")
+        .trim();
+    }
+
+    // Clean up trailing punctuation or connecting prepositions
+    titleCandidate = titleCandidate.replace(/^[,\-:\s]+|[,\-:\s]+$/g, "");
+    if (!titleCandidate || titleCandidate.length < 3) {
+      titleCandidate = "Meeting with the lead";
+    }
+
+    // Capitalize first letter
+    const taskTitle = titleCandidate.charAt(0).toUpperCase() + titleCandidate.slice(1);
+
+    // 3. Search for any associated lead mentioned in text
+    let associatedLead = null;
+    for (const l of leads) {
+      const lTitle = (l.title || l.name || "").toLowerCase();
+      if (lTitle && lowerMsg.includes(lTitle)) {
+        associatedLead = l;
+        break;
+      }
+    }
+
+    // If user generically asks to create a task "for my lead" without specifying title or schedule:
+    const isGenericFollowUpForLead = /^(?:please\s+)?(?:can you\s+)?(?:add|create|new|schedule|set up)\s+(?:a\s+)?(?:follow\s*-?\s*up\s+)?task\s+(?:for|with)\s+(?:my|a|the)\s+lead\s*$/i.test(message.trim());
+    if (isGenericFollowUpForLead && !associatedLead) {
+      requiresConfirmation = false;
+      answer = `Which lead would you like to create this follow-up task for? Please specify the lead title or ID.`;
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_TASK",
+          step: "AWAITING_LEAD",
+          dueDate,
+          taskTitle: "Follow-up meeting",
+        });
+      }
+      return {
+        answer,
+        sources,
+        toolsUsed,
+        executionTimeMs: Date.now() - startTime,
+        requiresConfirmation: false,
+        pendingAction: null,
+        executedAction: false,
+        conversationId,
+        executionMode: context.isDemo ? "DEMO" : "LIVE",
+      };
+    }
+
+    if (!associatedLead && leads.length > 0) {
+      associatedLead = leads[0];
+    }
+
+    const payload = {
+      title: taskTitle,
+      description: taskTitle,
+      status: "PENDING",
+      priority: "HIGH",
+      dueDate,
+      due_date: dueDate,
+      leadId: associatedLead ? associatedLead.id : null,
+      leadTitle: associatedLead ? associatedLead.title : null,
+    };
+
+    requiresConfirmation = true;
+    pendingAction = await storeAdapter.createPendingAction(context, {
+      actionType: "CREATE_TASK",
+      title: `Create Task: ${taskTitle}`,
+      summary: `Create task "${taskTitle}" due on ${dueDate}.`,
+      payload,
+    });
+
+    if (conversationId) {
+      await storeAdapter.setConversationState(context, conversationId, {
+        intent: "CREATE_TASK",
+        step: "AWAITING_CONFIRMATION",
+        data: payload,
+      });
+    }
+
+    answer = `I have prepared the follow-up task:\n\n` +
+      `• **Task:** ${taskTitle}\n` +
+      `• **Due Date:** ${dueDate}\n` +
+      `• **Priority:** HIGH\n` +
+      `• **Status:** PENDING\n` +
+      (associatedLead ? `• **Associated Lead:** ${associatedLead.title} (\`${associatedLead.id}\`)\n` : "") +
+      `\nPlease confirm below before I add this task to your CRM.`;
+  }
+
+  // =============================================================
+  // STEP 4: CREATE LEAD (Strict Lead Creation, NOT Tasks)
+  // e.g. "Create a new lead for ABC Company", "Add a lead called Global Fleet $100k"
+  // =============================================================
+  else if (isLeadCreationIntent(lowerMsg, message)) {
+    toolsUsed.push("crm_lead_creator");
+
+    // Extract title
+    let title = "New Prospect Lead";
+    const titleMatch = message.match(/(?:lead|deal|opportunity)\s+(?:for\s+|named\s+|called\s+)?([^,\n;]+)/i);
+    if (titleMatch) {
+      title = titleMatch[1]
+        .replace(/(?:with|value|stage|amount|\$).*/i, "")
+        .replace(/^(?:a\s+|an\s+|new\s+)+/i, "")
+        .trim();
+    }
+    if (!title || title.length < 2) title = "New Prospect Lead";
+
+    // Extract value safely: preceded by deal size/value/amount/worth/$
+    let value = 0;
+    const valueMatch = message.match(/(?:deal\s*size|value|amount|worth|size|\$)\s*[:=]?\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i) ||
+      message.match(/\$([0-9,]+(?:\.[0-9]+)?k?)/i);
+
+    if (valueMatch) {
+      let raw = valueMatch[1].replace(/,/g, "").toLowerCase();
+      let mult = 1;
+      if (raw.endsWith("k")) { mult = 1000; raw = raw.replace("k", ""); }
+      const p = parseFloat(raw) * mult;
+      if (!isNaN(p)) value = p;
+    }
+
+    const stageInfo = extractStageFromText(message);
+    const stage = (stageInfo && stageInfo.canonical) || "New";
+
+    const payload = {
+      title,
+      name: title,
+      companyName: title,
+      value,
+      stage,
+      priority: "HIGH",
+      notes: "Created via AI Assistant",
+    };
+
+    requiresConfirmation = true;
+    pendingAction = await storeAdapter.createPendingAction(context, {
+      actionType: "CREATE_LEAD",
+      title: `Create Lead: ${title}`,
+      summary: `Register new lead "${title}" ($${value.toLocaleString()}) in stage ${stage}.`,
+      payload,
+    });
+
+    if (conversationId) {
+      await storeAdapter.setConversationState(context, conversationId, {
+        intent: "CREATE_LEAD",
+        step: "AWAITING_CONFIRMATION",
+        lastMentionedLeadTitle: title,
+      });
+    }
+
+    answer = `I have prepared the request to create lead **${title}** ($${value.toLocaleString()} — stage: *${stage}*).\n\nPlease confirm below to add this lead to your pipeline.`;
+  }
+
+  // =============================================================
+  // STEP 5: CREATE CUSTOMER ACCOUNT
+  // =============================================================
+  else if (isCustomerCreationIntent(lowerMsg, message)) {
+    toolsUsed.push("crm_customer_creator");
+
+    let accountNo = "";
+    const acctMatch = message.match(/(?:customer\s+account|account\s+no|account\s+number|account\s+#|account|acc\s+no)\s*[:#]?\s*([a-zA-Z0-9_-]+)/i);
+    if (acctMatch) accountNo = acctMatch[1].trim();
+
+    let industry = "";
+    const indMatch = message.match(/(?:industry|domain|sector)\s*(?:is|:|=)\s*([^,\n;]+)/i);
+    if (indMatch) industry = indMatch[1].trim();
+
+    let primaryContact = "";
+    const contactMatch = message.match(/(?:primary\s+contact|contact\s+person|contact|phone)\s*(?:is|:|=)\s*([^,\n;]+)/i);
+    if (contactMatch) primaryContact = contactMatch[1].trim();
+
+    let status = "ACTIVE";
+    const statusMatch = message.match(/(?:status)\s*(?:is|:|=)?\s*([a-zA-Z]+)/i);
+    if (statusMatch) status = statusMatch[1].trim().toUpperCase();
+
+    let createdAt = new Date().toISOString();
+    const dateMatch = message.match(/(?:created\s+on|created\s+at|created|date)\s*(?:is|:|=)?\s*([0-9\/\-\.]+)/i);
+    if (dateMatch) {
+      const rawDate = dateMatch[1].trim();
+      const parsed = new Date(rawDate);
+      if (!isNaN(parsed.getTime())) createdAt = parsed.toISOString();
+    }
+
+    let customerName = "";
+    const nameMatch = message.match(/(?:for|named|called|company|name|title)\s*(?:is|:|=)?\s*([^,\n;]+)/i);
+    if (nameMatch) {
+      customerName = nameMatch[1].replace(/^(?:a\s+|an\s+|the\s+)+/i, "").trim();
+    } else if (industry && /industries|logistics|systems|corp|inc|ltd|group|technologies|solutions/i.test(industry)) {
+      customerName = industry;
+    } else if (accountNo) {
+      customerName = `Customer Account #${accountNo}`;
+    } else {
+      customerName = "New Customer Account";
+    }
+
+    const payload = {
+      accountNo: accountNo || (Date.now() % 1000).toString(),
+      name: customerName,
+      company: customerName,
+      industry: industry || "Aeropax Industries",
+      contactName: primaryContact && !/^\+?[0-9\-\s()]+$/.test(primaryContact) ? primaryContact : "Primary Contact",
+      email: primaryContact && primaryContact.includes("@") ? primaryContact : "contact@client.com",
+      phone: /^\+?[0-9\-\s()]+$/.test(primaryContact) ? primaryContact : (primaryContact || "+1 (555) 019-2831"),
+      status,
+      isActive: status === "ACTIVE",
+      createdAt,
+    };
+
+    requiresConfirmation = true;
+    pendingAction = await storeAdapter.createPendingAction(context, {
+      actionType: "CREATE_CUSTOMER",
+      title: `Create Customer Account: ${payload.name}`,
+      summary: `Register customer account #${payload.accountNo} (${payload.name}) in ${payload.industry}.`,
+      payload,
+    });
+
+    answer = `I have prepared the request to create a customer account with the following details:\n\n` +
+      `• **Customer Account:** #${payload.accountNo} (${payload.name})\n` +
+      `• **Industry / Domain:** ${payload.industry}\n` +
+      `• **Primary Contact:** ${payload.phone || payload.contactName}\n` +
+      `• **Status:** ${payload.status}\n\n` +
+      `Please confirm below before I proceed with registering this customer account.`;
+  }
+
+  // =============================================================
+  // STEP 6: MOVE LEAD TO NEW STAGE
+  // e.g. "Move the National Courier Fleet Automation to stage Contacted"
   // =============================================================
   else if (
     (lowerMsg.includes("move") ||
       lowerMsg.includes("advance") ||
       lowerMsg.includes("shift") ||
-      lowerMsg.includes("transition") ||
       lowerMsg.includes("transfer") ||
-      lowerMsg.includes("put") ||
-      lowerMsg.includes("set") ||
-      lowerMsg.includes("change")) &&
-    (lowerMsg.includes("stage") ||
-      CRM_VALID_STAGES.some((s) => lowerMsg.includes(s.toLowerCase())))
+      lowerMsg.includes("transition") ||
+      lowerMsg.includes("promote") ||
+      lowerMsg.includes("change stage") ||
+      lowerMsg.includes("update stage")) &&
+    (lowerMsg.includes("stage") || lowerMsg.includes("to") || lowerMsg.includes("into"))
   ) {
-    toolsUsed.push("crm_lead_stage_router");
+    toolsUsed.push("crm_lead_stage_updater");
 
     const stageInfo = extractStageFromText(message);
-    const matchedLead = matchLeadFromText(message, leads);
+    let matchedLead = matchLeadFromText(message, leads);
 
-    if (!stageInfo || !stageInfo.raw) {
-      if (matchedLead) {
-        answer = `Which stage would you like to move "${matchedLead.title}" to? Valid stages are: ${CRM_VALID_STAGES.join(", ")}.`;
-      } else {
-        answer = `Which lead would you like to move, and to what stage? Valid stages are: ${CRM_VALID_STAGES.join(", ")}.`;
+    // If lead not found in current message, check conversation state for previously mentioned lead
+    if (!matchedLead && currentWorkflow?.lastMentionedLeadId) {
+      matchedLead = leads.find((l) => l.id === currentWorkflow.lastMentionedLeadId);
+    }
+
+    if (!stageInfo || !stageInfo.canonical) {
+      const invalidStage = stageInfo?.raw || "unknown";
+      answer = `"${invalidStage}" is not a valid CRM stage. Valid stages are: ${CRM_VALID_STAGES.join(", ")}. Please specify one of these stages.`;
+      requiresConfirmation = false;
+    } else if (!matchedLead) {
+      answer = `Which lead would you like to move to **${stageInfo.canonical}**? Please specify the lead title or ID.`;
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "MOVE_LEAD",
+          step: "AWAITING_LEAD",
+          targetStage: stageInfo.canonical,
+        });
       }
-    } else if (!stageInfo.canonical) {
-      // User specified an invalid stage
-      answer = `"${stageInfo.raw}" is not a valid CRM stage. Valid stages are: ${CRM_VALID_STAGES.join(", ")}.`;
     } else {
-      const targetStage = stageInfo.canonical;
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "EDIT_LEAD",
+        title: `Move Lead: ${matchedLead.title}`,
+        summary: `Move "${matchedLead.title}" from stage ${matchedLead.stage} to ${stageInfo.canonical}.`,
+        payload: {
+          leadId: matchedLead.id,
+          leadTitle: matchedLead.title,
+          fromStage: matchedLead.stage,
+          toStage: stageInfo.canonical,
+          updates: { stage: stageInfo.canonical },
+        },
+      });
 
-      if (!matchedLead) {
-        // Extract candidate lead name
-        const leadMatch = message.match(/(?:move|advance|shift|transfer|transition|put|change|set)\s+(?:the\s+)?(?:lead\s+)?([a-zA-Z0-9_\-\s]+?)(?:\s+to\s+stage|\s+to|\s+into|\s+stage|$)/i);
-        const candidateName = leadMatch && leadMatch[1] ? leadMatch[1].trim() : "";
-
-        const leadsList = (leads || [])
-          .slice(0, 5)
-          .map((l) => `• **${l.title}** (Current stage: *${l.stage}*)`)
-          .join("\n");
-
-        if (candidateName && candidateName.length > 1) {
-          answer = `I could not find an existing lead matching "${candidateName}" in your CRM pipeline.\n\nHere are your current active leads:\n${leadsList}\n\nPlease verify the lead name.`;
-        } else {
-          answer = `Which lead would you like to move to ${targetStage}? Here are your current active leads:\n${leadsList}`;
-        }
-      } else {
-        const currentStage = matchedLead.stage || "New";
-
-        if (currentStage.toLowerCase() === targetStage.toLowerCase()) {
-          answer = `The lead "${matchedLead.title}" is already in the "${currentStage}" stage.`;
-        } else {
-          requiresConfirmation = true;
-          pendingAction = await storeAdapter.createPendingAction(context, {
-            actionType: "EDIT_LEAD",
-            title: `Move Lead: ${matchedLead.title}`,
-            summary: `Move lead "${matchedLead.title}" from ${currentStage} to ${targetStage}`,
-            payload: {
-              leadId: matchedLead.id,
-              leadTitle: matchedLead.title,
-              fromStage: currentStage,
-              toStage: targetStage,
-              updates: { stage: targetStage },
-            },
-          });
-
-          answer = `I found the lead "${matchedLead.title}". You want to move it from ${currentStage} to ${targetStage}. Shall I proceed?`;
-        }
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          lastMentionedLeadId: matchedLead.id,
+          lastMentionedLeadTitle: matchedLead.title,
+        });
       }
+
+      answer = `I have prepared the update to move **${matchedLead.title}** from stage *${matchedLead.stage}* to **${stageInfo.canonical}**.\n\nPlease confirm below to proceed with updating this lead.`;
     }
   }
 
   // =============================================================
-  // STEP 3: RENEW / RESTOCK PRODUCT (Requires Confirmation)
+  // STEP 7: RESTOCK / RENEW PRODUCT
+  // e.g. "renew the stock of Brushless Motor by 20 units"
   // =============================================================
-  else if (
-    lowerMsg.includes("renew stock") ||
-    lowerMsg.includes("renew the stock") ||
-    lowerMsg.startsWith("restock") ||
-    lowerMsg.includes("restock ") ||
-    lowerMsg.includes("replenish") ||
-    lowerMsg.startsWith("order ") ||
-    lowerMsg.includes("order +") ||
-    (lowerMsg.includes("order") && (lowerMsg.includes("unit") || lowerMsg.includes("item") || lowerMsg.includes("more") || lowerMsg.includes("stock"))) ||
-    (lowerMsg.includes("add") && (lowerMsg.includes("stock") || lowerMsg.includes("unit") || lowerMsg.includes("qty")))
-  ) {
-    toolsUsed.push("inventory_restock_evaluator");
+  else if (isRestockIntent(lowerMsg, message)) {
+    toolsUsed.push("inventory_restock_orchestrator");
     const matchedProduct = matchProductFromText(message, products);
 
     if (!matchedProduct) {
       answer = "Which product would you like to restock? Please specify the product name or SKU.";
     } else {
-      const specificQty =
-        message.match(/(?:by|add|with|order|\+)\s*(\d+)/i) ||
-        message.match(/(\d+)\s*(?:units?|pcs?|pieces?|items?|qty|more|new)/i) ||
-        message.replace(/\bv\d+\b/gi, "").match(/\b(\d+)\b/);
+      // Remove product name and SKU from message text to avoid matching model numbers (e.g. v2, 24V, 400W)
+      let textWithoutProduct = message;
+      if (matchedProduct.name) {
+        textWithoutProduct = textWithoutProduct.replace(new RegExp(matchedProduct.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "");
+      }
+      if (matchedProduct.sku) {
+        textWithoutProduct = textWithoutProduct.replace(new RegExp(matchedProduct.sku.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "");
+      }
 
-      if (!specificQty) {
+      const qtyMatch = textWithoutProduct.match(/\b(?:by|with|add|plus|\+)\s*(\d+)\b/i) ||
+        textWithoutProduct.match(/\b(\d+)\s*(?:units?|pieces?|pcs?|items?|boxes?)\b/i) ||
+        textWithoutProduct.match(/\b(?:quantity|qty|amount)\s*[:=]?\s*(\d+)\b/i) ||
+        textWithoutProduct.match(/\b(\d+)\b/);
+      const hasExplicitQuantity = Boolean(qtyMatch && parseInt(qtyMatch[1], 10) > 0);
+
+      if (!hasExplicitQuantity) {
         answer = `How many units of **${matchedProduct.name}** would you like to restock? Please specify the quantity you want to add.`;
+        requiresConfirmation = false;
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, {
+            intent: "RESTOCK_PRODUCT",
+            step: "AWAITING_QUANTITY",
+            productId: matchedProduct.id,
+            productName: matchedProduct.name,
+          });
+        }
       } else {
-        const quantityDelta = parseInt(specificQty[1], 10);
+        const quantity = parseInt(qtyMatch[1], 10);
         requiresConfirmation = true;
         pendingAction = await storeAdapter.createPendingAction(context, {
           actionType: "RESTOCK_PRODUCT",
-          title: `Renew Stock: ${matchedProduct.name}`,
-          summary: `Add +${quantityDelta} units to ${matchedProduct.name} (${matchedProduct.sku}). Current stock: ${matchedProduct.quantity} units (Min threshold: ${matchedProduct.reorderPoint}).`,
+          title: `Restock: ${matchedProduct.name}`,
+          summary: `Renew stock for ${matchedProduct.name} (${matchedProduct.sku}) by +${quantity} units.`,
           payload: {
             productId: matchedProduct.id,
             sku: matchedProduct.sku,
             productName: matchedProduct.name,
+            quantityDelta: quantity,
             changeType: "IN",
-            quantityDelta,
-            reason: `Restock operation requested via AI Assistant`,
+            reason: "User requested restocking via AI assistant",
           },
         });
 
-        answer = `I have prepared the request to renew the stock of **${matchedProduct.name}** (**${matchedProduct.sku}**) by **+${quantityDelta} units** (current stock: ${matchedProduct.quantity} units).\n\nPlease confirm below before I proceed.`;
+        answer = `I have prepared the request to renew the stock of **${matchedProduct.name}** (**${matchedProduct.sku}**) by **+${quantity} units** (current stock: ${matchedProduct.quantity} units).\n\nPlease confirm below before I proceed.`;
       }
     }
   }
 
   // =============================================================
-  // STEP 4: DELETE RECORD (Requires Confirmation)
+  // STEP 8: DELETE RECORDS (LEAD, PRODUCT, TASK)
+  // e.g. "delete the lead #L-2357", "delete product Optoelectronic Sensor"
   // =============================================================
-  else if (
-    lowerMsg.includes("delete") ||
-    lowerMsg.includes("remove") ||
-    lowerMsg.includes("erase") ||
-    lowerMsg.includes("drop")
-  ) {
-    if (lowerMsg.includes("lead") || lowerMsg.includes("deal")) {
+  else if (isDeleteIntent(lowerMsg, message)) {
+    // 8A. Delete Lead
+    if (lowerMsg.includes("lead") || lowerMsg.includes("deal") || lowerMsg.includes("opportunity")) {
       toolsUsed.push("crm_lead_deleter");
       const matchedLead = matchLeadFromText(message, leads);
+      const candidateId = extractLeadIdentifierCandidate(message);
+
       if (matchedLead) {
         requiresConfirmation = true;
         pendingAction = await storeAdapter.createPendingAction(context, {
           actionType: "DELETE_LEAD",
           title: `Delete Lead: ${matchedLead.title}`,
-          summary: `Permanently delete lead "${matchedLead.title}" (Value: $${Number(matchedLead.value || 0).toLocaleString()}).`,
+          summary: `Permanently delete lead "${matchedLead.title}" (ID: ${matchedLead.id}).`,
           payload: {
             leadId: matchedLead.id,
             leadTitle: matchedLead.title,
           },
         });
-        answer = `I have prepared the request to delete lead **${matchedLead.title}**.\n\nPlease confirm below before I permanently remove it.`;
+        answer = `I have prepared the request to delete lead **${matchedLead.title}** (ID: \`${matchedLead.id}\`).\n\nPlease confirm below before I permanently remove it.`;
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, null);
+        }
+      } else if (candidateId) {
+        // Candidate was explicitly requested but does not exist in tenant's records
+        const activeLeadsList = leads.length > 0
+          ? leads.slice(0, 5).map((l) => `• **${l.title}** (ID: \`${l.id}\`)`).join("\n")
+          : "None";
+        answer = `I could not find a lead with ID or title **${candidateId}** in your CRM pipeline (it may have already been deleted).\n\nHere are your current active leads:\n${activeLeadsList}\n\nWhich lead would you like to delete?`;
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, {
+            intent: "DELETE_LEAD",
+            step: "AWAITING_LEAD_IDENTIFIER",
+          });
+        }
       } else {
-        answer = "Which lead would you like to delete? Please specify the lead title.";
+        answer = "Which lead would you like to delete? Please specify the lead title or ID.";
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, {
+            intent: "DELETE_LEAD",
+            step: "AWAITING_LEAD_IDENTIFIER",
+          });
+        }
       }
-    } else if (lowerMsg.includes("task")) {
+    }
+    // 8B. Delete Task
+    else if (lowerMsg.includes("task")) {
       toolsUsed.push("crm_task_deleter");
       const matchedTask = matchTaskFromText(message, tasks);
       if (matchedTask) {
@@ -552,102 +1204,124 @@ export async function executeAgentChat(context, { agentId, message, conversation
         pendingAction = await storeAdapter.createPendingAction(context, {
           actionType: "DELETE_TASK",
           title: `Delete Task: ${matchedTask.title}`,
-          summary: `Permanently delete task "${matchedTask.title}".`,
+          summary: `Delete task "${matchedTask.title}" from CRM.`,
           payload: {
             taskId: matchedTask.id,
             taskTitle: matchedTask.title,
           },
         });
-        answer = `I have prepared the request to delete task **${matchedTask.title}**.\n\nPlease confirm below before I permanently remove it.`;
+        answer = `I have prepared the request to delete task **${matchedTask.title}**.\n\nPlease confirm below to proceed.`;
       } else {
         answer = "Which task would you like to delete? Please specify the task title.";
       }
-    } else {
-      toolsUsed.push("inventory_sku_deleter");
+    }
+    // 8C. Delete Product
+    else {
+      toolsUsed.push("inventory_product_deleter");
       const matchedProduct = matchProductFromText(message, products);
       if (matchedProduct) {
         requiresConfirmation = true;
         pendingAction = await storeAdapter.createPendingAction(context, {
           actionType: "DELETE_PRODUCT",
           title: `Delete Product: ${matchedProduct.name}`,
-          summary: `Permanently delete product "${matchedProduct.name}" (${matchedProduct.sku}) from inventory.`,
+          summary: `Permanently delete ${matchedProduct.name} (${matchedProduct.sku}) from inventory.`,
           payload: {
             productId: matchedProduct.id,
-            productName: matchedProduct.name,
             sku: matchedProduct.sku,
+            productName: matchedProduct.name,
           },
         });
-        answer = `I have prepared the request to delete product **${matchedProduct.name}** (**${matchedProduct.sku}**).\n\nBecause this will permanently remove it from inventory, please confirm below before I proceed.`;
+        answer = `I have prepared the request to delete **${matchedProduct.name}** (**${matchedProduct.sku}**).\n\nPlease confirm below before I permanently remove it from inventory.`;
       } else {
-        answer = "Which item would you like to delete? Please specify the product name or SKU.";
+        const prodMatch = message.match(/(?:product|item)\s+([a-zA-Z0-9_\-\s]+)/i);
+        const nameTried = prodMatch ? prodMatch[1].trim() : null;
+        if (nameTried) {
+          answer = `Product "${nameTried}" was not found in your inventory (it may have already been deleted).`;
+        } else {
+          answer = "Which item would you like to delete? Please specify the product name or SKU.";
+        }
       }
     }
   }
 
   // =============================================================
-  // STEP 5: EDIT / UPDATE RECORD (Requires Confirmation)
+  // STEP 9: EDIT RECORDS (PRODUCT, LEAD, TASK)
+  // e.g. "edit the price of Brushless Motor to $299", "edit lead National Courier value to $150000"
   // =============================================================
   else if (
     lowerMsg.includes("edit") ||
     lowerMsg.includes("update") ||
-    lowerMsg.includes("modify")
+    lowerMsg.includes("modify") ||
+    lowerMsg.includes("change price") ||
+    lowerMsg.includes("change value")
   ) {
     if (lowerMsg.includes("lead") || lowerMsg.includes("deal")) {
       toolsUsed.push("crm_lead_updater");
-      const matchedLead = matchLeadFromText(message, leads);
+      let matchedLead = matchLeadFromText(message, leads);
+
+      // Support editing a previously mentioned lead
+      if (!matchedLead && currentWorkflow?.lastMentionedLeadId) {
+        matchedLead = leads.find((l) => l.id === currentWorkflow.lastMentionedLeadId);
+      }
+
       if (matchedLead) {
         const updates = {};
+        const valMatch = message.match(/(?:value|deal|amount|\$)\s*[:=]?\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i);
+        if (valMatch) {
+          let raw = valMatch[1].replace(/,/g, "").toLowerCase();
+          let mult = 1;
+          if (raw.endsWith("k")) { mult = 1000; raw = raw.replace("k", ""); }
+          const p = parseFloat(raw) * mult;
+          if (!isNaN(p)) updates.value = p;
+        }
+
         const stageInfo = extractStageFromText(message);
         if (stageInfo && stageInfo.canonical) {
           updates.stage = stageInfo.canonical;
         }
 
-        const toMatch = message.match(/(?:to|set\s+to|=)\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i);
-        if (toMatch) {
-          let rawVal = toMatch[1].replace(/,/g, "").toLowerCase();
-          let mult = 1;
-          if (rawVal.endsWith("k")) {
-            mult = 1000;
-            rawVal = rawVal.replace("k", "");
-          }
-          const parsed = parseFloat(rawVal) * mult;
-          if (!isNaN(parsed)) updates.value = parsed;
-        }
+        const changesSummary = Object.entries(updates)
+          .map(([k, v]) => `${k} to ${v}`)
+          .join(", ") || "requested properties";
 
-        const changesList = [];
-        if (updates.value !== undefined) changesList.push(`Amount to $${updates.value.toLocaleString()}`);
-        if (updates.stage) changesList.push(`Stage to "${updates.stage}"`);
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "EDIT_LEAD",
+          title: `Edit Lead: ${matchedLead.title}`,
+          summary: `Update lead "${matchedLead.title}": Set ${changesSummary}.`,
+          payload: {
+            leadId: matchedLead.id,
+            leadTitle: matchedLead.title,
+            updates,
+          },
+        });
 
-        if (changesList.length === 0) {
-          answer = `I located lead **${matchedLead.title}** (Amount: $${Number(matchedLead.value || 0).toLocaleString()}, Stage: ${matchedLead.stage}). What would you like to update?`;
-        } else {
-          const changesSummary = changesList.join(", ");
-          requiresConfirmation = true;
-          pendingAction = await storeAdapter.createPendingAction(context, {
-            actionType: "EDIT_LEAD",
-            title: `Edit Lead: ${matchedLead.title}`,
-            summary: `Update lead "${matchedLead.title}": Set ${changesSummary}.`,
-            payload: {
-              leadId: matchedLead.id,
-              leadTitle: matchedLead.title,
-              updates,
-            },
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, {
+            lastMentionedLeadId: matchedLead.id,
+            lastMentionedLeadTitle: matchedLead.title,
           });
-          answer = `I have prepared the update for lead **${matchedLead.title}** (${changesSummary}).\n\nPlease confirm below to apply this update.`;
         }
+
+        answer = `I have prepared the update for lead **${matchedLead.title}** (${changesSummary}).\n\nPlease confirm below to proceed.`;
       } else {
-        answer = "Which lead would you like to update? Please specify the lead name.";
+        answer = "Which lead would you like to edit? Please specify the lead title or ID.";
       }
     } else if (lowerMsg.includes("task")) {
       toolsUsed.push("crm_task_updater");
       const matchedTask = matchTaskFromText(message, tasks);
       if (matchedTask) {
         const updates = {};
-        if (lowerMsg.includes("complet") || lowerMsg.includes("done")) updates.status = "COMPLETED";
-        else if (lowerMsg.includes("pending")) updates.status = "PENDING";
-        else if (lowerMsg.includes("progress")) updates.status = "IN_PROGRESS";
+        if (lowerMsg.includes("complete") || lowerMsg.includes("done")) {
+          updates.status = "COMPLETED";
+        }
+        const dateInfo = extractDueDateFromText(message);
+        if (dateInfo) updates.dueDate = dateInfo.dateStr;
 
-        const changesSummary = Object.entries(updates).map(([k, v]) => `${k} to "${v}"`).join(", ") || "status updated";
+        const changesSummary = Object.entries(updates)
+          .map(([k, v]) => `${k} to ${v}`)
+          .join(", ") || "requested properties";
+
         requiresConfirmation = true;
         pendingAction = await storeAdapter.createPendingAction(context, {
           actionType: "EDIT_TASK",
@@ -698,172 +1372,9 @@ export async function executeAgentChat(context, { agentId, message, conversation
   }
 
   // =============================================================
-  // STEP 5B: CREATE RECORD (Requires Confirmation)
-  // e.g. "create a customer account with customer account 12 ,Industry is Aeropax Industries, Primary Contact is 03001254165,Status active,Created on 12/1/2026"
+  // STEP 10: READ-ONLY INQUIRIES & QUERIES
   // =============================================================
-  else if (
-    (lowerMsg.includes("create") ||
-      lowerMsg.includes("add") ||
-      lowerMsg.includes("register") ||
-      lowerMsg.includes("new ") ||
-      lowerMsg.includes("insert") ||
-      lowerMsg.includes("open ")) &&
-    (lowerMsg.includes("customer") ||
-      lowerMsg.includes("account") ||
-      lowerMsg.includes("client"))
-  ) {
-    toolsUsed.push("crm_customer_creator");
-
-    // 1. Extract Account Number
-    let accountNo = "";
-    const acctMatch = message.match(/(?:customer\s+account|account\s+no|account\s+number|account\s+#|account|acc\s+no)\s*[:#]?\s*([a-zA-Z0-9_-]+)/i);
-    if (acctMatch) {
-      accountNo = acctMatch[1].trim();
-    }
-
-    // 2. Extract Industry / Domain
-    let industry = "";
-    const indMatch = message.match(/(?:industry|domain|sector)\s*(?:is|:|=)\s*([^,\n;]+)/i);
-    if (indMatch) {
-      industry = indMatch[1].trim();
-    }
-
-    // 3. Extract Primary Contact / Phone
-    let primaryContact = "";
-    const contactMatch = message.match(/(?:primary\s+contact|contact\s+person|contact|phone)\s*(?:is|:|=)\s*([^,\n;]+)/i);
-    if (contactMatch) {
-      primaryContact = contactMatch[1].trim();
-    }
-
-    // 4. Extract Status
-    let status = "ACTIVE";
-    const statusMatch = message.match(/(?:status)\s*(?:is|:|=)?\s*([a-zA-Z]+)/i);
-    if (statusMatch) {
-      status = statusMatch[1].trim().toUpperCase();
-    }
-
-    // 5. Extract Created Date
-    let createdAt = new Date().toISOString();
-    const dateMatch = message.match(/(?:created\s+on|created\s+at|created|date)\s*(?:is|:|=)?\s*([0-9\/\-\.]+)/i);
-    if (dateMatch) {
-      const rawDate = dateMatch[1].trim();
-      const parsed = new Date(rawDate);
-      if (!isNaN(parsed.getTime())) {
-        createdAt = parsed.toISOString();
-      } else {
-        createdAt = rawDate;
-      }
-    }
-
-    // Determine customer/company name
-    let customerName = "";
-    const companyMatch = message.match(/(?:company|name|title)\s*(?:is|:|=)\s*([^,\n;]+)/i);
-    if (companyMatch) {
-      customerName = companyMatch[1].trim();
-    } else if (industry && /industries|logistics|systems|corp|inc|ltd|group|technologies|solutions/i.test(industry)) {
-      customerName = industry;
-    } else if (accountNo) {
-      customerName = `Customer Account #${accountNo}`;
-    } else {
-      customerName = "New Customer Account";
-    }
-
-    const payload = {
-      accountNo: accountNo || (Date.now() % 1000).toString(),
-      name: customerName,
-      company: customerName,
-      industry: industry || "Aeropax Industries",
-      contactName: primaryContact && !/^\+?[0-9\-\s()]+$/.test(primaryContact) ? primaryContact : "Primary Contact",
-      email: primaryContact && primaryContact.includes("@") ? primaryContact : "contact@client.com",
-      phone: /^\+?[0-9\-\s()]+$/.test(primaryContact) ? primaryContact : (primaryContact || "+1 (555) 019-2831"),
-      status,
-      isActive: status === "ACTIVE",
-      createdAt,
-    };
-
-    requiresConfirmation = true;
-    pendingAction = await storeAdapter.createPendingAction(context, {
-      actionType: "CREATE_CUSTOMER",
-      title: `Create Customer Account: ${payload.name}`,
-      summary: `Register customer account #${payload.accountNo} (${payload.name}) in ${payload.industry}.`,
-      payload,
-    });
-
-    const displayDate = !isNaN(new Date(payload.createdAt).getTime()) ? new Date(payload.createdAt).toLocaleDateString() : payload.createdAt;
-    answer = `I have prepared the request to create a customer account with the following details:\n\n` +
-      `• **Customer Account:** #${payload.accountNo} (${payload.name})\n` +
-      `• **Industry / Domain:** ${payload.industry}\n` +
-      `• **Primary Contact:** ${payload.phone || payload.contactName}\n` +
-      `• **Status:** ${payload.status}\n` +
-      `• **Created On:** ${displayDate}\n\n` +
-      `Please confirm below before I proceed with registering this customer account.`;
-  }
-
-  else if (
-    (lowerMsg.includes("create") || lowerMsg.includes("add") || lowerMsg.includes("new ")) &&
-    (lowerMsg.includes("lead") || lowerMsg.includes("deal") || lowerMsg.includes("opportunity"))
-  ) {
-    toolsUsed.push("crm_lead_creator");
-    const titleMatch = message.match(/(?:lead|deal|opportunity)\s+(?:for\s+|named\s+|called\s+)?([^,\n;]+)/i);
-    const title = titleMatch ? titleMatch[1].replace(/(?:with|value|stage|for).*/i, "").trim() : "New Prospect Lead";
-    const valueMatch = message.match(/\$?([0-9,]+(?:\.[0-9]+)?k?)/i);
-    let value = 50000;
-    if (valueMatch) {
-      let raw = valueMatch[1].replace(/,/g, "").toLowerCase();
-      let mult = 1;
-      if (raw.endsWith("k")) { mult = 1000; raw = raw.replace("k", ""); }
-      const p = parseFloat(raw) * mult;
-      if (!isNaN(p)) value = p;
-    }
-    const stageInfo = extractStageFromText(message);
-    const stage = (stageInfo && stageInfo.canonical) || "New";
-
-    const payload = {
-      title,
-      name: title,
-      companyName: title,
-      value,
-      stage,
-      priority: "HIGH",
-      notes: "Created via AI Assistant",
-    };
-
-    requiresConfirmation = true;
-    pendingAction = await storeAdapter.createPendingAction(context, {
-      actionType: "CREATE_LEAD",
-      title: `Create Lead: ${title}`,
-      summary: `Register new lead "${title}" ($${value.toLocaleString()}) in stage ${stage}.`,
-      payload,
-    });
-    answer = `I have prepared the request to create lead **${title}** ($${value.toLocaleString()} — stage: *${stage}*).\n\nPlease confirm below to add this lead to your pipeline.`;
-  }
-
-  else if (
-    (lowerMsg.includes("create") || lowerMsg.includes("add") || lowerMsg.includes("new ")) &&
-    lowerMsg.includes("task")
-  ) {
-    toolsUsed.push("crm_task_creator");
-    const titleMatch = message.match(/(?:task)\s+(?:to\s+|for\s+|named\s+|called\s+)?([^,\n;]+)/i);
-    const title = titleMatch ? titleMatch[1].trim() : "Follow up with client";
-    const payload = {
-      title,
-      status: "PENDING",
-      priority: "HIGH",
-    };
-    requiresConfirmation = true;
-    pendingAction = await storeAdapter.createPendingAction(context, {
-      actionType: "CREATE_TASK",
-      title: `Create Task: ${title}`,
-      summary: `Create task "${title}" in CRM.`,
-      payload,
-    });
-    answer = `I have prepared the request to create task **${title}**.\n\nPlease confirm below before I add this task.`;
-  }
-
-  // =============================================================
-  // STEP 6: READ-ONLY INQUIRIES & QUERIES
-  // =============================================================
-  // 6A. Low Stock Inquiry
+  // 10A. Low Stock Inquiry
   else if (
     lowerMsg.includes("low stock") ||
     lowerMsg.includes("out of stock") ||
@@ -898,7 +1409,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
     }
   }
 
-  // 6B. General Inventory / Stock Query
+  // 10B. General Stock / Inventory Query
   else if (
     lowerMsg.includes("stock") ||
     lowerMsg.includes("inventory") ||
@@ -940,7 +1451,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
     }
   }
 
-  // 6C. CRM & Pipeline Inquiry
+  // 10C. CRM Leads Query
   else if (
     lowerMsg.includes("lead") ||
     lowerMsg.includes("crm") ||
@@ -957,7 +1468,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
       leads.slice(0, 5).map((l) => `• **${l.title}** ($${Number(l.value || 0).toLocaleString()} — *${l.stage}*)`).join("\n");
   }
 
-  // 6D. Tasks Inquiry
+  // 10D. Tasks Query
   else if (lowerMsg.includes("task")) {
     toolsUsed.push("crm_task_tracker");
     const pending = tasks.filter((t) => t.status === "PENDING");
@@ -968,15 +1479,26 @@ export async function executeAgentChat(context, { agentId, message, conversation
   }
 
   // =============================================================
-  // STEP 7: GENERAL AI REASONING WITH CONFIGURED LLM
+  // STEP 11: GENERAL AI REASONING WITH MEM0 MEMORY RECALL
   // =============================================================
   if (!answer) {
+    // Token-efficient memory recall (max 3 relevant memories)
+    let memoriesContext = "";
+    try {
+      const recalled = await memoryService.recall(context, { query: message, limit: 3 });
+      if (recalled && recalled.length > 0) {
+        memoriesContext = `\nRelevant User Context & Preferences:\n${recalled.map((m) => `- ${m}`).join("\n")}\n`;
+      }
+    } catch (e) {
+      console.warn("Memory recall in agent failed:", e.message);
+    }
+
     const systemPrompt = `You are a helpful, direct supply chain assistant for ${context.user?.tenantName || "SmartSupply"}.
 User: ${context.user?.name || "User"}
 Execution Mode: ${context.mode}
 Available Products: ${products.length} items
 Active Leads: ${leads.length} leads (Valid stages: ${CRM_VALID_STAGES.join(", ")})
-
+${memoriesContext}
 Instructions:
 1. Answer simply, directly, and politely in 1 to 3 short sentences.
 2. If the user requests to move or update a lead, renew stock, or delete records, explain that you can stage the request for their confirmation.
@@ -1007,12 +1529,12 @@ Instructions:
         finalConvId = newConv.id;
       }
 
-      await neonDb.addMessageToDb(finalConvId, {
+      await neonDb.addMessageToDb(context.user.tenantId, finalConvId, {
         sender: "USER",
         content: message,
       });
 
-      await neonDb.addMessageToDb(finalConvId, {
+      await neonDb.addMessageToDb(context.user.tenantId, finalConvId, {
         sender: "AGENT",
         content: answer,
         sources,
@@ -1041,6 +1563,7 @@ Instructions:
       db.conversations.unshift(conv);
     }
     finalConvId = conv.id;
+    if (!conv.messages) conv.messages = [];
 
     conv.messages.push({
       id: `msg-user-${Date.now()}`,
@@ -1062,6 +1585,14 @@ Instructions:
     });
 
     if (isLive) saveLiveDb(); else saveDemoDb();
+  }
+
+  if (finalConvId && pendingAction && pendingAction.id) {
+    const existingWorkflow = (await storeAdapter.getConversationState(context, finalConvId)) || {};
+    await storeAdapter.setConversationState(context, finalConvId, {
+      ...existingWorkflow,
+      pendingActionId: pendingAction.id,
+    });
   }
 
   return {

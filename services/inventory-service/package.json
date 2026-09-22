@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node -r dotenv/config src/index.js",
     "dev": "nodemon -r dotenv/config src/index.js",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
+    "test": "NEW_RELIC_ENABLED=false node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "migrate": "npx sequelize-cli db:migrate"
   },
   "keywords": [],

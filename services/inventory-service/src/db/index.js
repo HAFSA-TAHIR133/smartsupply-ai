@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const sequelize = new Sequelize(process.env.DATABASE_URL, {
+const sequelize = new Sequelize(process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/smartsupply_test", {
   dialect: "postgres",
   logging: process.env.NODE_ENV === "development" ? console.log : false,
   pool: {

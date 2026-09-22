@@ -490,6 +490,10 @@ export async function deleteLeadFromDb(id, tenantId) {
   const p = getNeonPool();
   if (!p || !id) return false;
   try {
+    if (tenantId && isValidUuid(tenantId)) {
+      const res = await p.query('DELETE FROM leads WHERE id::text = $1 AND "tenantId" = $2 RETURNING id;', [String(id), tenantId]);
+      return res.rowCount > 0;
+    }
     const res = await p.query('DELETE FROM leads WHERE id::text = $1 RETURNING id;', [String(id)]);
     return res.rowCount > 0;
   } catch (err) {
@@ -679,9 +683,28 @@ export async function createConversationInDb(tenantId, userId, { id, title, agen
   return res.rows[0];
 }
 
-export async function addMessageToDb(tenantId, conversationId, { sender, content, sources, metadata }) {
+export async function addMessageToDb(firstArg, secondArg, thirdArg) {
+  let tenantId, conversationId, data;
+  if (thirdArg && typeof thirdArg === "object") {
+    tenantId = firstArg;
+    conversationId = secondArg;
+    data = thirdArg;
+  } else {
+    conversationId = firstArg;
+    data = secondArg || {};
+    tenantId = data.tenantId;
+  }
   const p = getNeonPool();
-  if (!p || !isValidUuid(tenantId) || !isValidUuid(conversationId)) return null;
+  if (!p || !isValidUuid(conversationId)) return null;
+
+  if (!tenantId || !isValidUuid(tenantId)) {
+    try {
+      const cRes = await p.query('SELECT "tenantId" FROM conversations WHERE id = $1 LIMIT 1;', [conversationId]);
+      if (cRes.rows[0]) tenantId = cRes.rows[0].tenantId;
+    } catch {}
+  }
+  if (!tenantId || !isValidUuid(tenantId)) return null;
+
   const msgId = crypto.randomUUID();
   const res = await p.query(
     `INSERT INTO messages (id, "tenantId", "conversationId", sender, content, sources, metadata, "createdAt", "updatedAt")
@@ -691,10 +714,10 @@ export async function addMessageToDb(tenantId, conversationId, { sender, content
       msgId,
       tenantId,
       conversationId,
-      sender,
-      content,
-      JSON.stringify(sources || []),
-      JSON.stringify(metadata || {}),
+      data.sender || "USER",
+      data.content || "",
+      JSON.stringify(data.sources || []),
+      JSON.stringify(data.metadata || {}),
     ]
   );
   return res.rows[0];

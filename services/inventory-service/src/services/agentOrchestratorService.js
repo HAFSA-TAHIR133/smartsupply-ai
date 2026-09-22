@@ -14,11 +14,49 @@ export async function analyzeAgentIntent({ message, tenantId, userId }) {
   const text = (message || "").toLowerCase().trim();
 
   // 1. Check for mutating / write actions
+  const isCreateTask = /(?:add|create|new|schedule|set up|register|insert)\s+(?:a\s+)?(?:follow\s*-?\s*up\s+)?task\b/i.test(text) ||
+    /follow\s*-?\s*up\s+task\b/i.test(text) ||
+    /^task\s+(?:to|for|of|about)\b/i.test(text) ||
+    /\badd\s+(?:a\s+)?follow\s*-?\s*up\b/i.test(text);
+
+  const isCreateLead = !isCreateTask && /(?:add|create|new|register|insert|open)\s+(?:a\s+)?(?:new\s+)?(?:lead|deal|opportunity)\b/i.test(text);
+
   const isRestock = /(restock|re-stock|add stock|increase stock|replenish)/i.test(text);
   const isAdjustOut = /(reduce stock|decrease stock|deduct stock|remove stock|consume)/i.test(text);
   const isDeleteProduct = /(delete product|remove product|delete item|remove item)/i.test(text);
+  const isDeleteLead = /(delete lead|remove lead|erase lead|drop lead)/i.test(text);
   const isCreateChart = /(create chart|generate chart|build chart|new chart|add chart)/i.test(text);
   const isDeleteChart = /(delete chart|remove chart)/i.test(text);
+
+  // Parse create task
+  if (isCreateTask) {
+    let titleCandidate = text
+      .replace(/^(?:please\s+)?(?:can you\s+)?(?:add|create|new|schedule|set up|register|insert)\s+(?:a\s+)?(?:follow\s*-?\s*up\s+)?task\s+(?:to|for|of|named|about)?\s*/i, "")
+      .trim();
+
+    return {
+      isWrite: true,
+      actionType: "create_task",
+      targetEntity: { title: titleCandidate || "Follow-up task" },
+      params: { title: titleCandidate || "Follow-up task", status: "PENDING" },
+      summary: `Create follow-up task: "${titleCandidate || "Follow-up task"}"`,
+    };
+  }
+
+  // Parse create lead
+  if (isCreateLead) {
+    let titleCandidate = text
+      .replace(/^(?:please\s+)?(?:can you\s+)?(?:add|create|new|register|insert)\s+(?:a\s+)?(?:new\s+)?(?:lead|deal|opportunity)\s+(?:for|named|called)?\s*/i, "")
+      .trim();
+
+    return {
+      isWrite: true,
+      actionType: "create_lead",
+      targetEntity: { title: titleCandidate || "New Lead" },
+      params: { title: titleCandidate || "New Lead", stage: "New" },
+      summary: `Create CRM lead: "${titleCandidate || "New Lead"}"`,
+    };
+  }
 
   // Parse restock / stock adjustment
   if (isRestock || isAdjustOut) {

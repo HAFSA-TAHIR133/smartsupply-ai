@@ -918,6 +918,12 @@ export const storeAdapter = {
     return leads.map((l) => ({ ...l, _executionMode: isLive ? "LIVE" : "DEMO" }));
   },
 
+  async getLeadById(context, id) {
+    const leads = await this.getLeads(context);
+    const lead = leads.find((l) => l.id === id);
+    return lead || null;
+  },
+
   async createLead(context, payload) {
     if (!context.isDemo && neonDb.isNeonConfigured()) {
       try {
@@ -1054,7 +1060,7 @@ export const storeAdapter = {
     if (!context.isDemo && neonDb.isNeonConfigured()) {
       try {
         const ok = await neonDb.deleteLeadFromDb(id, context.user?.tenantId);
-        if (ok) return true;
+        if (ok) return { success: true, deletedId: id, _executionMode: "LIVE" };
       } catch (err) {
         console.warn("Neon deleteLeadFromDb error:", err.message);
       }
@@ -1063,11 +1069,12 @@ export const storeAdapter = {
     const isLive = !context.isDemo;
     const db = isLive ? getLiveDb() : getDemoDb();
     const index = (db.leads || []).findIndex((l) => (!isLive || l.tenantId === context.user?.tenantId) && (l.id === id || l.title === id));
-    if (index !== -1) {
-      db.leads.splice(index, 1);
+    if (index === -1) {
+      throw new Error(`Lead ${id} not found.`);
     }
+    const removed = db.leads.splice(index, 1)[0];
     if (isLive) saveLiveDb(); else saveDemoDb();
-    return { success: true, deletedId: id, _executionMode: isLive ? "LIVE" : "DEMO" };
+    return { success: true, deletedId: id, deletedLead: removed, _executionMode: isLive ? "LIVE" : "DEMO" };
   },
 
   // --- CRM TASKS ---
@@ -1087,6 +1094,12 @@ export const storeAdapter = {
       tasks = tasks.filter((t) => t.tenantId === context.user.tenantId);
     }
     return tasks.map((t) => ({ ...t, _executionMode: isLive ? "LIVE" : "DEMO" }));
+  },
+
+  async getTaskById(context, id) {
+    const tasks = await this.getTasks(context);
+    const task = tasks.find((t) => t.id === id);
+    return task || null;
   },
 
   async createTask(context, payload) {
@@ -1645,6 +1658,21 @@ export const storeAdapter = {
     return actions.filter((a) => a.status === "PENDING_CONFIRMATION" || a.status === "PENDING");
   },
 
+  async getPendingActionById(context, actionId) {
+    if (!context.isDemo && neonDb.isNeonConfigured() && context.user?.tenantId && neonDb.isValidUuid(context.user.tenantId)) {
+      try {
+        const action = await neonDb.getPendingActionByIdFromDb(actionId, context.user.tenantId);
+        if (action) return action;
+      } catch (e) {
+        console.warn("Neon getPendingActionById error:", e.message);
+      }
+    }
+    const isLive = !context.isDemo;
+    const db = isLive ? getLiveDb() : getDemoDb();
+    const actions = db.pendingActions || [];
+    return actions.find((a) => a.id === actionId) || null;
+  },
+
   async createPendingAction(context, { actionType, title, summary, payload }) {
     if (!context.isDemo && neonDb.isNeonConfigured() && context.user?.tenantId && neonDb.isValidUuid(context.user.tenantId)) {
       try {
@@ -1844,5 +1872,49 @@ export const storeAdapter = {
       status: "REJECTED",
       executionMode: isLive ? "LIVE" : "DEMO",
     };
+  },
+
+  // --- MEMORY INTEGRATION (Mem0 / Tenant Scoped) ---
+  async remember(context, { text, category, metadata }) {
+    const { memoryService } = await import("./memory");
+    return await memoryService.remember(context, { text, category, metadata });
+  },
+
+  async recall(context, { query, limit, category }) {
+    const { memoryService } = await import("./memory");
+    return await memoryService.recall(context, { query, limit, category });
+  },
+
+  // --- CONVERSATION WORKFLOW STATE ---
+  async getConversationState(context, convId) {
+    if (!convId) return null;
+    const isLive = !context.isDemo;
+    const db = isLive ? getLiveDb() : getDemoDb();
+    const conv = (db.conversations || []).find((c) => c.id === convId);
+    return conv?.workflowState || null;
+  },
+
+  async setConversationState(context, convId, workflowState) {
+    if (!convId) return null;
+    const isLive = !context.isDemo;
+    const db = isLive ? getLiveDb() : getDemoDb();
+    if (!db.conversations) db.conversations = [];
+    let conv = db.conversations.find((c) => c.id === convId);
+    if (!conv) {
+      conv = {
+        id: convId,
+        tenantId: context.user?.tenantId || (isLive ? "tenant-live-default" : "demo-tenant-id"),
+        userId: context.user?.id || (isLive ? "user-live" : "demo-user-alex"),
+        title: "AI Assistant Conversation",
+        messages: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.conversations.push(conv);
+    }
+    conv.workflowState = workflowState;
+    conv.updatedAt = new Date().toISOString();
+    if (isLive) saveLiveDb(); else saveDemoDb();
+    return workflowState;
   },
 };

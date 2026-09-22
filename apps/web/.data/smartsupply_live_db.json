@@ -87,6 +87,61 @@
       "isActive": true,
       "isDemo": false,
       "createdAt": "2026-09-19T11:50:25.712Z"
+    },
+    {
+      "id": "user-1790065088618",
+      "email": "live_user_a_1790065088045@apexlogistics.com",
+      "name": "Alice Vance",
+      "passwordHash": "$2b$10$m/w0b1QOcRbCrOobbt5sEu74CUhw65elzroEBpe1DADwcdym2tyBe",
+      "role": "ADMIN",
+      "tenantId": "tenant-1790065088501",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-22T08:18:08.618Z"
+    },
+    {
+      "id": "user-1790065155354",
+      "email": "live_user_a_1790065154884@apexlogistics.com",
+      "name": "Alice Vance",
+      "passwordHash": "$2b$10$Pvn5blydEjtXLSsBc1X6.e3QY6kYrMxIOLnULgo9T1tDNxGw6x3KG",
+      "role": "ADMIN",
+      "tenantId": "tenant-1790065155243",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-22T08:19:15.354Z"
+    },
+    {
+      "id": "user-1790065155834",
+      "email": "live_user_b_1790065154884@zenithfreight.com",
+      "name": "Bob Stone",
+      "passwordHash": "$2b$10$pdZtBg4XPqSaaAgPIrDy8.jU7RnhTvJ8XoJcjSovwJBM1VS0.uPWW",
+      "role": "ADMIN",
+      "tenantId": "tenant-1790065155696",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-22T08:19:15.834Z"
+    },
+    {
+      "id": "user-1790065309611",
+      "email": "testuser_1790065309469@smartsupply.test",
+      "name": "Test User 1790065309469",
+      "passwordHash": "$2b$10$1AD6rHeD/M02K6a4IILZ1e9JE2cpoZMnL6NSsKFUkvu8tMDGXaF/6",
+      "role": "ADMIN",
+      "tenantId": "tenant-1790065309486",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-22T08:21:49.611Z"
+    },
+    {
+      "id": "user-1790065309994",
+      "email": "testuser_1790065309809@smartsupply.test",
+      "name": "Test User 1790065309809",
+      "passwordHash": "$2b$10$RQ8kviHjYEc2JoXYACzoF.P1cZzI3Z90Inyey/4GLRcNbjW21JBeC",
+      "role": "ADMIN",
+      "tenantId": "tenant-1790065309843",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-22T08:21:49.994Z"
     }
   ],
   "tenants": [
@@ -153,9 +208,75 @@
       "isActive": true,
       "isDemo": false,
       "createdAt": "2026-09-19T11:50:25.574Z"
+    },
+    {
+      "id": "tenant-1790065088501",
+      "name": "Apex Logistics Global",
+      "slug": "apex-logistics-global",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-22T08:18:08.501Z"
+    },
+    {
+      "id": "tenant-1790065155243",
+      "name": "Apex Logistics Global",
+      "slug": "apex-logistics-global",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-22T08:19:15.243Z"
+    },
+    {
+      "id": "tenant-1790065155696",
+      "name": "Zenith Freight Systems",
+      "slug": "zenith-freight-systems",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-22T08:19:15.696Z"
+    },
+    {
+      "id": "tenant-1790065309486",
+      "name": "Org 1790065309469 Corp",
+      "slug": "org-1790065309469-corp",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-22T08:21:49.486Z"
+    },
+    {
+      "id": "tenant-1790065309843",
+      "name": "Org 1790065309809 Corp",
+      "slug": "org-1790065309809-corp",
+      "isActive": true,
+      "isDemo": false,
+      "createdAt": "2026-09-22T08:21:49.843Z"
     }
   ],
   "products": [
+    {
+      "id": "prod-live-1790065155401",
+      "tenantId": "tenant-1790065155243",
+      "name": "Industrial IoT Gateway Pro v2",
+      "sku": "SKU-IOT-1790065154884",
+      "category": "Hardware",
+      "unitPrice": 319.99,
+      "quantity": 105,
+      "reorderPoint": 20,
+      "description": "Enterprise grade sensor gateway",
+      "createdAt": "2026-09-22T08:19:15.401Z",
+      "updatedAt": "2026-09-22T08:19:15.668Z"
+    },
+    {
+      "id": "prod-live-1790065088669",
+      "tenantId": "tenant-1790065088501",
+      "name": "Industrial IoT Gateway Pro v2",
+      "sku": "SKU-IOT-1790065088045",
+      "category": "Hardware",
+      "unitPrice": 319.99,
+      "quantity": 77,
+      "reorderPoint": 20,
+      "description": "Enterprise grade sensor gateway",
+      "createdAt": "2026-09-22T08:18:08.669Z",
+      "updatedAt": "2026-09-22T08:18:08.974Z"
+    },
     {
       "id": "prod-live-1789818691522",
       "tenantId": "tenant-1789818625574",
@@ -223,6 +344,90 @@
     }
   ],
   "stockLogs": [
+    {
+      "id": "log-1790065155668",
+      "tenantId": "tenant-1790065155243",
+      "productId": "prod-live-1790065155401",
+      "productName": "Industrial IoT Gateway Pro v2",
+      "sku": "SKU-IOT-1790065154884",
+      "changeType": "IN",
+      "quantityDelta": 30,
+      "previousQuantity": 75,
+      "newQuantity": 105,
+      "reason": "User requested restocking via AI assistant",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-22T08:19:15.668Z"
+    },
+    {
+      "id": "log-1790065155439",
+      "tenantId": "tenant-1790065155243",
+      "productId": "prod-live-1790065155401",
+      "productName": "Industrial IoT Gateway Pro",
+      "sku": "SKU-IOT-1790065154884",
+      "changeType": "IN",
+      "quantityDelta": 25,
+      "previousQuantity": 50,
+      "newQuantity": 75,
+      "reason": "Incoming pallet delivery",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-22T08:19:15.439Z"
+    },
+    {
+      "id": "log-1790065155401",
+      "tenantId": "tenant-1790065155243",
+      "productId": "prod-live-1790065155401",
+      "productName": "Industrial IoT Gateway Pro",
+      "sku": "SKU-IOT-1790065154884",
+      "changeType": "IN",
+      "quantityDelta": 50,
+      "previousQuantity": 0,
+      "newQuantity": 50,
+      "reason": "Initial stock intake",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-22T08:19:15.401Z"
+    },
+    {
+      "id": "log-1790065088974",
+      "tenantId": "tenant-1790065088501",
+      "productId": "prod-live-1790065088669",
+      "productName": "Industrial IoT Gateway Pro v2",
+      "sku": "SKU-IOT-1790065088045",
+      "changeType": "IN",
+      "quantityDelta": 2,
+      "previousQuantity": 75,
+      "newQuantity": 77,
+      "reason": "User requested restocking via AI assistant",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-22T08:18:08.974Z"
+    },
+    {
+      "id": "log-1790065088708",
+      "tenantId": "tenant-1790065088501",
+      "productId": "prod-live-1790065088669",
+      "productName": "Industrial IoT Gateway Pro",
+      "sku": "SKU-IOT-1790065088045",
+      "changeType": "IN",
+      "quantityDelta": 25,
+      "previousQuantity": 50,
+      "newQuantity": 75,
+      "reason": "Incoming pallet delivery",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-22T08:18:08.708Z"
+    },
+    {
+      "id": "log-1790065088669",
+      "tenantId": "tenant-1790065088501",
+      "productId": "prod-live-1790065088669",
+      "productName": "Industrial IoT Gateway Pro",
+      "sku": "SKU-IOT-1790065088045",
+      "changeType": "IN",
+      "quantityDelta": 50,
+      "previousQuantity": 0,
+      "newQuantity": 50,
+      "reason": "Initial stock intake",
+      "executedBy": "Alice Vance",
+      "createdAt": "2026-09-22T08:18:08.669Z"
+    },
     {
       "id": "log-1789818691522",
       "tenantId": "tenant-1789818625574",
@@ -363,6 +568,40 @@
   ],
   "leads": [
     {
+      "id": "lead-1790065155490",
+      "tenantId": "tenant-1790065155243",
+      "title": "Supply Chain Overhaul Deal",
+      "name": "Supply Chain Overhaul Deal",
+      "companyName": "MegaCorp Industries",
+      "contactName": "Robert Smith",
+      "contactEmail": "rsmith@megacorp.com",
+      "contactPhone": "",
+      "value": 120000,
+      "stage": "Qualified",
+      "priority": "HIGH",
+      "notes": "",
+      "createdAt": "2026-09-22T08:19:15.490Z",
+      "updatedAt": "2026-09-22T08:19:15.508Z",
+      "status": "Qualified"
+    },
+    {
+      "id": "lead-1790065088774",
+      "tenantId": "tenant-1790065088501",
+      "title": "Supply Chain Overhaul Deal",
+      "name": "Supply Chain Overhaul Deal",
+      "companyName": "MegaCorp Industries",
+      "contactName": "Robert Smith",
+      "contactEmail": "rsmith@megacorp.com",
+      "contactPhone": "",
+      "value": 120000,
+      "stage": "Qualified",
+      "priority": "HIGH",
+      "notes": "",
+      "createdAt": "2026-09-22T08:18:08.774Z",
+      "updatedAt": "2026-09-22T08:18:08.797Z",
+      "status": "Qualified"
+    },
+    {
       "id": "lead-1789818776809",
       "tenantId": "tenant-1789818625574",
       "title": "Q4 Automated Warehouse Expansion",
@@ -447,6 +686,40 @@
   ],
   "customers": [
     {
+      "id": "cust-lead-lead-1790065155490",
+      "leadId": "lead-1790065155490",
+      "tenantId": "tenant-1790065155243",
+      "accountNo": "L-5491",
+      "name": "MegaCorp Industries",
+      "company": "MegaCorp Industries",
+      "industry": "Logistics / Industrial",
+      "contactName": "Robert Smith",
+      "email": "rsmith@megacorp.com",
+      "phone": "+1 (555) 019-2831",
+      "status": "ACTIVE",
+      "isActive": true,
+      "totalSpend": 120000,
+      "createdAt": "2026-09-22T08:19:15.490Z",
+      "updatedAt": "2026-09-22T08:19:15.491Z"
+    },
+    {
+      "id": "cust-lead-lead-1790065088774",
+      "leadId": "lead-1790065088774",
+      "tenantId": "tenant-1790065088501",
+      "accountNo": "L-8774",
+      "name": "MegaCorp Industries",
+      "company": "MegaCorp Industries",
+      "industry": "Logistics / Industrial",
+      "contactName": "Robert Smith",
+      "email": "rsmith@megacorp.com",
+      "phone": "+1 (555) 019-2831",
+      "status": "ACTIVE",
+      "isActive": true,
+      "totalSpend": 120000,
+      "createdAt": "2026-09-22T08:18:08.774Z",
+      "updatedAt": "2026-09-22T08:18:08.774Z"
+    },
+    {
       "id": "cust-12-live",
       "tenantId": "tenant-live-default",
       "accountNo": "12",
@@ -480,6 +753,32 @@
     }
   ],
   "tasks": [
+    {
+      "id": "task-live-1790065155546",
+      "tenantId": "tenant-1790065155243",
+      "title": "Deliver IoT gateway proposal",
+      "description": "",
+      "status": "COMPLETED",
+      "priority": "HIGH",
+      "dueDate": "2026-10-01",
+      "due_date": "2026-10-01",
+      "assignedTo": "Alice Vance",
+      "createdAt": "2026-09-22T08:19:15.546Z",
+      "updatedAt": "2026-09-22T08:19:15.563Z"
+    },
+    {
+      "id": "task-live-1790065088821",
+      "tenantId": "tenant-1790065088501",
+      "title": "Deliver IoT gateway proposal",
+      "description": "",
+      "status": "COMPLETED",
+      "priority": "HIGH",
+      "dueDate": "2026-10-01",
+      "due_date": "2026-10-01",
+      "assignedTo": "Alice Vance",
+      "createdAt": "2026-09-22T08:18:08.821Z",
+      "updatedAt": "2026-09-22T08:18:08.850Z"
+    },
     {
       "id": "task-live-1789818484202",
       "tenantId": "tenant-1789818483799",
@@ -518,6 +817,38 @@
   ],
   "charts": [
     {
+      "id": "chart-live-1790065155581",
+      "tenantId": "tenant-1790065155243",
+      "title": "Q4 Warehouse Throughput",
+      "type": "bar",
+      "config": {
+        "dataSource": "inventory_category",
+        "data": [
+          {
+            "name": "Hardware",
+            "value": 75
+          }
+        ]
+      },
+      "createdAt": "2026-09-22T08:19:15.581Z"
+    },
+    {
+      "id": "chart-live-1790065088871",
+      "tenantId": "tenant-1790065088501",
+      "title": "Q4 Warehouse Throughput",
+      "type": "bar",
+      "config": {
+        "dataSource": "inventory_category",
+        "data": [
+          {
+            "name": "Hardware",
+            "value": 75
+          }
+        ]
+      },
+      "createdAt": "2026-09-22T08:18:08.871Z"
+    },
+    {
       "id": "chart-live-1789818484231",
       "tenantId": "tenant-1789818483799",
       "title": "Q4 Warehouse Throughput",
@@ -551,6 +882,218 @@
     }
   ],
   "conversations": [
+    {
+      "id": "conv-live-1790065155652",
+      "title": "Restock Industrial IoT Gateway Pro v2 by...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-22T08:19:15.652Z",
+      "messages": [
+        {
+          "id": "msg-user-1790065155652",
+          "sender": "USER",
+          "content": "Restock Industrial IoT Gateway Pro v2 by 30 units",
+          "createdAt": "2026-09-22T08:19:15.652Z"
+        },
+        {
+          "id": "msg-bot-1790065155652",
+          "sender": "AGENT",
+          "content": "I have prepared the request to renew the stock of **Industrial IoT Gateway Pro v2** (**SKU-IOT-1790065154884**) by **+30 units** (current stock: 75 units).\n\nPlease confirm below before I proceed.",
+          "sources": [],
+          "toolsUsed": [
+            "inventory_restock_orchestrator"
+          ],
+          "executionTimeMs": 2,
+          "requiresConfirmation": true,
+          "pendingAction": {
+            "id": "act-live-1790065155651-379",
+            "actionType": "RESTOCK_PRODUCT",
+            "title": "Restock: Industrial IoT Gateway Pro v2",
+            "summary": "Renew stock for Industrial IoT Gateway Pro v2 (SKU-IOT-1790065154884) by +30 units.",
+            "payload": {
+              "productId": "prod-live-1790065155401",
+              "sku": "SKU-IOT-1790065154884",
+              "productName": "Industrial IoT Gateway Pro v2",
+              "quantityDelta": 30,
+              "changeType": "IN",
+              "reason": "User requested restocking via AI assistant"
+            },
+            "status": "APPROVED",
+            "expiresAt": "2026-09-22T08:34:15.651Z",
+            "createdAt": "2026-09-22T08:19:15.651Z",
+            "executionMode": "LIVE",
+            "approvedAt": "2026-09-22T08:19:15.669Z",
+            "result": {
+              "product": {
+                "id": "prod-live-1790065155401",
+                "tenantId": "tenant-1790065155243",
+                "name": "Industrial IoT Gateway Pro v2",
+                "sku": "SKU-IOT-1790065154884",
+                "category": "Hardware",
+                "unitPrice": 319.99,
+                "quantity": 105,
+                "reorderPoint": 20,
+                "description": "Enterprise grade sensor gateway",
+                "createdAt": "2026-09-22T08:19:15.401Z",
+                "updatedAt": "2026-09-22T08:19:15.668Z",
+                "unit_price": 319.99,
+                "current_stock": 105,
+                "min_stock_threshold": 20,
+                "_executionMode": "LIVE"
+              },
+              "log": {
+                "id": "log-1790065155668",
+                "tenantId": "tenant-1790065155243",
+                "productId": "prod-live-1790065155401",
+                "productName": "Industrial IoT Gateway Pro v2",
+                "sku": "SKU-IOT-1790065154884",
+                "changeType": "IN",
+                "quantityDelta": 30,
+                "previousQuantity": 75,
+                "newQuantity": 105,
+                "reason": "User requested restocking via AI assistant",
+                "executedBy": "Alice Vance",
+                "createdAt": "2026-09-22T08:19:15.668Z"
+              },
+              "_executionMode": "LIVE"
+            }
+          },
+          "createdAt": "2026-09-22T08:19:15.652Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-live-1790065155611",
+      "title": "What is our current stock and inventory ...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-22T08:19:15.611Z",
+      "messages": [
+        {
+          "id": "msg-user-1790065155611",
+          "sender": "USER",
+          "content": "What is our current stock and inventory status?",
+          "createdAt": "2026-09-22T08:19:15.611Z"
+        },
+        {
+          "id": "msg-bot-1790065155611",
+          "sender": "AGENT",
+          "content": "Here is your current inventory overview:\n\n- **Total Inventory SKUs:** 1\n- **Healthy Stock:** 1 items\n- **Low Stock Alerts:** 0 items\n\n**Inventory SKUs:**\n• **Industrial IoT Gateway Pro v2** (`SKU-IOT-1790065154884`) — 75 in stock\n",
+          "sources": [],
+          "toolsUsed": [
+            "warehouse_inventory_scanner"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": false,
+          "pendingAction": null,
+          "createdAt": "2026-09-22T08:19:15.611Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-live-1790065088958",
+      "title": "Restock Industrial IoT Gateway Pro v2 by...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-22T08:18:08.958Z",
+      "messages": [
+        {
+          "id": "msg-user-1790065088958",
+          "sender": "USER",
+          "content": "Restock Industrial IoT Gateway Pro v2 by 30 units",
+          "createdAt": "2026-09-22T08:18:08.958Z"
+        },
+        {
+          "id": "msg-bot-1790065088958",
+          "sender": "AGENT",
+          "content": "I have prepared the request to renew the stock of **Industrial IoT Gateway Pro v2** (**SKU-IOT-1790065088045**) by **+2 units** (current stock: 75 units).\n\nPlease confirm below before I proceed.",
+          "sources": [],
+          "toolsUsed": [
+            "inventory_restock_orchestrator"
+          ],
+          "executionTimeMs": 1,
+          "requiresConfirmation": true,
+          "pendingAction": {
+            "id": "act-live-1790065088957-689",
+            "actionType": "RESTOCK_PRODUCT",
+            "title": "Restock: Industrial IoT Gateway Pro v2",
+            "summary": "Renew stock for Industrial IoT Gateway Pro v2 (SKU-IOT-1790065088045) by +2 units.",
+            "payload": {
+              "productId": "prod-live-1790065088669",
+              "sku": "SKU-IOT-1790065088045",
+              "productName": "Industrial IoT Gateway Pro v2",
+              "quantityDelta": 2,
+              "changeType": "IN",
+              "reason": "User requested restocking via AI assistant"
+            },
+            "status": "APPROVED",
+            "expiresAt": "2026-09-22T08:33:08.957Z",
+            "createdAt": "2026-09-22T08:18:08.957Z",
+            "executionMode": "LIVE",
+            "approvedAt": "2026-09-22T08:18:08.974Z",
+            "result": {
+              "product": {
+                "id": "prod-live-1790065088669",
+                "tenantId": "tenant-1790065088501",
+                "name": "Industrial IoT Gateway Pro v2",
+                "sku": "SKU-IOT-1790065088045",
+                "category": "Hardware",
+                "unitPrice": 319.99,
+                "quantity": 77,
+                "reorderPoint": 20,
+                "description": "Enterprise grade sensor gateway",
+                "createdAt": "2026-09-22T08:18:08.669Z",
+                "updatedAt": "2026-09-22T08:18:08.974Z",
+                "unit_price": 319.99,
+                "current_stock": 77,
+                "min_stock_threshold": 20,
+                "_executionMode": "LIVE"
+              },
+              "log": {
+                "id": "log-1790065088974",
+                "tenantId": "tenant-1790065088501",
+                "productId": "prod-live-1790065088669",
+                "productName": "Industrial IoT Gateway Pro v2",
+                "sku": "SKU-IOT-1790065088045",
+                "changeType": "IN",
+                "quantityDelta": 2,
+                "previousQuantity": 75,
+                "newQuantity": 77,
+                "reason": "User requested restocking via AI assistant",
+                "executedBy": "Alice Vance",
+                "createdAt": "2026-09-22T08:18:08.974Z"
+              },
+              "_executionMode": "LIVE"
+            }
+          },
+          "createdAt": "2026-09-22T08:18:08.958Z"
+        }
+      ]
+    },
+    {
+      "id": "conv-live-1790065088937",
+      "title": "What is our current stock and inventory ...",
+      "agentId": "supply-chain-agent",
+      "createdAt": "2026-09-22T08:18:08.937Z",
+      "messages": [
+        {
+          "id": "msg-user-1790065088937",
+          "sender": "USER",
+          "content": "What is our current stock and inventory status?",
+          "createdAt": "2026-09-22T08:18:08.937Z"
+        },
+        {
+          "id": "msg-bot-1790065088937",
+          "sender": "AGENT",
+          "content": "Here is your current inventory overview:\n\n- **Total Inventory SKUs:** 1\n- **Healthy Stock:** 1 items\n- **Low Stock Alerts:** 0 items\n\n**Inventory SKUs:**\n• **Industrial IoT Gateway Pro v2** (`SKU-IOT-1790065088045`) — 75 in stock\n",
+          "sources": [],
+          "toolsUsed": [
+            "warehouse_inventory_scanner"
+          ],
+          "executionTimeMs": 0,
+          "requiresConfirmation": false,
+          "pendingAction": null,
+          "createdAt": "2026-09-22T08:18:08.937Z"
+        }
+      ]
+    },
     {
       "id": "conv-live-1789818834963",
       "title": "Which products need restocking?",
@@ -974,6 +1517,112 @@
     }
   ],
   "pendingActions": [
+    {
+      "id": "act-live-1790065155651-379",
+      "actionType": "RESTOCK_PRODUCT",
+      "title": "Restock: Industrial IoT Gateway Pro v2",
+      "summary": "Renew stock for Industrial IoT Gateway Pro v2 (SKU-IOT-1790065154884) by +30 units.",
+      "payload": {
+        "productId": "prod-live-1790065155401",
+        "sku": "SKU-IOT-1790065154884",
+        "productName": "Industrial IoT Gateway Pro v2",
+        "quantityDelta": 30,
+        "changeType": "IN",
+        "reason": "User requested restocking via AI assistant"
+      },
+      "status": "APPROVED",
+      "expiresAt": "2026-09-22T08:34:15.651Z",
+      "createdAt": "2026-09-22T08:19:15.651Z",
+      "executionMode": "LIVE",
+      "approvedAt": "2026-09-22T08:19:15.669Z",
+      "result": {
+        "product": {
+          "id": "prod-live-1790065155401",
+          "tenantId": "tenant-1790065155243",
+          "name": "Industrial IoT Gateway Pro v2",
+          "sku": "SKU-IOT-1790065154884",
+          "category": "Hardware",
+          "unitPrice": 319.99,
+          "quantity": 105,
+          "reorderPoint": 20,
+          "description": "Enterprise grade sensor gateway",
+          "createdAt": "2026-09-22T08:19:15.401Z",
+          "updatedAt": "2026-09-22T08:19:15.668Z",
+          "unit_price": 319.99,
+          "current_stock": 105,
+          "min_stock_threshold": 20,
+          "_executionMode": "LIVE"
+        },
+        "log": {
+          "id": "log-1790065155668",
+          "tenantId": "tenant-1790065155243",
+          "productId": "prod-live-1790065155401",
+          "productName": "Industrial IoT Gateway Pro v2",
+          "sku": "SKU-IOT-1790065154884",
+          "changeType": "IN",
+          "quantityDelta": 30,
+          "previousQuantity": 75,
+          "newQuantity": 105,
+          "reason": "User requested restocking via AI assistant",
+          "executedBy": "Alice Vance",
+          "createdAt": "2026-09-22T08:19:15.668Z"
+        },
+        "_executionMode": "LIVE"
+      }
+    },
+    {
+      "id": "act-live-1790065088957-689",
+      "actionType": "RESTOCK_PRODUCT",
+      "title": "Restock: Industrial IoT Gateway Pro v2",
+      "summary": "Renew stock for Industrial IoT Gateway Pro v2 (SKU-IOT-1790065088045) by +2 units.",
+      "payload": {
+        "productId": "prod-live-1790065088669",
+        "sku": "SKU-IOT-1790065088045",
+        "productName": "Industrial IoT Gateway Pro v2",
+        "quantityDelta": 2,
+        "changeType": "IN",
+        "reason": "User requested restocking via AI assistant"
+      },
+      "status": "APPROVED",
+      "expiresAt": "2026-09-22T08:33:08.957Z",
+      "createdAt": "2026-09-22T08:18:08.957Z",
+      "executionMode": "LIVE",
+      "approvedAt": "2026-09-22T08:18:08.974Z",
+      "result": {
+        "product": {
+          "id": "prod-live-1790065088669",
+          "tenantId": "tenant-1790065088501",
+          "name": "Industrial IoT Gateway Pro v2",
+          "sku": "SKU-IOT-1790065088045",
+          "category": "Hardware",
+          "unitPrice": 319.99,
+          "quantity": 77,
+          "reorderPoint": 20,
+          "description": "Enterprise grade sensor gateway",
+          "createdAt": "2026-09-22T08:18:08.669Z",
+          "updatedAt": "2026-09-22T08:18:08.974Z",
+          "unit_price": 319.99,
+          "current_stock": 77,
+          "min_stock_threshold": 20,
+          "_executionMode": "LIVE"
+        },
+        "log": {
+          "id": "log-1790065088974",
+          "tenantId": "tenant-1790065088501",
+          "productId": "prod-live-1790065088669",
+          "productName": "Industrial IoT Gateway Pro v2",
+          "sku": "SKU-IOT-1790065088045",
+          "changeType": "IN",
+          "quantityDelta": 2,
+          "previousQuantity": 75,
+          "newQuantity": 77,
+          "reason": "User requested restocking via AI assistant",
+          "executedBy": "Alice Vance",
+          "createdAt": "2026-09-22T08:18:08.974Z"
+        },
+        "_executionMode": "LIVE"
+      }
+    },
     {
       "id": "act-live-1789819111240-407",
       "actionType": "DELETE_TASK",

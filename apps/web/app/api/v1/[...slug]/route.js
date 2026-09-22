@@ -59,31 +59,47 @@ export async function GET(req, { params }) {
         const history = await storeAdapter.getStockHistory(context, slug[1]);
         return jsonSuccess(history);
       }
-      // GET /api/v1/inventory/:id
-      if (slug[1] && !slug[2]) {
-        const item = await storeAdapter.getProductById(context, slug[1]);
-        if (!item) return jsonError("Product not found", 404, "NOT_FOUND");
-        return jsonSuccess(item);
+      // GET /api/v1/inventory or /api/v1/inventory/products or /api/v1/inventory/items
+      if (!slug[1] || slug[1] === "products" || slug[1] === "items") {
+        const category = url.searchParams.get("category") || "ALL";
+        const status = url.searchParams.get("status") || "ALL";
+        const search = url.searchParams.get("search") || "";
+        const products = await storeAdapter.getProducts(context, { category, status, search });
+        return jsonSuccess(products);
       }
-      // GET /api/v1/inventory
-      const category = url.searchParams.get("category") || "ALL";
-      const status = url.searchParams.get("status") || "ALL";
-      const search = url.searchParams.get("search") || "";
-      const products = await storeAdapter.getProducts(context, { category, status, search });
-      return jsonSuccess(products);
+      // GET /api/v1/inventory/:id
+      const item = await storeAdapter.getProductById(context, slug[1]);
+      if (!item) return jsonError("Product not found", 404, "NOT_FOUND");
+      return jsonSuccess(item);
     }
 
     // 3. CRM Routes
     if (slug[0] === "crm") {
       if (slug[1] === "leads") {
+        if (slug[2]) {
+          const lead = await storeAdapter.getLeadById(context, slug[2]);
+          if (!lead) return jsonError(`Lead "${slug[2]}" not found`, 404, "NOT_FOUND");
+          return jsonSuccess(lead);
+        }
         const leads = await storeAdapter.getLeads(context);
         return jsonSuccess(leads);
       }
       if (slug[1] === "tasks") {
+        if (slug[2]) {
+          const task = await storeAdapter.getTaskById(context, slug[2]);
+          if (!task) return jsonError(`Task "${slug[2]}" not found`, 404, "NOT_FOUND");
+          return jsonSuccess(task);
+        }
         const tasks = await storeAdapter.getTasks(context);
         return jsonSuccess(tasks);
       }
       if (slug[1] === "customers") {
+        if (slug[2]) {
+          const customers = await storeAdapter.getCustomers(context);
+          const customer = customers.find((c) => c.id === slug[2] || c.accountNo === slug[2]);
+          if (!customer) return jsonError(`Customer "${slug[2]}" not found`, 404, "NOT_FOUND");
+          return jsonSuccess(customer);
+        }
         const customers = await storeAdapter.getCustomers(context);
         return jsonSuccess(customers);
       }
@@ -126,12 +142,27 @@ export async function GET(req, { params }) {
     }
 
     // 8. Agents list
-    if (slug[0] === "agents") {
+    if (slug[0] === "agents" && !slug[1]) {
       return jsonSuccess([
         { id: "supply-chain-agent", name: "Supply Chain Master", status: "ACTIVE" },
         { id: "inventory-agent", name: "Inventory Agent", status: "ACTIVE" },
         { id: "crm-agent", name: "CRM Agent", status: "ACTIVE" },
       ]);
+    }
+
+    // 9. Pending Actions (HITL)
+    if (
+      (slug[0] === "actions" && slug[1] === "pending") ||
+      (slug[0] === "agents" && slug[1] === "actions")
+    ) {
+      const actionId = slug[2];
+      if (actionId) {
+        const action = await storeAdapter.getPendingActionById(context, actionId);
+        if (!action) return jsonError(`Pending action "${actionId}" not found`, 404, "NOT_FOUND");
+        return jsonSuccess(action);
+      }
+      const actions = await storeAdapter.getPendingActions(context);
+      return jsonSuccess(actions);
     }
 
     return jsonError(`Route GET /api/v1/${slug.join("/")} not found`, 404, "NOT_FOUND");
@@ -156,6 +187,9 @@ export async function POST(req, { params }) {
   try {
     // 1. Auth: Demo Login
     if (slug[0] === "auth" && slug[1] === "demo") {
+      if (body?.reset || slug[2] === "reset") {
+        resetDemoDb();
+      }
       const demoUser = {
         userId: "demo-user-alex",
         email: "demo@smartsupply.ai",
@@ -503,15 +537,21 @@ export async function POST(req, { params }) {
       return jsonSuccess(result);
     }
 
-    // 11. AI Agent: Approve HITL Action
-    if (slug[0] === "agents" && slug[1] === "actions" && slug[3] === "approve") {
+    // 11. AI Agent / Pending Actions: Approve HITL Action
+    if (
+      (slug[0] === "agents" && slug[1] === "actions" && slug[3] === "approve") ||
+      (slug[0] === "actions" && slug[1] === "pending" && slug[3] === "approve")
+    ) {
       const actionId = slug[2];
       const result = await storeAdapter.approvePendingAction(context, actionId);
       return jsonSuccess(result, "Action successfully approved and executed.");
     }
 
-    // 12. AI Agent: Reject HITL Action
-    if (slug[0] === "agents" && slug[1] === "actions" && slug[3] === "reject") {
+    // 12. AI Agent / Pending Actions: Reject HITL Action
+    if (
+      (slug[0] === "agents" && slug[1] === "actions" && slug[3] === "reject") ||
+      (slug[0] === "actions" && slug[1] === "pending" && slug[3] === "reject")
+    ) {
       const actionId = slug[2];
       const result = await storeAdapter.rejectPendingAction(context, actionId);
       return jsonSuccess(result, "Action rejected.");
