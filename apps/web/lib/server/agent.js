@@ -295,15 +295,20 @@ function matchTaskFromText(text, tasks) {
 
   // 3. Normalized candidate match
   // Handles queries like "Delete the Follow up task with Marcus Vance on AeroTech quotation"
-  // matching task title "Follow up with Marcus Vance on AeroTech quotation"
+  // or "Edit the time of task meeting with cliient from 8 p.m to 9 a.m"
   const cleanUserQuery = lower
-    .replace(/^(?:please\s+)?(?:can you\s+)?(?:delete|remove|erase|cancel|drop|destroy)\s+(?:the\s+)?(?:task\s+)?/i, "")
+    .replace(/^(?:please\s+)?(?:can you\s+)?(?:delete|remove|erase|cancel|drop|destroy|edit|update|modify|change|reschedule)\s+(?:the\s+)?(?:time\s+of\s+|date\s+of\s+|priority\s+of\s+|status\s+of\s+|title\s+of\s+)?(?:task\s+)?/i, "")
+    .replace(/(?:from\s+)?\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)\b(?:\s+(?:to|until)\s+\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)\b)?/gi, "")
     .replace(/\b(?:the\s+)?(?:task|todo|to-do)\b/gi, "")
     .replace(/\s+/g, " ")
     .trim();
 
   for (const t of tasks) {
-    const cleanTitle = (t.title || "").toLowerCase().replace(/\b(?:the\s+)?(?:task|todo|to-do)\b/gi, "").replace(/\s+/g, " ").trim();
+    const cleanTitle = (t.title || "").toLowerCase()
+      .replace(/\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)\b/gi, "")
+      .replace(/\b(?:the\s+)?(?:task|todo|to-do)\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
     if (cleanTitle && cleanUserQuery) {
       if (cleanUserQuery.includes(cleanTitle) || cleanTitle.includes(cleanUserQuery)) {
         return t;
@@ -314,7 +319,11 @@ function matchTaskFromText(text, tasks) {
   // 4. Token & key entity overlap scoring
   let bestTask = null;
   let highestScore = 0;
-  const stopWords = new Set(["delete", "remove", "erase", "cancel", "drop", "destroy", "the", "task", "with", "on", "for", "to", "in", "at", "a", "an", "of", "and", "please", "can", "you"]);
+  const stopWords = new Set([
+    "delete", "remove", "erase", "cancel", "drop", "destroy", "edit", "update", "modify", "change",
+    "reschedule", "time", "date", "priority", "status", "from", "the", "task", "with", "on", "for",
+    "to", "in", "at", "a", "an", "of", "and", "please", "can", "you", "pm", "am", "p.m", "a.m"
+  ]);
 
   const userWords = lower
     .replace(/[^a-z0-9\s]/g, " ")
@@ -325,7 +334,8 @@ function matchTaskFromText(text, tasks) {
     const combined = `${t.title || ""} ${t.description || ""}`.toLowerCase();
     let score = 0;
     for (const w of userWords) {
-      if (combined.includes(w)) {
+      const deDuped = w.replace(/(.)\1+/g, "$1");
+      if (combined.includes(w) || combined.includes(deDuped)) {
         score++;
       }
     }
@@ -445,6 +455,72 @@ function extractDueDateFromText(text) {
   }
 
   return null;
+}
+
+/**
+ * Extracts time information such as "from 8 p.m to 9 a.m", "to 9am", "at 9:30 am", "8pm".
+ */
+function extractTimeInfo(text) {
+  if (!text) return null;
+
+  // Pattern 1: "from 8 p.m to 9 a.m", "from 8pm to 9am", "8 p.m to 9 a.m"
+  const fromToMatch = text.match(/(?:from\s+)?(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm))\s+(?:to|until)\s+(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm))/i);
+  if (fromToMatch) {
+    return {
+      oldTime: fromToMatch[1].trim(),
+      newTime: fromToMatch[2].trim(),
+      timeStr: fromToMatch[2].trim(),
+      isRange: true,
+      rawMatched: fromToMatch[0],
+    };
+  }
+
+  // Pattern 2: "to 9 a.m", "at 9 a.m", "time is 9 a.m", "schedule to 9am"
+  const toMatch = text.match(/(?:to|at|time\s*(?:is|to|=)?|schedule\s*(?:for|to)?)\s+(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm))/i);
+  if (toMatch) {
+    return {
+      newTime: toMatch[1].trim(),
+      timeStr: toMatch[1].trim(),
+      isRange: false,
+      rawMatched: toMatch[0],
+    };
+  }
+
+  // Pattern 3: Any standalone time mention with am/pm
+  const anyAmPm = text.match(/\b(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm))\b/i);
+  if (anyAmPm) {
+    return {
+      newTime: anyAmPm[1].trim(),
+      timeStr: anyAmPm[1].trim(),
+      isRange: false,
+      rawMatched: anyAmPm[0],
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Parses a time string into 24h hours, minutes, and standard 12h display string.
+ */
+function parseTimeHoursMinutes(timeStr) {
+  if (!timeStr) return null;
+  const clean = timeStr.toLowerCase().replace(/\./g, "").trim();
+  const m = clean.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+  if (!m) return null;
+  let hours = parseInt(m[1], 10);
+  const minutes = m[2] ? parseInt(m[2], 10) : 0;
+  const ampm = (m[3] || "").toLowerCase();
+  if (ampm === "pm" && hours < 12) hours += 12;
+  if (ampm === "am" && hours === 12) hours = 0;
+  const display12 = `${hours % 12 === 0 ? 12 : hours % 12}:${String(minutes).padStart(2, "0")} ${hours >= 12 ? "PM" : "AM"}`;
+  const displayShort = `${hours % 12 === 0 ? 12 : hours % 12}${minutes > 0 ? `:${String(minutes).padStart(2, "0")}` : ""} ${hours >= 12 ? "PM" : "AM"}`;
+  return {
+    hours,
+    minutes,
+    display12,
+    displayShort,
+  };
 }
 
 /**
@@ -1164,9 +1240,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
         requiresConfirmation = false;
         pendingAction = { ...activePending, status: "APPROVED" };
 
-        if (conversationId) {
-          await storeAdapter.setConversationState(context, conversationId, null);
-        }
+        await saveWorkflowState(null);
 
         const actionType = activePending.actionType;
         const payload = activePending.payload || {};
@@ -1183,6 +1257,11 @@ export async function executeAgentChat(context, { agentId, message, conversation
           answer = `Done. Product **${payload.productName || payload.name || "item"}** has been deleted from inventory.`;
         } else if (actionType === "DELETE_TASK") {
           answer = `Done. Task **${payload.taskTitle || payload.title || "task"}** has been deleted.`;
+        } else if (actionType === "EDIT_TASK") {
+          const newTitle = payload.updates?.title || payload.taskTitle || "task";
+          const timePart = payload.updates?.time ? ` (Time: ${payload.updates.time})` : "";
+          const duePart = payload.updates?.dueDate && !payload.updates?.time ? ` (Due: ${payload.updates.dueDate})` : "";
+          answer = `Done. Task **${newTitle}** has been updated successfully${timePart || duePart}.`;
         } else if (actionType === "EDIT_LEAD") {
           const stageDesc = payload.toStage ? `moved to **${payload.toStage}**` : `updated`;
           answer = `Done. Lead **${payload.leadTitle}** has been ${stageDesc}.`;
@@ -2898,7 +2977,12 @@ export async function executeAgentChat(context, { agentId, message, conversation
     lowerMsg.includes("update") ||
     lowerMsg.includes("modify") ||
     lowerMsg.includes("change price") ||
-    lowerMsg.includes("change value")
+    lowerMsg.includes("change value") ||
+    lowerMsg.includes("change time") ||
+    lowerMsg.includes("change date") ||
+    lowerMsg.includes("reschedule") ||
+    lowerMsg.includes("postpone") ||
+    lowerMsg.includes("rename")
   ) {
     if (lowerMsg.includes("lead") || lowerMsg.includes("deal")) {
       toolsUsed.push("crm_lead_updater");
@@ -2952,33 +3036,137 @@ export async function executeAgentChat(context, { agentId, message, conversation
       } else {
         answer = "Which lead would you like to edit? Please specify the lead title or ID.";
       }
-    } else if (lowerMsg.includes("task")) {
+    } else if (lowerMsg.includes("task") || matchTaskFromText(message, tasks)) {
       toolsUsed.push("crm_task_updater");
       const matchedTask = matchTaskFromText(message, tasks);
       if (matchedTask) {
         const updates = {};
-        if (lowerMsg.includes("complete") || lowerMsg.includes("done")) {
+
+        // 1. Status extraction
+        if (lowerMsg.includes("complete") || lowerMsg.includes("done") || lowerMsg.includes("finished")) {
           updates.status = "COMPLETED";
+        } else if (lowerMsg.includes("in progress") || lowerMsg.includes("in-progress")) {
+          updates.status = "IN_PROGRESS";
+        } else if (lowerMsg.includes("pending")) {
+          updates.status = "PENDING";
         }
+
+        // 2. Priority extraction
+        const priorityMatch = message.match(/(?:priority\s*(?:to|is|=)?\s*|mark\s*as\s*)(urgent|high|medium|low)\b/i);
+        if (priorityMatch) {
+          updates.priority = priorityMatch[1].toUpperCase();
+        }
+
+        // 3. Due Date extraction
         const dateInfo = extractDueDateFromText(message);
-        if (dateInfo) updates.dueDate = dateInfo.dateStr;
 
-        const changesSummary = Object.entries(updates)
-          .map(([k, v]) => `${k} to ${v}`)
-          .join(", ") || "requested properties";
+        // 4. Time extraction
+        const timeInfo = extractTimeInfo(message);
+        let parsedTime = null;
+        if (timeInfo) {
+          parsedTime = parseTimeHoursMinutes(timeInfo.newTime || timeInfo.timeStr);
+          if (parsedTime) {
+            updates.time = parsedTime.display12;
+          }
+        }
 
-        requiresConfirmation = true;
-        pendingAction = await storeAdapter.createPendingAction(context, {
-          actionType: "EDIT_TASK",
-          title: `Edit Task: ${matchedTask.title}`,
-          summary: `Update task "${matchedTask.title}": Set ${changesSummary}.`,
-          payload: {
+        // Calculate combined dueDate (date + time)
+        const baseDateStr = dateInfo?.dateStr || (matchedTask.dueDate ? matchedTask.dueDate.split("T")[0] : null);
+        if (baseDateStr && parsedTime) {
+          const [y, m, d] = baseDateStr.split("-").map((num) => parseInt(num, 10));
+          const dt = new Date(Date.UTC(y, m - 1, d, parsedTime.hours, parsedTime.minutes, 0, 0));
+          updates.dueDate = dt.toISOString();
+        } else if (dateInfo) {
+          updates.dueDate = dateInfo.dateStr;
+        }
+
+        // 5. Update task title if time changed or user asked to rename
+        let updatedTitle = matchedTask.title;
+        const renameMatch = message.match(/(?:rename(?:\s+task)?\s+to|change(?:\s+task)?\s+title\s+to|edit(?:\s+task)?\s+title\s+to)\s+["']?([^"'\n]+?)["']?$/i);
+        if (renameMatch && renameMatch[1].trim()) {
+          updatedTitle = renameMatch[1].trim();
+        } else if (timeInfo) {
+          // If the task title already mentions the old time or has a time, replace it
+          if (timeInfo.oldTime) {
+            const digits = timeInfo.oldTime.match(/\d+/)?.[0] || "";
+            const isPm = /p/i.test(timeInfo.oldTime);
+            const isAm = /a/i.test(timeInfo.oldTime);
+            const oldTimePattern = new RegExp(`\\b${digits}(?::00)?\\s*(?:${isPm ? "p\\.?m\\.?" : isAm ? "a\\.?m\\.?" : "[ap]\\.?m\\.?"})\\b`, "i");
+            if (oldTimePattern.test(updatedTitle)) {
+              updatedTitle = updatedTitle.replace(oldTimePattern, timeInfo.newTime);
+            }
+          }
+
+          if (updatedTitle === matchedTask.title) {
+            const genericTimeInTitle = updatedTitle.match(/\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)\b/i);
+            if (genericTimeInTitle) {
+              updatedTitle = updatedTitle.replace(genericTimeInTitle[0], timeInfo.newTime);
+            } else if (/\bat\b/i.test(message)) {
+              updatedTitle = `${updatedTitle} at ${timeInfo.newTime}`;
+            }
+          }
+        }
+
+        if (updatedTitle && updatedTitle !== matchedTask.title) {
+          updates.title = updatedTitle;
+        }
+
+        // Also check description
+        if (matchedTask.description && timeInfo) {
+          let updatedDesc = matchedTask.description;
+          if (timeInfo.oldTime) {
+            const digits = timeInfo.oldTime.match(/\d+/)?.[0] || "";
+            const isPm = /p/i.test(timeInfo.oldTime);
+            const isAm = /a/i.test(timeInfo.oldTime);
+            const oldTimePattern = new RegExp(`\\b${digits}(?::00)?\\s*(?:${isPm ? "p\\.?m\\.?" : isAm ? "a\\.?m\\.?" : "[ap]\\.?m\\.?"})\\b`, "i");
+            if (oldTimePattern.test(updatedDesc)) {
+              updatedDesc = updatedDesc.replace(oldTimePattern, timeInfo.newTime);
+            }
+          }
+          if (updatedDesc === matchedTask.description) {
+            const genericTime = updatedDesc.match(/\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)\b/i);
+            if (genericTime) {
+              updatedDesc = updatedDesc.replace(genericTime[0], timeInfo.newTime);
+            }
+          }
+          if (updatedDesc && updatedDesc !== matchedTask.description) {
+            updates.description = updatedDesc;
+          }
+        }
+
+        if (Object.keys(updates).length === 0) {
+          requiresConfirmation = false;
+          answer = `What updates would you like to make to task **${matchedTask.title}**? You can specify a new time, due date, title, priority, or status.`;
+        } else {
+          const summaryParts = [];
+          if (updates.time) summaryParts.push(`time to ${updates.time}`);
+          if (updates.title && updates.title !== matchedTask.title) summaryParts.push(`title to "${updates.title}"`);
+          if (updates.dueDate && !updates.time) summaryParts.push(`due date to ${updates.dueDate}`);
+          if (updates.priority) summaryParts.push(`priority to ${updates.priority}`);
+          if (updates.status) summaryParts.push(`status to ${updates.status}`);
+          const changesSummary = summaryParts.join(", ") || Object.entries(updates).map(([k, v]) => `${k} to ${v}`).join(", ");
+
+          requiresConfirmation = true;
+          pendingAction = await storeAdapter.createPendingAction(context, {
+            actionType: "EDIT_TASK",
+            title: `Edit Task: ${matchedTask.title}`,
+            summary: `Update task "${matchedTask.title}": Set ${changesSummary}.`,
+            payload: {
+              taskId: matchedTask.id,
+              taskTitle: matchedTask.title,
+              updates,
+            },
+          });
+
+          await saveWorkflowState({
+            intent: "EDIT_TASK",
+            step: "AWAITING_CONFIRMATION",
             taskId: matchedTask.id,
-            taskTitle: matchedTask.title,
-            updates,
-          },
-        });
-        answer = `I have prepared the update for task **${matchedTask.title}** (${changesSummary}).\n\nPlease confirm below to proceed.`;
+            pendingActionId: pendingAction.id,
+          });
+
+          answer = `I have prepared the update for task **${matchedTask.title}** (${changesSummary}).\n\nPlease confirm below to proceed.`;
+        }
       } else {
         answer = "Which task would you like to edit? Please specify the task title.";
       }

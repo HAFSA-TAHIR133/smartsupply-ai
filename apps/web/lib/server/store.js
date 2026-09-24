@@ -1180,6 +1180,7 @@ export const storeAdapter = {
       item.dueDate = d;
       item.due_date = d;
     }
+    if (payload.time !== undefined) item.time = payload.time;
     item.updatedAt = new Date().toISOString();
 
     if (isLive) saveLiveDb(); else saveDemoDb();
