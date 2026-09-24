@@ -15,18 +15,11 @@ import {
   X,
   ChevronDown,
   Building2,
-  PanelLeftClose,
-  PanelLeft,
-  CheckCircle2,
   BarChart3,
-  Pencil,
 } from "lucide-react";
 import { useAuthContext } from "@/context/authContext";
 import { AIAssistantDrawer } from "@/components/ai/ai-assistant-drawer";
 import { apiRequest } from "@/lib/api";
-import Modal from "@/components/ui/modal";
-import Input from "@/components/ui/input";
-import Button from "@/components/ui/button";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -36,21 +29,18 @@ const NAV_ITEMS = [
 ];
 
 export function AppLayout({ children }) {
-  const { user, isDemo, logout, loading, updateUser } = useAuthContext();
+  const { user, isDemo, logout, loading } = useAuthContext();
   const pathname = usePathname();
   const router = useRouter();
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarDrawerOpen, setSidebarDrawerOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [profileNameInput, setProfileNameInput] = useState("");
-  const [profileSaving, setProfileSaving] = useState(false);
 
-  // Compute clean user display name and avatar letter from user's full name (not email address)
+  // Compute clean user display name and avatar letter from user's full name
   const displayName = (() => {
     if (user?.name && !user.name.includes("@")) {
       return user.name;
@@ -65,25 +55,10 @@ export function AppLayout({ children }) {
 
   const avatarInitial = (displayName.charAt(0) || "A").toUpperCase();
 
-  const handleSaveProfileName = async (e) => {
-    e.preventDefault();
-    if (!profileNameInput.trim()) return;
-    setProfileSaving(true);
-    try {
-      if (updateUser) {
-        await updateUser({ name: profileNameInput.trim() });
-      }
-      setEditProfileOpen(false);
-    } catch (err) {
-      console.warn("Failed to update profile name:", err);
-    } finally {
-      setProfileSaving(false);
-    }
-  };
-
   const handleLogout = () => {
     setShowUserMenu(false);
     setMobileMenuOpen(false);
+    setSidebarDrawerOpen(false);
     logout();
     router.replace("/login");
   };
@@ -134,12 +109,10 @@ export function AppLayout({ children }) {
     } catch (e) {}
   };
 
-  // If viewing login page, render children directly without dashboard shell
   if (pathname === "/login") {
     return children;
   }
 
-  // If viewing non-existent/unknown route (404), render 404 page directly without shell or redirect
   if (!isKnownRoute) {
     return children;
   }
@@ -166,43 +139,53 @@ export function AppLayout({ children }) {
       {/* Top Header Bar */}
       <header className="sticky top-0 z-40 h-14 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md flex items-center justify-between px-4 lg:px-6 transition-all">
         <div className="flex items-center gap-3">
-          {/* Mobile Menu Button (Visible on Small Screens) */}
+          {/* Mobile Menu Toggle Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-zinc-800 transition-all"
+            className="lg:hidden p-1.5 rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 border border-zinc-800 transition-all"
           >
             <Menu className="h-4 w-4" />
           </button>
 
-          {/* 1. App Brand FIRST */}
-          <Link href="/" prefetch={true} className="flex items-center gap-2.5 group">
-            <div className="h-7 w-7 rounded-lg bg-indigo-600 border border-indigo-500/40 flex items-center justify-center text-white font-bold text-xs shadow-sm group-hover:bg-indigo-500 transition-colors">
-              S
-            </div>
-            <span className="font-semibold text-sm tracking-tight text-zinc-100 group-hover:text-white transition-colors">
-              SmartSupply
-            </span>
-          </Link>
-
-          {/* 2. Desktop Collapsible Sidebar Button SECOND */}
+          {/* 1. Collapsible Drawer Toggle (3 Horizontal Lines) FIRST */}
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="hidden lg:flex p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/80 border border-transparent hover:border-zinc-800 transition-all"
-            title={sidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
+            onClick={() => setSidebarDrawerOpen(!sidebarDrawerOpen)}
+            className="hidden lg:flex p-2 rounded-xl text-zinc-300 hover:text-white bg-zinc-900/80 hover:bg-zinc-900 border border-zinc-800/80 transition-all active:scale-95"
+            title="Open Menu Drawer"
           >
-            {sidebarOpen ? (
-              <PanelLeftClose className="h-4 w-4" />
-            ) : (
-              <PanelLeft className="h-4 w-4" />
-            )}
+            <Menu className="h-4 w-4" />
           </button>
 
+          {/* 2. Glowing SmartSupply AI Logo SECOND */}
+          <Link href="/" prefetch={true} className="flex items-center gap-2.5 group ml-1">
+            <div className="relative flex items-center justify-center">
+              {/* Vibrant Glow Halo */}
+              <div className="absolute -inset-1 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-70 blur-md group-hover:opacity-100 transition duration-500 animate-pulse" />
+              
+              {/* Logo Badge */}
+              <div className="relative h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 border border-indigo-300/40 flex items-center justify-center text-white font-black text-sm shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform duration-300">
+                S
+                {/* Charming Sparkle */}
+                <Sparkles className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 text-amber-300 drop-shadow-[0_0_6px_rgba(252,211,77,0.9)] animate-bounce" />
+              </div>
+            </div>
+
+            <div className="flex items-baseline gap-1">
+              <span className="font-bold text-base tracking-tight bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent group-hover:from-indigo-200 group-hover:to-white transition-all">
+                SmartSupply
+              </span>
+              <span className="text-xs text-indigo-400 font-extrabold tracking-wider">
+                AI
+              </span>
+            </div>
+          </Link>
+
           {/* Tenant Badge */}
-          <div className="hidden sm:flex items-center gap-2 pl-3 ml-1 border-l border-zinc-800 text-xs">
+          <div className="hidden sm:flex items-center gap-2 pl-3 ml-2 border-l border-zinc-800 text-xs">
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800/80 text-zinc-300">
               <Building2 className="h-3 w-3 text-indigo-400" />
               <span className="font-medium text-[11px] truncate max-w-[140px]">
-                {isDemo ? "Demo Account" : (user?.tenantName || "Enterprise Workspace")}
+                {isDemo ? "Demo Account" : user?.tenantName || "Enterprise Workspace"}
               </span>
             </div>
           </div>
@@ -303,39 +286,13 @@ export function AppLayout({ children }) {
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-56 rounded-xl border border-zinc-800 bg-zinc-900 p-1.5 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="px-3 py-2 border-b border-zinc-800/80 mb-1">
-                  <div className="flex items-center justify-between gap-1.5">
-                    <p className="text-xs font-semibold text-zinc-100 truncate">
-                      {displayName}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProfileNameInput(displayName);
-                        setEditProfileOpen(true);
-                        setShowUserMenu(false);
-                      }}
-                      className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-                      title="Edit Display Name"
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                  </div>
+                  <p className="text-xs font-semibold text-zinc-100 truncate">
+                    {displayName}
+                  </p>
                   <p className="text-[10px] text-zinc-400 truncate mt-0.5">
                     {user?.email || "alex@demostore.com"}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProfileNameInput(displayName);
-                    setEditProfileOpen(true);
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
-                >
-                  <Pencil className="h-3.5 w-3.5 text-zinc-400" />
-                  Edit Display Name
-                </button>
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-rose-400 hover:bg-rose-950/30 hover:text-rose-300 transition-colors cursor-pointer"
@@ -350,62 +307,108 @@ export function AppLayout({ children }) {
       </header>
 
       {/* Main Workspace Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Desktop Sidebar */}
-        <aside
-          className={`hidden lg:flex flex-col border-r border-zinc-800/80 bg-zinc-950 transition-all duration-300 ease-in-out ${
-            sidebarOpen ? "w-56" : "w-16"
-          }`}
-        >
-          <div className="flex-1 p-2 space-y-1.5">
-            {sidebarOpen && (
-              <div className="px-3 py-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
-                Navigation
-              </div>
-            )}
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  prefetch={true}
-                  className={`group relative flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${
-                    isActive
-                      ? "bg-zinc-900 text-white border border-zinc-800 shadow-xs"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 border border-transparent"
-                  }`}
-                >
-                  <Icon
-                    className={`h-4 w-4 shrink-0 transition-colors ${
-                      isActive ? "text-indigo-400" : "text-zinc-400 group-hover:text-zinc-200"
-                    }`}
-                  />
-                  {sidebarOpen && <span>{item.label}</span>}
-                  
-                  {/* Active Indicator */}
-                  {isActive && sidebarOpen && (
-                    <div className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                  )}
-                </Link>
-              );
-            })}
-          </div>
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-7xl mx-auto w-full">
+          {children}
+        </main>
 
-          {/* Quick Info Block when expanded */}
-          {sidebarOpen && (
-            <div className="m-2.5 p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/80 text-[11px] text-zinc-400 space-y-1">
-              <div className="flex items-center gap-1.5 text-zinc-300 font-medium">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Connected</span>
-              </div>
-              <p className="text-[10px] text-zinc-500 leading-tight">
-                Enterprise real-time sync active.
-              </p>
+        {/* Collapsible Slide-Out Drawer */}
+        <AnimatePresence>
+          {sidebarDrawerOpen && (
+            <div className="fixed inset-0 z-50 flex">
+              {/* Dimmed backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSidebarDrawerOpen(false)}
+                className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+              />
+
+              {/* Opened Sidebar Drawer */}
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", damping: 26, stiffness: 220 }}
+                className="relative z-10 w-72 bg-zinc-950 border-r border-zinc-850 p-5 flex flex-col justify-between shadow-2xl h-full"
+              >
+                <div>
+                  {/* Drawer Header: Glowing Logo & Close Button */}
+                  <div className="flex items-center justify-between pb-6 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex items-center justify-center">
+                        <div className="absolute -inset-1 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-80 blur-sm animate-pulse" />
+                        <div className="relative h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-700 border border-indigo-300/40 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-indigo-600/30">
+                          S
+                          <Sparkles className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 text-amber-300 drop-shadow-[0_0_6px_rgba(252,211,77,0.9)] animate-bounce" />
+                        </div>
+                      </div>
+                      <span className="font-bold text-base text-zinc-100 tracking-tight">
+                        SmartSupply <span className="text-xs text-indigo-400 font-extrabold">AI</span>
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => setSidebarDrawerOpen(false)}
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="h-px w-full bg-zinc-800/80 mb-6" />
+
+                  {/* Section Label */}
+                  <div className="px-2 mb-3 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">
+                    Menu
+                  </div>
+
+                  {/* Nav Links styled as sleek active pills */}
+                  <nav className="space-y-1.5">
+                    {NAV_ITEMS.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = pathname === item.href;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          prefetch={true}
+                          onClick={() => setSidebarDrawerOpen(false)}
+                          className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+                            isActive
+                              ? "bg-zinc-850 text-white shadow-sm border border-zinc-800/80"
+                              : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
+                          }`}
+                        >
+                          <Icon
+                            className={`h-5 w-5 ${
+                              isActive ? "text-indigo-400" : "text-zinc-400"
+                            }`}
+                          />
+                          <span>{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </nav>
+                </div>
+
+                {/* Footer Sign Out */}
+                <div>
+                  <div className="h-px w-full bg-zinc-800/80 mb-4" />
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </motion.div>
             </div>
           )}
-        </aside>
+        </AnimatePresence>
 
         {/* Mobile Navigation Drawer */}
         <AnimatePresence>
@@ -423,12 +426,12 @@ export function AppLayout({ children }) {
                 animate={{ x: 0 }}
                 exit={{ x: "-100%" }}
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed inset-y-0 left-0 w-60 bg-zinc-950 border-r border-zinc-800 p-4 flex flex-col justify-between shadow-2xl"
+                className="fixed inset-y-0 left-0 w-64 bg-zinc-950 border-r border-zinc-800 p-5 flex flex-col justify-between shadow-2xl"
               >
                 <div>
                   <div className="flex items-center justify-between pb-4 border-b border-zinc-800 mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="h-6 w-6 rounded-md bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
                         S
                       </div>
                       <span className="font-semibold text-sm text-zinc-100">SmartSupply</span>
@@ -451,9 +454,9 @@ export function AppLayout({ children }) {
                         href={item.href}
                         prefetch={true}
                         onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                           pathname === item.href
-                            ? "bg-zinc-800 text-white font-semibold border border-zinc-700/60"
+                            ? "bg-zinc-800 text-white border border-zinc-700/60"
                             : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
                         }`}
                       >
@@ -477,11 +480,6 @@ export function AppLayout({ children }) {
             </div>
           )}
         </AnimatePresence>
-
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-7xl mx-auto w-full">
-          {children}
-        </main>
       </div>
 
       {/* Floating AI Assistant Trigger */}
@@ -497,44 +495,6 @@ export function AppLayout({ children }) {
 
       {/* Slide-Over AI Drawer */}
       <AIAssistantDrawer isOpen={aiDrawerOpen} onClose={() => setAiDrawerOpen(false)} />
-
-      {/* Edit Profile Name Modal */}
-      <Modal
-        isOpen={editProfileOpen}
-        onClose={() => setEditProfileOpen(false)}
-        title="Update Profile Name"
-      >
-        <form onSubmit={handleSaveProfileName} className="space-y-4">
-          <p className="text-xs text-zinc-400">
-            Customize your displayed user name and the avatar initial shown in the navigation bar and workspace.
-          </p>
-          <Input
-            label="Full User Name"
-            placeholder="e.g. Alex Reynolds"
-            required
-            value={profileNameInput}
-            onChange={(e) => setProfileNameInput(e.target.value)}
-          />
-          <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setEditProfileOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              disabled={profileSaving}
-            >
-              {profileSaving ? "Saving..." : "Save Name"}
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 }

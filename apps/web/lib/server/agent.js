@@ -479,6 +479,215 @@ function matchCustomerFromText(text, customers) {
   return null;
 }
 
+/**
+ * Intelligently extracts customer details from natural language text, merging with previous state.
+ */
+function extractCustomerDetails(text, previous = {}) {
+  const result = {
+    name: previous.name || "",
+    industry: previous.industry || "",
+    phone: previous.phone || "",
+    email: previous.email || "",
+    contactName: previous.contactName || "",
+    accountNo: previous.accountNo || "",
+  };
+
+  const cleanText = text.replace(/[\r\n]+/g, " ").trim();
+
+  // 1. Phone extraction
+  const phonePatterns = [
+    /(?:contact\s*(?:number|no)?|phone\s*(?:number|no)?|cell|mobile|tel)\s*(?:is|:|=)?\s*([+0-9\-\s().]{7,25})/i,
+    /\b(?:\+?\d{1,4}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,5}\b/,
+    /\b0\d{9,11}\b/
+  ];
+  for (const pat of phonePatterns) {
+    const m = cleanText.match(pat);
+    if (m) {
+      const cand = (m[1] || m[0]).trim();
+      const digitsOnly = cand.replace(/[^0-9]/g, "");
+      if (digitsOnly.length >= 7) {
+        result.phone = cand;
+        break;
+      }
+    }
+  }
+
+  // 2. Email extraction
+  const emailMatch = cleanText.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
+  if (emailMatch) {
+    result.email = emailMatch[0];
+  }
+
+  // 3. Industry / Domain extraction
+  const indExplicit = cleanText.match(/(?:industry|domain|sector|field)\s*(?:is|:|=)?\s*([^,\n;]+?)(?:,|;|\.|\bwhile\b|\band\b|\bwith\b|\bphone\b|\bcontact\b|\bemail\b|\bname\b|\bcompany\b|$)/i);
+  if (indExplicit && indExplicit[1].trim()) {
+    result.industry = indExplicit[1].trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  } else if (!result.industry) {
+    const mOf = cleanText.match(/(?:customer|client|account)\s+of\s+([^,;\n]+?)\s+(?:client|account|customer|company)/i);
+    const mFor = cleanText.match(/(?:customer|client|account)\s+for\s+([^,;\n]+?)\s+(?:client|account|customer|company)/i);
+    const mType = cleanText.match(/(?:create|add|new)\s+(?:a\s+)?(?:new\s+)?([a-zA-Z\s]+?)\s+(?:client|customer|account)\b/i);
+    const candidate = (mOf && mOf[1]) || (mFor && mFor[1]) || (mType && mType[1]);
+    if (candidate) {
+      const cleaned = candidate.replace(/^(?:a\s+|an\s+|the\s+)+/i, "").trim();
+      if (!/^(?:customer|client|account|user|new)$/i.test(cleaned)) {
+        result.industry = cleaned.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+      }
+    }
+  }
+
+  // 4. Contact person name
+  const contactNameMatch = cleanText.match(/(?:contact\s*person|primary\s*contact|person\s*in\s*charge|rep)\s*(?:is|:|=)?\s*([a-zA-Z\s]+?)(?:,|;|\.|\bwhile\b|\band\b|\bwith\b|\bphone\b|\bcontact\s*number\b|\bemail\b|$)/i);
+  if (contactNameMatch && contactNameMatch[1].trim()) {
+    result.contactName = contactNameMatch[1].trim();
+  }
+
+  // 5. Company / Customer Name extraction
+  const nameExplicit = cleanText.match(/(?:company\s*name|company|customer\s*name|client\s*name|business\s*name|account\s*name|name)\s*(?:is|:|=)?\s*([^,\n;]+?)(?:,|;|\.|\bwhile\b|\band\b|\bwith\b|\bphone\b|\bcontact\b|\bindustry\b|\bdomain\b|\bemail\b|$)/i);
+  if (nameExplicit && nameExplicit[1].trim()) {
+    const cand = nameExplicit[1].replace(/^(?:a\s+|an\s+|the\s+)+/i, "").trim();
+    if (!/^(?:customer|client|account|new)$/i.test(cand)) {
+      result.name = cand;
+    }
+  } else if (!result.name) {
+    const isCommandPhrase = /^(?:please\s+)?(?:can you\s+)?(?:create|add|new|register|insert)\s+(?:a\s+)?(?:new\s+)?(?:customer|account|client)/i.test(cleanText);
+    if (!isCommandPhrase) {
+      let stripped = cleanText
+        .replace(/(?:contact\s*(?:number|no)?|phone\s*(?:number|no)?|cell|mobile|tel)\s*(?:is|:|=)?\s*[+0-9\-\s().]{7,25}/gi, "")
+        .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "")
+        .replace(/(?:industry|domain|sector|field)\s*(?:is|:|=)?\s*[^,\n;]+/gi, "")
+        .replace(/^(?:company\s+is|name\s+is|it\s+is|they\s+are|called|named)\s+/i, "")
+        .replace(/[,;.\s]+$/g, "")
+        .trim();
+      if (stripped.length >= 2 && !/^(?:customer|client|account)$/i.test(stripped)) {
+        result.name = stripped;
+      }
+    }
+  }
+
+  // 6. Account number
+  const acctMatch = cleanText.match(/(?:customer\s+account|account\s+no|account\s+number|account\s+#|acc\s+no)\s*[:#]?\s*([a-zA-Z0-9_-]+)/i);
+  if (acctMatch) {
+    result.accountNo = acctMatch[1].trim();
+  }
+
+  // Fallback clean email if missing
+  if (!result.email && result.name) {
+    const cleanDomain = result.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (cleanDomain) {
+      result.email = `contact@${cleanDomain}.com`;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Intelligently extracts lead details from natural language text, merging with previous state.
+ */
+function extractLeadDetails(text, previous = {}) {
+  const result = {
+    title: previous.title || "",
+    value: previous.value || 0,
+    stage: previous.stage || "New",
+    hasExplicitValue: Boolean(previous.hasExplicitValue),
+    hasExplicitTitle: Boolean(previous.hasExplicitTitle),
+  };
+
+  const cleanText = text.replace(/[\r\n]+/g, " ").trim();
+
+  // 1. Value extraction
+  const valueMatch = cleanText.match(/(?:deal\s*size|value|amount|worth|size|\$)\s*[:=]?\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i) ||
+    cleanText.match(/\$([0-9,]+(?:\.[0-9]+)?k?)/i);
+  if (valueMatch) {
+    let raw = valueMatch[1].replace(/,/g, "").toLowerCase();
+    let mult = 1;
+    if (raw.endsWith("k")) { mult = 1000; raw = raw.replace("k", ""); }
+    const p = parseFloat(raw) * mult;
+    if (!isNaN(p) && p > 0) {
+      result.value = p;
+      result.hasExplicitValue = true;
+    }
+  }
+
+  // 2. Stage extraction
+  const stageInfo = extractStageFromText(cleanText);
+  if (stageInfo && stageInfo.canonical) {
+    result.stage = stageInfo.canonical;
+  }
+
+  // 3. Title / Company extraction
+  const titleExplicit = cleanText.match(/(?:company\s*name|company|lead\s*name|lead|client\s*name|prospect\s*name|prospect|title|name)\s*(?:is|:|=)?\s*([^,\n;]+?)(?:,|;|\.|\bwhile\b|\band\b|\bwith\b|\bvalue\b|\bamount\b|\$|\bdeal\b|\bstage\b|$)/i);
+  if (titleExplicit && titleExplicit[1].trim()) {
+    const cand = titleExplicit[1].replace(/^(?:a\s+|an\s+|the\s+)+/i, "").trim();
+    if (!/^(?:lead|deal|opportunity|new lead)$/i.test(cand)) {
+      result.title = cand;
+      result.hasExplicitTitle = true;
+    }
+  } else if (!result.hasExplicitTitle) {
+    const isCommandPhrase = /^(?:please\s+)?(?:can you\s+)?(?:create|add|new|register|insert)\s+(?:a\s+)?(?:new\s+)?(?:lead|deal|opportunity)/i.test(cleanText);
+    if (!isCommandPhrase) {
+      let stripped = cleanText
+        .replace(/(?:deal\s*size|value|amount|worth|size|\$)\s*[:=]?\s*\$?[0-9,]+(?:\.[0-9]+)?k?/gi, "")
+        .replace(/\$[0-9,]+(?:\.[0-9]+)?k?/gi, "")
+        .replace(/(?:stage|status)\s*[:=]?\s*[a-zA-Z]+/gi, "")
+        .replace(/^(?:company\s+is|name\s+is|it\s+is|they\s+are|called|named)\s+/i, "")
+        .replace(/[,;.\s]+$/g, "")
+        .trim();
+      if (stripped.length >= 2 && !/^(?:lead|deal|opportunity)$/i.test(stripped)) {
+        result.title = stripped;
+        result.hasExplicitTitle = true;
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Intelligently extracts task details from natural language text, merging with previous state.
+ */
+function extractTaskDetails(text, previous = {}, leads = []) {
+  const result = {
+    title: previous.title || "",
+    dueDate: previous.dueDate || "",
+    leadId: previous.leadId || null,
+    leadTitle: previous.leadTitle || null,
+    hasExplicitTitle: Boolean(previous.hasExplicitTitle),
+    hasExplicitDueDate: Boolean(previous.hasExplicitDueDate),
+  };
+
+  const cleanText = text.replace(/[\r\n]+/g, " ").trim();
+
+  const dateInfo = extractDueDateFromText(cleanText);
+  if (dateInfo) {
+    result.dueDate = dateInfo.dateStr;
+    result.hasExplicitDueDate = true;
+  }
+
+  const matchedLead = matchLeadFromText(cleanText, leads);
+  if (matchedLead) {
+    result.leadId = matchedLead.id;
+    result.leadTitle = matchedLead.title;
+  }
+
+  let taskTitle = cleanText
+    .replace(/^(?:please\s+)?(?:can you\s+)?(?:add|create|new|schedule|set up|register|insert)\s+(?:a\s+)?(?:follow\s*-?\s*up\s+)?task\s+(?:to|for|of|named|about)?\s*/i, "")
+    .trim();
+  if (dateInfo) {
+    taskTitle = taskTitle
+      .replace(new RegExp(`(?:schedule(?:d)?\\s+)?(?:on|by|due|for)?\\s*${dateInfo.rawMatched}`, "i"), "")
+      .replace(/(?:schedule(?:d)?\\s+on|due\s+on|on\s*$)/i, "")
+      .trim();
+  }
+  taskTitle = taskTitle.replace(/^[,\-:\s]+|[,\-:\s]+$/g, "");
+  if (taskTitle.length >= 3 && !/^(?:task|follow\s*-?\s*up|todo)$/i.test(taskTitle)) {
+    result.title = taskTitle.charAt(0).toUpperCase() + taskTitle.slice(1);
+    result.hasExplicitTitle = true;
+  }
+
+  return result;
+}
+
 // -------------------------------------------------------------
 // INTENT CLASSIFICATION HELPERS
 // -------------------------------------------------------------
@@ -869,12 +1078,11 @@ export async function executeAgentChat(context, { agentId, message, conversation
   // Check for active pending actions awaiting HITL confirmation
   const activePendingActions = await storeAdapter.getPendingActions(context);
   let activePending = null;
-  if (conversationId) {
-    if (currentWorkflow?.pendingActionId) {
-      activePending = activePendingActions.find((a) => a.id === currentWorkflow.pendingActionId);
-    }
-  } else {
-    activePending = activePendingActions.length > 0 ? activePendingActions[0] : null;
+  if (currentWorkflow?.pendingActionId) {
+    activePending = activePendingActions.find((a) => a.id === currentWorkflow.pendingActionId);
+  }
+  if (!activePending && activePendingActions.length > 0) {
+    activePending = activePendingActions[0];
   }
 
   // =============================================================
@@ -1410,53 +1618,72 @@ export async function executeAgentChat(context, { agentId, message, conversation
     !isExplicitReadQuery(lowerMsg)
   ) {
     toolsUsed.push("crm_lead_creator");
-    let title = message
-      .replace(/^(?:the\s+name\s+is\s+|company\s+is\s+|lead\s+is\s+|for\s+|prospect\s+is\s+)/i, "")
-      .replace(/(?:with|value|stage|amount|\$).*/i, "")
-      .trim();
-    if (!title || title.length < 2) title = "New Prospect Lead";
+    const extracted = extractLeadDetails(message, currentWorkflow.partialData || {});
 
-    let value = 0;
-    const valueMatch = message.match(/(?:deal\s*size|value|amount|worth|size|\$)\s*[:=]?\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i) ||
-      message.match(/\$([0-9,]+(?:\.[0-9]+)?k?)/i);
-    if (valueMatch) {
-      let raw = valueMatch[1].replace(/,/g, "").toLowerCase();
-      let mult = 1;
-      if (raw.endsWith("k")) { mult = 1000; raw = raw.replace("k", ""); }
-      const p = parseFloat(raw) * mult;
-      if (!isNaN(p)) value = p;
-    }
+    if (!extracted.hasExplicitTitle && !extracted.hasExplicitValue) {
+      requiresConfirmation = false;
+      answer = "What is the company or prospect name for this new lead, and what is the estimated deal value?";
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_LEAD",
+          step: "AWAITING_LEAD_DETAILS",
+          partialData: extracted,
+        });
+      }
+    } else if (extracted.hasExplicitTitle && !extracted.hasExplicitValue) {
+      requiresConfirmation = false;
+      answer = `What is the estimated deal value for **${extracted.title}** (e.g. $50,000)?`;
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_LEAD",
+          step: "AWAITING_LEAD_DETAILS",
+          partialData: extracted,
+        });
+      }
+    } else if (!extracted.hasExplicitTitle && extracted.hasExplicitValue) {
+      requiresConfirmation = false;
+      answer = `What is the company or prospect name for this $${extracted.value.toLocaleString()} lead?`;
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_LEAD",
+          step: "AWAITING_LEAD_DETAILS",
+          partialData: extracted,
+        });
+      }
+    } else {
+      const title = extracted.title;
+      const value = extracted.value;
+      const stage = extracted.stage || "New";
 
-    const stageInfo = extractStageFromText(message);
-    const stage = (stageInfo && stageInfo.canonical) || "New";
+      const payload = {
+        title,
+        name: title,
+        companyName: title,
+        value,
+        stage,
+        priority: "HIGH",
+        notes: "Created via AI Assistant",
+      };
 
-    const payload = {
-      title,
-      name: title,
-      companyName: title,
-      value,
-      stage,
-      priority: "HIGH",
-      notes: "Created via AI Assistant",
-    };
-
-    requiresConfirmation = true;
-    pendingAction = await storeAdapter.createPendingAction(context, {
-      actionType: "CREATE_LEAD",
-      title: `Create Lead: ${title}`,
-      summary: `Register new lead "${title}" ($${value.toLocaleString()}) in stage ${stage}.`,
-      payload,
-    });
-
-    if (conversationId) {
-      await storeAdapter.setConversationState(context, conversationId, {
-        intent: "CREATE_LEAD",
-        step: "AWAITING_CONFIRMATION",
-        lastMentionedLeadTitle: title,
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "CREATE_LEAD",
+        title: `Create Lead: ${title}`,
+        summary: `Register new lead "${title}" ($${value.toLocaleString()}) in stage ${stage}.`,
+        payload,
       });
-    }
 
-    answer = `I have prepared the request to create lead **${title}** ($${value.toLocaleString()} — stage: *${stage}*).\n\nPlease confirm below to add this lead to your pipeline.`;
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_LEAD",
+          step: "AWAITING_CONFIRMATION",
+          data: payload,
+          lastMentionedLeadTitle: title,
+        });
+      }
+
+      answer = `I have prepared the request to create lead **${title}** ($${value.toLocaleString()} — stage: *${stage}*).\n\nPlease confirm below to add this lead to your pipeline.`;
+    }
   }
 
   // 3E. CREATE_TASK: Awaiting Task Details
@@ -1536,53 +1763,73 @@ export async function executeAgentChat(context, { agentId, message, conversation
     !isExplicitReadQuery(lowerMsg)
   ) {
     toolsUsed.push("crm_customer_creator");
-    let customerName = message.replace(/(?:industry|domain|contact|phone|email|\+).*/i, "").trim();
-    customerName = customerName.replace(/^(?:the\s+name\s+is\s+|company\s+is\s+|for\s+)/i, "").trim();
-    if (!customerName) customerName = "New Customer Account";
+    const extracted = extractCustomerDetails(message, currentWorkflow.partialData || {});
 
-    let industry = "General";
-    const indMatch = message.match(/(?:industry|domain|sector)\s*(?:is|:|=)?\s*([^,\n;]+)/i);
-    if (indMatch) industry = indMatch[1].trim();
+    const missingFields = [];
+    if (!extracted.name) missingFields.push("company name");
+    if (!extracted.industry) missingFields.push("industry or domain");
+    if (!extracted.phone) missingFields.push("primary contact phone number");
 
-    let primaryContact = "";
-    const contactMatch = message.match(/(?:contact|phone|person)\s*(?:is|:|=)?\s*([^,\n;]+)/i);
-    if (contactMatch) primaryContact = contactMatch[1].trim();
+    if (missingFields.length > 0) {
+      requiresConfirmation = false;
+      let promptQuestion = "";
+      if (extracted.name && !extracted.industry && extracted.phone) {
+        promptQuestion = `What is the industry or domain for **${extracted.name}** (e.g., Hardware Supply, Logistics, Retail)?`;
+      } else if (extracted.name && extracted.industry && !extracted.phone) {
+        promptQuestion = `What is the primary contact phone number for **${extracted.name}**?`;
+      } else if (!extracted.name && extracted.industry && extracted.phone) {
+        promptQuestion = `What is the company name for this new **${extracted.industry}** customer?`;
+      } else {
+        promptQuestion = `Please specify the ${missingFields.join(" and ")} to complete creating the customer account.`;
+      }
 
-    const payload = {
-      accountNo: (Date.now() % 1000).toString(),
-      name: customerName,
-      company: customerName,
-      industry,
-      contactName: primaryContact || "Primary Contact",
-      email: primaryContact && primaryContact.includes("@") ? primaryContact : "contact@client.com",
-      phone: primaryContact && /^\+?[0-9\-\s()]+$/.test(primaryContact) ? primaryContact : "+1 (555) 019-2831",
-      status: "ACTIVE",
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
+      answer = promptQuestion;
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_CUSTOMER",
+          step: "AWAITING_CUSTOMER_DETAILS",
+          partialData: extracted,
+        });
+      }
+    } else {
+      const accountNo = extracted.accountNo || `C-${Math.floor(100 + Math.random() * 900)}`;
+      const payload = {
+        accountNo,
+        name: extracted.name,
+        company: extracted.name,
+        industry: extracted.industry,
+        contactName: extracted.contactName || "Primary Contact",
+        email: extracted.email || `contact@${extracted.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
+        phone: extracted.phone,
+        status: "ACTIVE",
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
 
-    requiresConfirmation = true;
-    pendingAction = await storeAdapter.createPendingAction(context, {
-      actionType: "CREATE_CUSTOMER",
-      title: `Create Customer Account: ${payload.name}`,
-      summary: `Register customer account #${payload.accountNo} (${payload.name}) in ${payload.industry}.`,
-      payload,
-    });
-
-    if (conversationId) {
-      await storeAdapter.setConversationState(context, conversationId, {
-        intent: "CREATE_CUSTOMER",
-        step: "AWAITING_CONFIRMATION",
-        data: payload,
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "CREATE_CUSTOMER",
+        title: `Create Customer Account: ${payload.name}`,
+        summary: `Register customer account #${payload.accountNo} (${payload.name}) in ${payload.industry}.`,
+        payload,
       });
-    }
 
-    answer = `I have prepared the request to create customer account **${payload.name}**:\n\n` +
-      `• **Company / Customer:** ${payload.name}\n` +
-      `• **Account #:** #${payload.accountNo}\n` +
-      `• **Industry:** ${payload.industry}\n` +
-      `• **Primary Contact:** ${payload.phone}\n\n` +
-      `Please confirm below before I proceed with registering this customer account.`;
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_CUSTOMER",
+          step: "AWAITING_CONFIRMATION",
+          pendingActionId: pendingAction?.id,
+          data: payload,
+        });
+      }
+
+      answer = `I have prepared the request to create customer account **${payload.name}**:\n\n` +
+        `• **Company / Customer:** ${payload.name}\n` +
+        `• **Account #:** #${payload.accountNo}\n` +
+        `• **Industry:** ${payload.industry}\n` +
+        `• **Primary Contact:** ${payload.phone}\n\n` +
+        `Please confirm below before I proceed with registering this customer account.`;
+    }
   }
 
   // 3G. DELETE_LEAD: Awaiting Lead Identifier
@@ -2209,41 +2456,25 @@ export async function executeAgentChat(context, { agentId, message, conversation
   else if (isLeadCreationIntent(lowerMsg, message)) {
     toolsUsed.push("crm_lead_creator");
 
-    // Extract title
-    let title = "";
-    const titleMatch = message.match(/(?:lead|deal|opportunity)\s+(?:for\s+|named\s+|called\s+)?([^,\n;]+)/i);
-    if (titleMatch) {
-      title = titleMatch[1]
-        .replace(/(?:with|value|stage|amount|\$).*/i, "")
-        .replace(/^(?:a\s+|an\s+|new\s+)+/i, "")
-        .trim();
-    }
-    if (!title || title.length < 2) {
-      title = "New Prospect Lead";
-    }
+    const extracted = extractLeadDetails(message);
 
-    // Extract value safely: preceded by deal size/value/amount/worth/$
-    let value = 0;
-    const valueMatch = message.match(/(?:deal\s*size|value|amount|worth|size|\$)\s*[:=]?\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i) ||
-      message.match(/\$([0-9,]+(?:\.[0-9]+)?k?)/i);
-
-    if (valueMatch) {
-      let raw = valueMatch[1].replace(/,/g, "").toLowerCase();
-      let mult = 1;
-      if (raw.endsWith("k")) { mult = 1000; raw = raw.replace("k", ""); }
-      const p = parseFloat(raw) * mult;
-      if (!isNaN(p)) value = p;
-    }
-
-    // If both title was not specified and value is 0
-    const isGenericLead = (!titleMatch || title === "New Prospect Lead" || /^(?:lead|deal|opportunity|new lead|prospect)$/i.test(title)) && value === 0;
-    if (isGenericLead) {
+    if (!extracted.hasExplicitTitle || !extracted.hasExplicitValue) {
       requiresConfirmation = false;
-      answer = "What is the company or prospect name for this new lead, and what is the estimated deal value?";
+      let promptQuestion = "";
+      if (!extracted.hasExplicitTitle && !extracted.hasExplicitValue) {
+        promptQuestion = "What is the company or prospect name for this new lead, and what is the estimated deal value?";
+      } else if (extracted.hasExplicitTitle && !extracted.hasExplicitValue) {
+        promptQuestion = `What is the estimated deal value for **${extracted.title}** (e.g., $50,000)?`;
+      } else {
+        promptQuestion = `What is the company or prospect name for this $${extracted.value.toLocaleString()} lead?`;
+      }
+
+      answer = promptQuestion;
       if (conversationId) {
         await storeAdapter.setConversationState(context, conversationId, {
           intent: "CREATE_LEAD",
           step: "AWAITING_LEAD_DETAILS",
+          partialData: extracted,
         });
       }
       return {
@@ -2259,8 +2490,9 @@ export async function executeAgentChat(context, { agentId, message, conversation
       };
     }
 
-    const stageInfo = extractStageFromText(message);
-    const stage = (stageInfo && stageInfo.canonical) || "New";
+    const title = extracted.title;
+    const value = extracted.value;
+    const stage = extracted.stage || "New";
 
     const payload = {
       title,
@@ -2284,6 +2516,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
       await storeAdapter.setConversationState(context, conversationId, {
         intent: "CREATE_LEAD",
         step: "AWAITING_CONFIRMATION",
+        data: payload,
         lastMentionedLeadTitle: title,
       });
     }
@@ -2297,50 +2530,36 @@ export async function executeAgentChat(context, { agentId, message, conversation
   else if (isCustomerCreationIntent(lowerMsg, message)) {
     toolsUsed.push("crm_customer_creator");
 
-    let accountNo = "";
-    const acctMatch = message.match(/(?:customer\s+account|account\s+no|account\s+number|account\s+#|account|acc\s+no)\s*[:#]?\s*([a-zA-Z0-9_-]+)/i);
-    if (acctMatch) accountNo = acctMatch[1].trim();
+    const extracted = extractCustomerDetails(message);
 
-    let industry = "";
-    const indMatch = message.match(/(?:industry|domain|sector)\s*(?:is|:|=)\s*([^,\n;]+)/i);
-    if (indMatch) industry = indMatch[1].trim();
+    const missingFields = [];
+    if (!extracted.name) missingFields.push("company name");
+    if (!extracted.industry) missingFields.push("industry or domain");
+    if (!extracted.phone) missingFields.push("primary contact phone number");
 
-    let primaryContact = "";
-    const contactMatch = message.match(/(?:primary\s+contact|contact\s+person|contact|phone)\s*(?:is|:|=)\s*([^,\n;]+)/i);
-    if (contactMatch) primaryContact = contactMatch[1].trim();
-
-    let status = "ACTIVE";
-    const statusMatch = message.match(/(?:status)\s*(?:is|:|=)?\s*([a-zA-Z]+)/i);
-    if (statusMatch) status = statusMatch[1].trim().toUpperCase();
-
-    let createdAt = new Date().toISOString();
-    const dateMatch = message.match(/(?:created\s+on|created\s+at|created|date)\s*(?:is|:|=)?\s*([0-9\/\-\.]+)/i);
-    if (dateMatch) {
-      const rawDate = dateMatch[1].trim();
-      const parsed = new Date(rawDate);
-      if (!isNaN(parsed.getTime())) createdAt = parsed.toISOString();
-    }
-
-    let customerName = "";
-    const nameMatch = message.match(/(?:for|named|called|company|name|title)\s*(?:is|:|=)?\s*([^,\n;]+)/i);
-    if (nameMatch) {
-      customerName = nameMatch[1].replace(/^(?:a\s+|an\s+|the\s+)+/i, "").trim();
-    } else if (industry && /industries|logistics|systems|corp|inc|ltd|group|technologies|solutions/i.test(industry)) {
-      customerName = industry;
-    } else if (accountNo) {
-      customerName = `Customer Account #${accountNo}`;
-    } else {
-      customerName = "New Customer Account";
-    }
-
-    const isGenericCustomer = (!nameMatch || customerName === "New Customer Account" || /^(?:customer|client|account|new customer)$/i.test(customerName)) && !industry && !primaryContact;
-    if (isGenericCustomer) {
+    if (missingFields.length > 0) {
       requiresConfirmation = false;
-      answer = "What is the company name for this new customer account, and what is their industry or primary contact?";
+      let promptQuestion = "";
+      if (!extracted.name && !extracted.phone && extracted.industry) {
+        promptQuestion = `What is the company name and primary contact phone number for this new **${extracted.industry}** customer?`;
+      } else if (!extracted.name && !extracted.industry && !extracted.phone) {
+        promptQuestion = "What is the company name, industry or domain, and primary contact phone number for this new customer account?";
+      } else if (extracted.name && !extracted.industry && !extracted.phone) {
+        promptQuestion = `What is the industry or domain, and primary contact phone number for **${extracted.name}**?`;
+      } else if (extracted.name && extracted.phone && !extracted.industry) {
+        promptQuestion = `What is the industry or domain for **${extracted.name}** (e.g., Hardware Supply, Logistics, Retail)?`;
+      } else if (extracted.name && extracted.industry && !extracted.phone) {
+        promptQuestion = `What is the primary contact phone number for **${extracted.name}**?`;
+      } else {
+        promptQuestion = `Please provide the ${missingFields.join(" and ")} for this customer account.`;
+      }
+
+      answer = promptQuestion;
       if (conversationId) {
         await storeAdapter.setConversationState(context, conversationId, {
           intent: "CREATE_CUSTOMER",
           step: "AWAITING_CUSTOMER_DETAILS",
+          partialData: extracted,
         });
       }
       return {
@@ -2356,17 +2575,18 @@ export async function executeAgentChat(context, { agentId, message, conversation
       };
     }
 
+    const accountNo = extracted.accountNo || `C-${Math.floor(100 + Math.random() * 900)}`;
     const payload = {
-      accountNo: accountNo || (Date.now() % 1000).toString(),
-      name: customerName,
-      company: customerName,
-      industry: industry || "Aeropax Industries",
-      contactName: primaryContact && !/^\+?[0-9\-\s()]+$/.test(primaryContact) ? primaryContact : "Primary Contact",
-      email: primaryContact && primaryContact.includes("@") ? primaryContact : "contact@client.com",
-      phone: /^\+?[0-9\-\s()]+$/.test(primaryContact) ? primaryContact : (primaryContact || "+1 (555) 019-2831"),
-      status,
-      isActive: status === "ACTIVE",
-      createdAt,
+      accountNo,
+      name: extracted.name,
+      company: extracted.name,
+      industry: extracted.industry,
+      contactName: extracted.contactName || "Primary Contact",
+      email: extracted.email || `contact@${extracted.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
+      phone: extracted.phone,
+      status: "ACTIVE",
+      isActive: true,
+      createdAt: new Date().toISOString(),
     };
 
     requiresConfirmation = true;
@@ -2377,11 +2597,20 @@ export async function executeAgentChat(context, { agentId, message, conversation
       payload,
     });
 
-    answer = `I have prepared the request to create a customer account with the following details:\n\n` +
-      `• **Customer Account:** #${payload.accountNo} (${payload.name})\n` +
-      `• **Industry / Domain:** ${payload.industry}\n` +
-      `• **Primary Contact:** ${payload.phone || payload.contactName}\n` +
-      `• **Status:** ${payload.status}\n\n` +
+    if (conversationId) {
+      await storeAdapter.setConversationState(context, conversationId, {
+        intent: "CREATE_CUSTOMER",
+        step: "AWAITING_CONFIRMATION",
+        pendingActionId: pendingAction?.id,
+        data: payload,
+      });
+    }
+
+    answer = `I have prepared the request to create customer account **${payload.name}**:\n\n` +
+      `• **Company / Customer:** ${payload.name}\n` +
+      `• **Account #:** #${payload.accountNo}\n` +
+      `• **Industry:** ${payload.industry}\n` +
+      `• **Primary Contact:** ${payload.phone}\n\n` +
       `Please confirm below before I proceed with registering this customer account.`;
   }
 

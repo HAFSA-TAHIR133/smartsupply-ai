@@ -495,6 +495,7 @@ function normalizeCustomer(c) {
     accountNo: c.accountNo || `C-${(c.id || "").slice(0, 4).toUpperCase()}`,
     name: c.name || c.company || "Customer Account",
     company: c.company || c.name || "Customer Company",
+    industry: c.industry || "General",
     email: c.email || "contact@client.com",
     phone: c.phone || "+1 (555) 019-2831",
     status: (c.status || "ACTIVE").toUpperCase(),
@@ -532,12 +533,13 @@ export async function createCustomerInDb(tenantId, data) {
   const company = data.company || data.name || "Commercial Client";
   const status = (data.status || "ACTIVE").toUpperCase();
   const totalSpend = Math.max(0, parseFloat(data.totalSpend ?? data.value ?? 0));
+  const industry = data.industry || data.domain || "General";
 
   const res = await p.query(
-    `INSERT INTO customers (id, "tenantId", name, email, phone, company, status, "totalSpend", "createdAt", "updatedAt")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+    `INSERT INTO customers (id, "tenantId", name, email, phone, company, status, "totalSpend", industry, "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
      RETURNING *;`,
-    [id, validTenant, name, email, phone, company, status, totalSpend]
+    [id, validTenant, name, email, phone, company, status, totalSpend, industry]
   );
   return normalizeCustomer(res.rows[0]);
 }
@@ -570,13 +572,14 @@ export async function updateCustomerInDb(id, tenantId, data) {
     const company = data.company || existing.company;
     const status = (data.status !== undefined ? data.status : (data.isActive !== undefined ? (data.isActive ? "ACTIVE" : "INACTIVE") : existing.status)).toUpperCase();
     const totalSpend = data.totalSpend !== undefined ? parseFloat(data.totalSpend) : existing.totalSpend;
+    const industry = data.industry !== undefined ? data.industry : (existing.industry || "General");
 
     const res = await p.query(
       `UPDATE customers
-       SET name = $1, email = $2, phone = $3, company = $4, status = $5, "totalSpend" = $6, "updatedAt" = NOW()
-       WHERE id = $7
+       SET name = $1, email = $2, phone = $3, company = $4, status = $5, "totalSpend" = $6, industry = $7, "updatedAt" = NOW()
+       WHERE id = $8
        RETURNING *;`,
-      [name, email, phone, company, status, totalSpend, existing.id]
+      [name, email, phone, company, status, totalSpend, industry, existing.id]
     );
     return normalizeCustomer(res.rows[0]);
   } catch (err) {
@@ -840,7 +843,17 @@ export async function createPendingActionInDb(tenantId, userId, action) {
   const p = getNeonPool();
   if (!p || !isValidUuid(tenantId)) return null;
   const actionId = action.id && isValidUuid(action.id) ? action.id : crypto.randomUUID();
-  const userFk = isValidUuid(userId) ? userId : null;
+  let userFk = isValidUuid(userId) ? userId : null;
+  if (!userFk) {
+    try {
+      const uRes = await p.query('SELECT id FROM users WHERE "tenantId" = $1 LIMIT 1;', [tenantId]);
+      userFk = uRes.rows[0]?.id || null;
+      if (!userFk) {
+        const uAny = await p.query('SELECT id FROM users LIMIT 1;');
+        userFk = uAny.rows[0]?.id || null;
+      }
+    } catch {}
+  }
   const res = await p.query(
     `INSERT INTO pending_actions (id, "tenantId", "userId", "actionType", "targetEntity", params, summary, status, "expiresAt", "createdAt", "updatedAt")
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
