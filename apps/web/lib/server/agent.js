@@ -550,7 +550,16 @@ function extractCustomerDetails(text, previous = {}) {
     }
   } else if (!result.name) {
     const isCommandPhrase = /^(?:please\s+)?(?:can you\s+)?(?:create|add|new|register|insert)\s+(?:a\s+)?(?:new\s+)?(?:customer|account|client)/i.test(cleanText);
-    if (!isCommandPhrase) {
+    if (isCommandPhrase) {
+      const trailingPart = cleanText
+        .replace(/^(?:please\s+)?(?:can you\s+)?(?:create|add|new|register|insert)\s+(?:a\s+)?(?:new\s+)?(?:customer|account|client)\s*(?:account|details)?/i, "")
+        .replace(/^(?:named|called|for|of)\s+/i, "")
+        .replace(/(?:with|industry|domain|sector|contact|phone|email|\+).*/i, "")
+        .trim();
+      if (trailingPart && !/^(?:for|of|with|a|an|the|new|client|customer|account)$/i.test(trailingPart) && trailingPart.length >= 2) {
+        result.name = trailingPart;
+      }
+    } else {
       let stripped = cleanText
         .replace(/(?:contact\s*(?:number|no)?|phone\s*(?:number|no)?|cell|mobile|tel)\s*(?:is|:|=)?\s*[+0-9\-\s().]{7,25}/gi, "")
         .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "")
@@ -785,9 +794,22 @@ function isLeadCreationIntent(lowerMsg, message) {
  */
 function isCustomerCreationIntent(lowerMsg, message) {
   if (isDeleteIntent(lowerMsg, message)) return false;
+  if (isExplicitReadQuery(lowerMsg)) return false;
+
   const hasCreateVerb = /(?:add|create|new|register|insert|open)\b/i.test(message);
   const hasCustomerNoun = /\b(?:customer|account|client)\b/i.test(message);
-  return hasCreateVerb && hasCustomerNoun;
+  if (hasCreateVerb && hasCustomerNoun) return true;
+
+  // Direct attribute specification: e.g. "company name is X, industry is Y, contact number is Z"
+  const hasCompany = /(?:company|business)\s*(?:name)?\s*(?:is|:|=)/i.test(message);
+  const hasIndustry = /(?:industry|domain|sector)\s*(?:is|:|=)/i.test(message);
+  const hasContact = /(?:contact|phone|cell|mobile)\s*(?:number|no)?\s*(?:is|:|=)/i.test(message);
+
+  if ((hasCompany && hasIndustry) || (hasCompany && hasContact) || (hasIndustry && hasContact)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -1047,6 +1069,38 @@ export async function executeAgentChat(context, { agentId, message, conversation
   const startTime = Date.now();
   const lowerMsg = (message || "").toLowerCase().trim();
 
+  // 1. Ensure valid finalConvId is established upfront
+  let finalConvId = conversationId;
+  if (!context.isDemo && neonDb.isNeonConfigured() && context.user?.tenantId && neonDb.isValidUuid(context.user.tenantId)) {
+    if (!finalConvId || !neonDb.isValidUuid(finalConvId)) {
+      try {
+        const newConv = await neonDb.createConversationInDb(context.user.tenantId, context.user.id, {
+          title: (message || "New Conversation").slice(0, 40) + ((message || "").length > 40 ? "..." : ""),
+          agentId: agentId || "supply-chain-agent",
+        });
+        if (newConv && newConv.id) {
+          finalConvId = newConv.id;
+        }
+      } catch (err) {
+        console.error("Neon init conversation error:", err.message);
+      }
+    }
+  }
+  if (!finalConvId) {
+    const isLive = !context.isDemo;
+    finalConvId = `conv-${isLive ? "live" : "demo"}-${Date.now()}`;
+  }
+
+  // Robust workflow state saver across conversation keys
+  const saveWorkflowState = async (state) => {
+    if (finalConvId) {
+      await storeAdapter.setConversationState(context, finalConvId, state);
+    }
+    if (conversationId && conversationId !== finalConvId) {
+      await storeAdapter.setConversationState(context, conversationId, state);
+    }
+  };
+
   // Load existing records strictly scoped by tenant
   const [products, leads, tasks, customers] = await Promise.all([
     storeAdapter.getProducts(context),
@@ -1066,6 +1120,12 @@ export async function executeAgentChat(context, { agentId, message, conversation
   let currentWorkflow = null;
   if (conversationId) {
     currentWorkflow = await storeAdapter.getConversationState(context, conversationId);
+  }
+  if (!currentWorkflow && finalConvId) {
+    currentWorkflow = await storeAdapter.getConversationState(context, finalConvId);
+  }
+  if (!currentWorkflow && typeof storeAdapter.getLatestConversationState === "function") {
+    currentWorkflow = await storeAdapter.getLatestConversationState(context);
   }
 
   const isAwaitingWorkflowInput = Boolean(
@@ -1784,13 +1844,11 @@ export async function executeAgentChat(context, { agentId, message, conversation
       }
 
       answer = promptQuestion;
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_CUSTOMER",
-          step: "AWAITING_CUSTOMER_DETAILS",
-          partialData: extracted,
-        });
-      }
+      await saveWorkflowState({
+        intent: "CREATE_CUSTOMER",
+        step: "AWAITING_CUSTOMER_DETAILS",
+        partialData: extracted,
+      });
     } else {
       const accountNo = extracted.accountNo || `C-${Math.floor(100 + Math.random() * 900)}`;
       const payload = {
@@ -1814,14 +1872,12 @@ export async function executeAgentChat(context, { agentId, message, conversation
         payload,
       });
 
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_CUSTOMER",
-          step: "AWAITING_CONFIRMATION",
-          pendingActionId: pendingAction?.id,
-          data: payload,
-        });
-      }
+      await saveWorkflowState({
+        intent: "CREATE_CUSTOMER",
+        step: "AWAITING_CONFIRMATION",
+        pendingActionId: pendingAction?.id,
+        data: payload,
+      });
 
       answer = `I have prepared the request to create customer account **${payload.name}**:\n\n` +
         `• **Company / Customer:** ${payload.name}\n` +
@@ -2357,96 +2413,60 @@ export async function executeAgentChat(context, { agentId, message, conversation
     if (isGenericFollowUpForLead && !associatedLead) {
       requiresConfirmation = false;
       answer = `Which lead would you like to create this follow-up task for? Please specify the lead title or ID.`;
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_TASK",
-          step: "AWAITING_LEAD",
-          dueDate,
-          taskTitle: "Follow-up meeting",
-        });
-      }
-      return {
-        answer,
-        sources,
-        toolsUsed,
-        executionTimeMs: Date.now() - startTime,
-        requiresConfirmation: false,
-        pendingAction: null,
-        executedAction: false,
-        conversationId,
-        executionMode: context.isDemo ? "DEMO" : "LIVE",
-      };
-    }
-
-    // If task title is generic or missing and no due date was specified
-    const isGenericTask = !dateInfo && (
-      !titleCandidate ||
-      titleCandidate.length < 3 ||
-      /^(?:meeting with the lead|task|follow up|todo|to-do|create a task|add a task)$/i.test(titleCandidate)
-    );
-
-    if (isGenericTask) {
+      await saveWorkflowState({
+        intent: "CREATE_TASK",
+        step: "AWAITING_LEAD",
+        dueDate,
+        taskTitle: "Follow-up meeting",
+      });
+    } else if (isGenericTask) {
       requiresConfirmation = false;
       answer = "What is the title or description of this task, and when is it scheduled for?";
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_TASK",
-          step: "AWAITING_TASK_DETAILS",
-          leadId: associatedLead ? associatedLead.id : null,
-          leadTitle: associatedLead ? associatedLead.title : null,
-        });
+      await saveWorkflowState({
+        intent: "CREATE_TASK",
+        step: "AWAITING_TASK_DETAILS",
+        leadId: associatedLead ? associatedLead.id : null,
+        leadTitle: associatedLead ? associatedLead.title : null,
+      });
+    } else {
+      if (!associatedLead && leads.length > 0) {
+        associatedLead = leads[0];
       }
-      return {
-        answer,
-        sources,
-        toolsUsed,
-        executionTimeMs: Date.now() - startTime,
-        requiresConfirmation: false,
-        pendingAction: null,
-        executedAction: false,
-        conversationId,
-        executionMode: context.isDemo ? "DEMO" : "LIVE",
+
+      const payload = {
+        title: taskTitle,
+        description: taskTitle,
+        status: "PENDING",
+        priority: "HIGH",
+        dueDate,
+        due_date: dueDate,
+        leadId: associatedLead ? associatedLead.id : null,
+        leadTitle: associatedLead ? associatedLead.title : null,
       };
-    }
 
-    if (!associatedLead && leads.length > 0) {
-      associatedLead = leads[0];
-    }
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "CREATE_TASK",
+        title: `Create Task: ${taskTitle}`,
+        summary: `Create task "${taskTitle}" due on ${dueDate}.`,
+        payload,
+      });
 
-    const payload = {
-      title: taskTitle,
-      description: taskTitle,
-      status: "PENDING",
-      priority: "HIGH",
-      dueDate,
-      due_date: dueDate,
-      leadId: associatedLead ? associatedLead.id : null,
-      leadTitle: associatedLead ? associatedLead.title : null,
-    };
-
-    requiresConfirmation = true;
-    pendingAction = await storeAdapter.createPendingAction(context, {
-      actionType: "CREATE_TASK",
-      title: `Create Task: ${taskTitle}`,
-      summary: `Create task "${taskTitle}" due on ${dueDate}.`,
-      payload,
-    });
-
-    if (conversationId) {
-      await storeAdapter.setConversationState(context, conversationId, {
+      await saveWorkflowState({
         intent: "CREATE_TASK",
         step: "AWAITING_CONFIRMATION",
+        pendingActionId: pendingAction?.id,
         data: payload,
       });
-    }
 
-    answer = `I have prepared the follow-up task:\n\n` +
-      `• **Task:** ${taskTitle}\n` +
-      `• **Due Date:** ${dueDate}\n` +
-      `• **Priority:** HIGH\n` +
-      `• **Status:** PENDING\n` +
-      (associatedLead ? `• **Associated Lead:** ${associatedLead.title} (\`${associatedLead.id}\`)\n` : "") +
-      `\nPlease confirm below before I add this task to your CRM.`;
+      answer = `I have prepared the follow-up task:\n\n` +
+        `• **Task:** ${taskTitle}\n` +
+        `• **Due Date:** ${dueDate}\n` +
+        `• **Priority:** HIGH\n` +
+        `• **Status:** PENDING\n` +
+        (associatedLead ? `• **Associated Lead:** ${associatedLead.title} (\`${associatedLead.id}\`)\n` : "") +
+        `\nPlease confirm below before I add this task to your CRM.`;
+    }
   }
 
   // =============================================================
@@ -2470,58 +2490,44 @@ export async function executeAgentChat(context, { agentId, message, conversation
       }
 
       answer = promptQuestion;
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_LEAD",
-          step: "AWAITING_LEAD_DETAILS",
-          partialData: extracted,
-        });
-      }
-      return {
-        answer,
-        sources,
-        toolsUsed,
-        executionTimeMs: Date.now() - startTime,
-        requiresConfirmation: false,
-        pendingAction: null,
-        executedAction: false,
-        conversationId,
-        executionMode: context.isDemo ? "DEMO" : "LIVE",
+      await saveWorkflowState({
+        intent: "CREATE_LEAD",
+        step: "AWAITING_LEAD_DETAILS",
+        partialData: extracted,
+      });
+    } else {
+      const title = extracted.title;
+      const value = extracted.value;
+      const stage = extracted.stage || "New";
+
+      const payload = {
+        title,
+        name: title,
+        companyName: title,
+        value,
+        stage,
+        priority: "HIGH",
+        notes: "Created via AI Assistant",
       };
-    }
 
-    const title = extracted.title;
-    const value = extracted.value;
-    const stage = extracted.stage || "New";
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "CREATE_LEAD",
+        title: `Create Lead: ${title}`,
+        summary: `Register new lead "${title}" ($${value.toLocaleString()}) in stage ${stage}.`,
+        payload,
+      });
 
-    const payload = {
-      title,
-      name: title,
-      companyName: title,
-      value,
-      stage,
-      priority: "HIGH",
-      notes: "Created via AI Assistant",
-    };
-
-    requiresConfirmation = true;
-    pendingAction = await storeAdapter.createPendingAction(context, {
-      actionType: "CREATE_LEAD",
-      title: `Create Lead: ${title}`,
-      summary: `Register new lead "${title}" ($${value.toLocaleString()}) in stage ${stage}.`,
-      payload,
-    });
-
-    if (conversationId) {
-      await storeAdapter.setConversationState(context, conversationId, {
+      await saveWorkflowState({
         intent: "CREATE_LEAD",
         step: "AWAITING_CONFIRMATION",
+        pendingActionId: pendingAction?.id,
         data: payload,
         lastMentionedLeadTitle: title,
       });
-    }
 
-    answer = `I have prepared the request to create lead **${title}** ($${value.toLocaleString()} — stage: *${stage}*).\n\nPlease confirm below to add this lead to your pipeline.`;
+      answer = `I have prepared the request to create lead **${title}** ($${value.toLocaleString()} — stage: *${stage}*).\n\nPlease confirm below to add this lead to your pipeline.`;
+    }
   }
 
   // =============================================================
@@ -2555,63 +2561,48 @@ export async function executeAgentChat(context, { agentId, message, conversation
       }
 
       answer = promptQuestion;
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_CUSTOMER",
-          step: "AWAITING_CUSTOMER_DETAILS",
-          partialData: extracted,
-        });
-      }
-      return {
-        answer,
-        sources,
-        toolsUsed,
-        executionTimeMs: Date.now() - startTime,
-        requiresConfirmation: false,
-        pendingAction: null,
-        executedAction: false,
-        conversationId,
-        executionMode: context.isDemo ? "DEMO" : "LIVE",
+      await saveWorkflowState({
+        intent: "CREATE_CUSTOMER",
+        step: "AWAITING_CUSTOMER_DETAILS",
+        partialData: extracted,
+      });
+    } else {
+      const accountNo = extracted.accountNo || `C-${Math.floor(100 + Math.random() * 900)}`;
+      const payload = {
+        accountNo,
+        name: extracted.name,
+        company: extracted.name,
+        industry: extracted.industry,
+        contactName: extracted.contactName || "Primary Contact",
+        email: extracted.email || `contact@${extracted.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
+        phone: extracted.phone,
+        status: "ACTIVE",
+        isActive: true,
+        createdAt: new Date().toISOString(),
       };
-    }
 
-    const accountNo = extracted.accountNo || `C-${Math.floor(100 + Math.random() * 900)}`;
-    const payload = {
-      accountNo,
-      name: extracted.name,
-      company: extracted.name,
-      industry: extracted.industry,
-      contactName: extracted.contactName || "Primary Contact",
-      email: extracted.email || `contact@${extracted.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
-      phone: extracted.phone,
-      status: "ACTIVE",
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "CREATE_CUSTOMER",
+        title: `Create Customer Account: ${payload.name}`,
+        summary: `Register customer account #${payload.accountNo} (${payload.name}) in ${payload.industry}.`,
+        payload,
+      });
 
-    requiresConfirmation = true;
-    pendingAction = await storeAdapter.createPendingAction(context, {
-      actionType: "CREATE_CUSTOMER",
-      title: `Create Customer Account: ${payload.name}`,
-      summary: `Register customer account #${payload.accountNo} (${payload.name}) in ${payload.industry}.`,
-      payload,
-    });
-
-    if (conversationId) {
-      await storeAdapter.setConversationState(context, conversationId, {
+      await saveWorkflowState({
         intent: "CREATE_CUSTOMER",
         step: "AWAITING_CONFIRMATION",
         pendingActionId: pendingAction?.id,
         data: payload,
       });
-    }
 
-    answer = `I have prepared the request to create customer account **${payload.name}**:\n\n` +
-      `• **Company / Customer:** ${payload.name}\n` +
-      `• **Account #:** #${payload.accountNo}\n` +
-      `• **Industry:** ${payload.industry}\n` +
-      `• **Primary Contact:** ${payload.phone}\n\n` +
-      `Please confirm below before I proceed with registering this customer account.`;
+      answer = `I have prepared the request to create customer account **${payload.name}**:\n\n` +
+        `• **Company / Customer:** ${payload.name}\n` +
+        `• **Account #:** #${payload.accountNo}\n` +
+        `• **Industry:** ${payload.industry}\n` +
+        `• **Primary Contact:** ${payload.phone}\n\n` +
+        `Please confirm below before I proceed with registering this customer account.`;
+    }
   }
 
   // =============================================================
@@ -3170,7 +3161,6 @@ Instructions:
   }
 
   const executionTimeMs = Date.now() - startTime;
-  let finalConvId = conversationId;
 
   // Persist conversation messages with strict LIVE vs DEMO isolation
   if (!context.isDemo && neonDb.isNeonConfigured() && context.user?.tenantId && neonDb.isValidUuid(context.user.tenantId)) {
@@ -3180,7 +3170,9 @@ Instructions:
           title: message.slice(0, 40) + (message.length > 40 ? "..." : ""),
           agentId: agentId || "supply-chain-agent",
         });
-        finalConvId = newConv.id;
+        if (newConv && newConv.id) {
+          finalConvId = newConv.id;
+        }
       }
 
       await neonDb.addMessageToDb(context.user.tenantId, finalConvId, {
@@ -3205,10 +3197,10 @@ Instructions:
     const db = isLive ? getLiveDb() : getDemoDb();
     if (!db.conversations) db.conversations = [];
 
-    let conv = db.conversations.find((c) => c.id === conversationId);
+    let conv = db.conversations.find((c) => c.id === finalConvId || (conversationId && c.id === conversationId));
     if (!conv) {
       conv = {
-        id: conversationId || `conv-${isLive ? "live" : "demo"}-${Date.now()}`,
+        id: finalConvId || conversationId || `conv-${isLive ? "live" : "demo"}-${Date.now()}`,
         title: message.slice(0, 40) + (message.length > 40 ? "..." : ""),
         agentId: agentId || "supply-chain-agent",
         createdAt: new Date().toISOString(),

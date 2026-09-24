@@ -1958,6 +1958,16 @@ export const storeAdapter = {
     return conv?.workflowState || null;
   },
 
+  async getLatestConversationState(context) {
+    const isLive = !context.isDemo;
+    const db = isLive ? getLiveDb() : getDemoDb();
+    const convs = db.conversations || [];
+    for (const c of convs) {
+      if (c.workflowState) return c.workflowState;
+    }
+    return null;
+  },
+
   async setConversationState(context, convId, workflowState) {
     if (!convId) return null;
     const isLive = !context.isDemo;
