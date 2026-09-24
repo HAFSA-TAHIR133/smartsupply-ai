@@ -307,29 +307,17 @@ const INITIAL_DEMO_DATA = {
 // Initial state for Live DB (seeded with initial admin and demo users)
 function getInitialLiveDb() {
   const adminId = "user-live-admin";
-  const tenantId = "tenant-live-default";
-  const passwordHash = bcrypt.hashSync("admin123", 10);
+  const tenantId = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12";
   const demoPasswordHash = bcrypt.hashSync("demo123", 10);
 
   return {
     users: [
       {
-        id: adminId,
-        email: "admin@smartsupply.ai",
-        name: "Admin User",
-        passwordHash,
-        tenantId,
-        role: "ADMIN",
-        isDemo: false,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      },
-      {
         id: "demo-user-alex",
         email: "demo@smartsupply.ai",
         name: "Alex Reynolds",
         passwordHash: demoPasswordHash,
-        tenantId: "demo-tenant-id",
+        tenantId: "3e6c5a8e-f131-4902-8d80-1c9056f858d4",
         role: "ADMIN",
         isDemo: true,
         isActive: true,
@@ -339,8 +327,16 @@ function getInitialLiveDb() {
     tenants: [
       {
         id: tenantId,
-        name: "Enterprise Global Logistics",
-        slug: "enterprise-global",
+        name: "Super Market retailer enterprise",
+        slug: "super-market-retailer-enterprise",
+        isActive: true,
+        isDemo: false,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "3e6c5a8e-f131-4902-8d80-1c9056f858d4",
+        name: "Demo Logistics Enterprise",
+        slug: "demo-logistics-enterprise",
         isActive: true,
         isDemo: false,
         createdAt: new Date().toISOString(),

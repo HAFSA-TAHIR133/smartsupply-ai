@@ -2,10 +2,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
+# Copy web app package definitions
+COPY apps/web/package*.json ./
 RUN npm install
 
-COPY . .
+# Copy application source code
+COPY apps/web/ ./
 RUN mkdir -p public && npm run build
 
 FROM node:20-alpine AS runner
@@ -22,4 +24,3 @@ COPY --from=builder /app/node_modules ./node_modules
 EXPOSE 3000
 
 CMD ["npm", "start"]
-
