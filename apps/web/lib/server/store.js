@@ -308,10 +308,45 @@ const INITIAL_DEMO_DATA = {
 function getInitialLiveDb() {
   const adminId = "user-live-admin";
   const tenantId = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12";
+  const adminPasswordHash = bcrypt.hashSync("admin123", 10);
   const demoPasswordHash = bcrypt.hashSync("demo123", 10);
+  const hafsaPasswordHash = bcrypt.hashSync("hafsa123", 10);
 
   return {
     users: [
+      {
+        id: "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a99",
+        email: "antigravity8007@gmail.com",
+        name: "Hafsa Tahir",
+        passwordHash: hafsaPasswordHash,
+        tenantId,
+        role: "ADMIN",
+        isDemo: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "b0c98d97-62df-4fad-a4b7-0bb9aa64ff35",
+        email: "forw8007@gmail.com",
+        name: "Hafsa Tahir",
+        passwordHash: hafsaPasswordHash,
+        tenantId,
+        role: "ADMIN",
+        isDemo: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: adminId,
+        email: "admin@smartsupply.ai",
+        name: "Admin User",
+        passwordHash: adminPasswordHash,
+        tenantId,
+        role: "ADMIN",
+        isDemo: false,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      },
       {
         id: "demo-user-alex",
         email: "demo@smartsupply.ai",
@@ -1767,6 +1802,9 @@ export const storeAdapter = {
           } else if (action.actionType === "DELETE_TASK") {
             const { taskId } = action.payload;
             executionResult = await this.deleteTask(context, taskId);
+          } else if (action.actionType === "DELETE_CUSTOMER") {
+            const { customerId } = action.payload;
+            executionResult = await this.deleteCustomer(context, customerId);
           } else if (action.actionType === "CREATE_CUSTOMER") {
             executionResult = await this.createCustomer(context, action.payload);
           } else if (action.actionType === "CREATE_LEAD") {
@@ -1834,6 +1872,9 @@ export const storeAdapter = {
     } else if (action.actionType === "DELETE_TASK") {
       const { taskId } = action.payload;
       executionResult = await this.deleteTask(context, taskId);
+    } else if (action.actionType === "DELETE_CUSTOMER") {
+      const { customerId } = action.payload;
+      executionResult = await this.deleteCustomer(context, customerId);
     } else if (action.actionType === "CREATE_CUSTOMER") {
       executionResult = await this.createCustomer(context, action.payload);
     } else if (action.actionType === "CREATE_LEAD") {

@@ -447,34 +447,79 @@ function extractDueDateFromText(text) {
   return null;
 }
 
+/**
+ * Matches a customer from message text by account number, company, or name.
+ */
+function matchCustomerFromText(text, customers) {
+  if (!customers || customers.length === 0) return null;
+  const lower = text.toLowerCase().trim();
+
+  // 1. Account number match e.g. #123, 123, account #123
+  const acctMatch = text.match(/(?:#?account\s*#?|#)([a-zA-Z0-9_-]+)/i);
+  if (acctMatch) {
+    const acct = acctMatch[1].toLowerCase();
+    const found = customers.find(
+      (c) => (c.accountNo && c.accountNo.toLowerCase() === acct) || (c.id && c.id.toLowerCase() === acct)
+    );
+    if (found) return found;
+  }
+
+  // 2. Exact or substring name / company match
+  for (const c of customers) {
+    const name = (c.name || c.company || "").toLowerCase().trim();
+    if (name && (lower === name || lower.includes(name) || name.includes(lower))) return c;
+  }
+
+  // 3. Token match
+  for (const c of customers) {
+    const tokens = (c.name || c.company || "").toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+    if (tokens.length > 0 && tokens.some((t) => lower.includes(t))) return c;
+  }
+
+  return null;
+}
+
 // -------------------------------------------------------------
 // INTENT CLASSIFICATION HELPERS
 // -------------------------------------------------------------
 
 function isAffirmativeConfirmation(text) {
   const trimmed = text.trim().toLowerCase().replace(/[.,!?:;]/g, " ").replace(/\s+/g, " ").trim();
+  // Any sentence with substantive command words/nouns is an instruction, NOT an approval!
+  if (
+    /\b(?:add|create|new|delete|remove|restock|renew|edit|update|change|move|advance|complete|mark|show|list|what|which|who|how|why|tell|check|find|laptop|lead|product|stock|task|customer|client|item|charges?|chargers?)\b/i.test(
+      trimmed
+    )
+  ) {
+    return false;
+  }
   if (/^(yes|confirm|confirmed|proceed|approve|approved|do it|go ahead|sure|yep|yeah|ok|okay|yes please|please do|execute)$/i.test(trimmed)) {
     return true;
   }
   if (
-    /^(?:yes|yep|yeah|sure|ok|okay)\b/i.test(trimmed) ||
-    /\b(?:please\s+confirm|confirm\s+(?:this|that|it|action|request)|proceed|go\s+ahead|approve\s+(?:this|that|it))\b/i.test(trimmed)
+    /^(?:yes|yep|yeah|sure|ok|okay)\s+(?:please|confirm|proceed|go ahead|do it|approve)$/i.test(trimmed) ||
+    /^(?:please\s+confirm|confirm\s+(?:this|that|it|action|request)|proceed|go\s+ahead|approve\s+(?:this|that|it))$/i.test(trimmed)
   ) {
-    if (!/\b(?:no|not|dont|don't|cancel|abort|stop)\b/i.test(trimmed)) {
-      return true;
-    }
+    return true;
   }
   return false;
 }
 
 function isNegativeCancellation(text) {
   const trimmed = text.trim().toLowerCase().replace(/[.,!?:;]/g, " ").replace(/\s+/g, " ").trim();
-  if (/^(no|cancel|cancelled|reject|rejected|abort|don't|stop|never mind|no thanks|do not|nevermind)$/i.test(trimmed)) {
+  if (
+    /\b(?:add|create|new|delete|remove|restock|renew|edit|update|change|move|advance|complete|mark|show|list|what|which|who|how|why|laptop|lead|product|stock|task|customer)\b/i.test(
+      trimmed
+    )
+  ) {
+    return false;
+  }
+  if (/^(no|cancel|cancelled|reject|rejected|abort|don't|stop|never mind|no thanks|do not|nevermind|deny)$/i.test(trimmed)) {
     return true;
   }
   if (
-    /^(?:no|cancel|stop|abort)\b/i.test(trimmed) ||
-    /\b(?:cancel\s+(?:this|that|it|action|request)|do\s+not|never\s*mind|no\s+thanks|keep\s+it)\b/i.test(trimmed)
+    /^(?:no|cancel|stop|abort)\s+(?:action|that|it|request|now)$/i.test(trimmed) ||
+    /^(?:cancel\s+(?:this|that|it|action|request)|do\s+not|never\s*mind|no\s+thanks|keep\s+it)$/i.test(trimmed)
   ) {
     return true;
   }
@@ -537,7 +582,7 @@ function isCustomerCreationIntent(lowerMsg, message) {
 }
 
 /**
- * Robust check for Restock intent.
+ * Robust check for Restock intent of EXISTING product.
  */
 function isRestockIntent(lowerMsg, message) {
   return (
@@ -548,19 +593,223 @@ function isRestockIntent(lowerMsg, message) {
 }
 
 /**
- * Robust check for Read-only questions.
+ * Robust check for Product creation or new stock intake.
+ * e.g. "add a new stock of laptop charges 23 items", "create product Laptop Charger 23 items", "add 50 units of USB-C cable"
  */
-function isQuestionOrInquiry(lowerMsg, message) {
+function isProductCreationIntent(lowerMsg, message) {
+  if (isDeleteIntent(lowerMsg, message)) return false;
+  if (isTaskCreationIntent(lowerMsg, message)) return false;
+  if (isLeadCreationIntent(lowerMsg, message)) return false;
+  if (isCustomerCreationIntent(lowerMsg, message)) return false;
+
+  // Explicit new stock phrases
+  if (/(?:add|create|register|insert|intake)\s+(?:a\s+)?(?:new\s+)?(?:stock|product|item)\b/i.test(message)) {
+    return true;
+  }
+  if (/(?:new\s+stock\s+of|stock\s+of)\b/i.test(message) && /(?:add|create|register|put|insert)\b/i.test(message)) {
+    return true;
+  }
+  if (/(?:add|create)\s+\d+\s+(?:items?|units?|pcs?|pieces?)\s+of\b/i.test(message)) {
+    return true;
+  }
+  if (/\b(?:add|create)\s+.*?\b(?:charges?|chargers?|laptops?|adapters?|cables?|monitors?|hardware|actuators?|sensors?|fasteners?)\b/i.test(message)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Extracts product details from natural language messages.
+ */
+function extractProductFromMessage(message) {
+  let text = message.replace(/^(?:okay|ok|sure|please|can you|could you)\s+/i, "").trim();
+
+  // 1. Quantity
+  let quantity = 10;
+  let hasExplicitQuantity = false;
+  const qtyMatch = text.match(/\b(\d+)\s*(?:items?|units?|pcs?|pieces?|charges?|chargers?|stock|qty|boxes?)?\b/i) ||
+    text.match(/(?:quantity|qty|count|amount)\s*[:=]?\s*(\d+)/i);
+  if (qtyMatch) {
+    const q = parseInt(qtyMatch[1], 10);
+    if (!isNaN(q) && q > 0) {
+      quantity = q;
+      hasExplicitQuantity = true;
+    }
+  }
+
+  // 2. Unit Price
+  let unitPrice = 29.99;
+  let hasExplicitPrice = false;
+  const priceMatch = text.match(/(?:price|cost|rate|\$)\s*[:=]?\s*\$?([0-9]+(?:\.[0-9]+)?)/i) ||
+    text.match(/\$([0-9]+(?:\.[0-9]+)?)/);
+  if (priceMatch) {
+    const p = parseFloat(priceMatch[1]);
+    if (!isNaN(p) && p > 0) {
+      unitPrice = p;
+      hasExplicitPrice = true;
+    }
+  }
+
+  // 3. Reorder Threshold
+  let reorderPoint = 10;
+  let hasExplicitThreshold = false;
+  const threshMatch = text.match(/(?:threshold|reorder|min(?:imum)?)\s*[:=]?\s*(\d+)/i);
+  if (threshMatch) {
+    const t = parseInt(threshMatch[1], 10);
+    if (!isNaN(t) && t > 0) {
+      reorderPoint = t;
+      hasExplicitThreshold = true;
+    }
+  }
+
+  // 4. Product Name
+  let name = "";
+  const m1 = text.match(/(?:new\s+stock\s+of|stock\s+of|add\s+(?:a\s+)?(?:new\s+)?(?:stock\s+of\s+)?|product\s+|item\s+)([\w\s\-]+?)(?:\s+(?:with|\bof\b|\bfor\b|\bquantity\b|\bqty\b|\bitems?\b|\bunits?\b|\bprice\b|\bcost\b|\bthreshold\b|\bcategory\b|\$|\d+)|$)/i);
+  if (m1 && m1[1]) {
+    name = m1[1].trim();
+  }
+
+  if (!name || name.length < 2) {
+    const m2 = text.match(/(?:add|create|insert|stock)\s+(?:\d+\s+(?:items?|units?|pcs?)\s+(?:of\s+)?)?([\w\s\-]+?)(?:\s+(?:to\s+stock|in\s+stock|with|\$|\d+)|$)/i);
+    if (m2 && m2[1]) {
+      name = m2[1].trim();
+    }
+  }
+
+  name = name
+    .replace(/^(?:a\s+|an\s+|the\s+|new\s+|stock\s+of\s+)+/i, "")
+    .replace(/\b(?:with|quantity|qty|items?|units?|stock|price|\$|\d+)\b.*$/i, "")
+    .replace(/[.,:;!]$/, "")
+    .trim();
+
+  let hasExplicitName = false;
+  const genericNouns = /^(?:stock|product|item|items|units|new\s+stock|new\s+product|something|charges?|chargers?)$/i;
+
+  if (name && name.length >= 2 && !genericNouns.test(name)) {
+    hasExplicitName = true;
+  } else if (/laptop\s*charg(?:es|ers?)/i.test(message)) {
+    name = "Laptop Charges";
+    hasExplicitName = true;
+  } else {
+    name = "";
+    hasExplicitName = false;
+  }
+
+  if (hasExplicitName) {
+    name = name.split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  }
+
+  // 5. Inferred Category
+  let category = "Electronics";
+  const lowerName = (name || "").toLowerCase();
+  const lowerMsg = message.toLowerCase();
+  if (lowerMsg.includes("electron") || lowerName.includes("laptop") || lowerName.includes("charg") || lowerName.includes("cable") || lowerName.includes("usb") || lowerName.includes("screen") || lowerName.includes("mouse") || lowerName.includes("keyboard") || lowerName.includes("phone")) {
+    category = "Electronics";
+  } else if (lowerMsg.includes("machin") || lowerName.includes("motor") || lowerName.includes("pump") || lowerName.includes("actuator") || lowerName.includes("valve") || lowerName.includes("sensor")) {
+    category = "Machinery";
+  } else if (lowerMsg.includes("fastener") || lowerName.includes("bolt") || lowerName.includes("screw") || lowerName.includes("nut") || lowerName.includes("rivet")) {
+    category = "Fasteners";
+  } else if (lowerMsg.includes("batter") || lowerName.includes("cell") || lowerName.includes("pack") || lowerName.includes("power")) {
+    category = "Batteries";
+  } else {
+    category = "General Hardware";
+  }
+
+  // 6. Clean SKU
+  const cleanLetters = (name || "ITM").replace(/[^a-zA-Z]/g, "").toUpperCase();
+  const p1 = cleanLetters.slice(0, 3) || "ITM";
+  const p2 = cleanLetters.slice(3, 6) || "SKU";
+  const randomNum = Math.floor(100 + Math.random() * 900);
+  const sku = `${p1}-${p2}-${randomNum}`;
+
+  return {
+    name,
+    sku,
+    quantity,
+    unitPrice,
+    reorderPoint,
+    category,
+    hasExplicitName,
+    hasExplicitQuantity,
+    hasExplicitPrice,
+    hasExplicitThreshold,
+    description: name ? `Stock intake: ${name} (${category})` : "New product stock intake",
+  };
+}
+
+/**
+ * Check if the user is asking an explicit read-only query (e.g. "which items left", "stock low").
+ */
+function isExplicitReadQuery(lowerMsg) {
+  return (
+    lowerMsg.includes("items left") ||
+    lowerMsg.includes("item left") ||
+    lowerMsg.includes("stock low") ||
+    lowerMsg.includes("stcok low") ||
+    lowerMsg.includes("low stock") ||
+    lowerMsg.includes("out of stock") ||
+    lowerMsg.includes("lead names") ||
+    lowerMsg.includes("leads list") ||
+    lowerMsg.includes("list leads") ||
+    lowerMsg.includes("who are the leads") ||
+    lowerMsg.includes("what items") ||
+    lowerMsg.includes("which items") ||
+    lowerMsg.includes("what products") ||
+    lowerMsg.includes("which products") ||
+    lowerMsg.includes("show leads") ||
+    lowerMsg.includes("show tasks") ||
+    lowerMsg.includes("show customers") ||
+    lowerMsg.includes("show inventory")
+  );
+}
+
+/**
+ * Robust check for Read-only questions and data inquiries.
+ * When true, the agent answers with real database data and does NOT perform an action!
+ */
+function isQuestionOrInquiry(lowerMsg, message = "") {
+  // If explicitly an operational action command, NOT a read query
   if (
+    isProductCreationIntent(lowerMsg, message) ||
+    isTaskCreationIntent(lowerMsg, message) ||
+    isLeadCreationIntent(lowerMsg, message) ||
+    isCustomerCreationIntent(lowerMsg, message) ||
+    isDeleteIntent(lowerMsg, message) ||
+    isRestockIntent(lowerMsg, message) ||
     lowerMsg.includes("move ") ||
-    isRestockIntent(lowerMsg, message || lowerMsg) ||
-    lowerMsg.includes("delete ") ||
-    lowerMsg.includes("edit ") ||
-    lowerMsg.includes("create ") ||
-    lowerMsg.includes("add ") ||
-    lowerMsg.includes("register ")
+    lowerMsg.includes("advance ") ||
+    lowerMsg.includes("change price") ||
+    lowerMsg.includes("change value") ||
+    lowerMsg.includes("mark as complete") ||
+    lowerMsg.includes("mark completed")
   ) {
     return false;
+  }
+
+  // Direct queries for items left / stock low / lead names
+  if (
+    lowerMsg.includes("items left") ||
+    lowerMsg.includes("item left") ||
+    lowerMsg.includes("stock low") ||
+    lowerMsg.includes("stcok low") ||
+    lowerMsg.includes("low stock") ||
+    lowerMsg.includes("out of stock") ||
+    lowerMsg.includes("lead names") ||
+    lowerMsg.includes("leads list") ||
+    lowerMsg.includes("list leads") ||
+    lowerMsg.includes("who are the leads") ||
+    lowerMsg.includes("what items") ||
+    lowerMsg.includes("which items") ||
+    lowerMsg.includes("what products") ||
+    lowerMsg.includes("which products") ||
+    lowerMsg.includes("products in stock") ||
+    lowerMsg.includes("inventory list") ||
+    lowerMsg.includes("pending tasks") ||
+    lowerMsg.includes("what tasks") ||
+    lowerMsg.includes("who are our customers")
+  ) {
+    return true;
   }
 
   return (
@@ -574,6 +823,9 @@ function isQuestionOrInquiry(lowerMsg, message) {
     lowerMsg.includes("who") ||
     lowerMsg.includes("can you check") ||
     lowerMsg.includes("view") ||
+    lowerMsg.includes("give me") ||
+    lowerMsg.includes("overview") ||
+    lowerMsg.includes("summary") ||
     lowerMsg.endsWith("?")
   );
 }
@@ -607,6 +859,13 @@ export async function executeAgentChat(context, { agentId, message, conversation
     currentWorkflow = await storeAdapter.getConversationState(context, conversationId);
   }
 
+  const isAwaitingWorkflowInput = Boolean(
+    currentWorkflow &&
+    currentWorkflow.step &&
+    currentWorkflow.step.startsWith("AWAITING_") &&
+    currentWorkflow.step !== "AWAITING_CONFIRMATION"
+  );
+
   // Check for active pending actions awaiting HITL confirmation
   const activePendingActions = await storeAdapter.getPendingActions(context);
   let activePending = null;
@@ -621,7 +880,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
   // =============================================================
   // STEP 1: HANDLE HITL CONFIRMATION / CANCELLATION
   // =============================================================
-  if (isAffirmativeConfirmation(lowerMsg) || isNegativeCancellation(lowerMsg)) {
+  if ((isAffirmativeConfirmation(lowerMsg) || isNegativeCancellation(lowerMsg)) && (!isAwaitingWorkflowInput || activePending)) {
     if (!activePending) {
       executedAction = false;
       requiresConfirmation = false;
@@ -659,6 +918,13 @@ export async function executeAgentChat(context, { agentId, message, conversation
         } else if (actionType === "EDIT_LEAD") {
           const stageDesc = payload.toStage ? `moved to **${payload.toStage}**` : `updated`;
           answer = `Done. Lead **${payload.leadTitle}** has been ${stageDesc}.`;
+        } else if (actionType === "CREATE_PRODUCT") {
+          const skuStr = payload.sku ? ` (\`${payload.sku}\`)` : "";
+          answer = `Done. Product **${payload.name}**${skuStr} with **${payload.quantity} units** has been added to your inventory.`;
+        } else if (actionType === "DELETE_CUSTOMER") {
+          answer = `Done. Customer account **${payload.customerName || payload.name || "account"}** has been deleted.`;
+        } else if (actionType === "CREATE_CHART") {
+          answer = `Done. Chart **${payload.title || "Custom Analytics"}** has been created.`;
         } else if (actionType === "RESTOCK_PRODUCT") {
           const newQty = approvalRes?.result?.product?.quantity ?? "updated";
           answer = `Done. Restocked **${payload.productName}** by **+${payload.quantityDelta} units**. Current stock is now **${newQty} units**.`;
@@ -684,16 +950,647 @@ export async function executeAgentChat(context, { agentId, message, conversation
   }
 
   // =============================================================
-  // STEP 2: HANDLE ONGOING CONVERSATION WORKFLOW
-  // (e.g. User was asked "Which lead would you like to delete?" and now provides title/ID)
+  // STEP 2: HANDLE READ-ONLY INQUIRIES & QUESTIONS (NO ACTION CREATED)
+  // When user asks "which items left", "stock low", "lead names", etc.,
+  // the agent directly answers with real data without triggering any HITL action.
   // =============================================================
+  else if (isQuestionOrInquiry(lowerMsg, message) && (!isAwaitingWorkflowInput || isExplicitReadQuery(lowerMsg))) {
+    requiresConfirmation = false;
+    pendingAction = null;
+    executedAction = false;
+
+    // 2A. Low Stock / Out of Stock Query
+    if (
+      lowerMsg.includes("low stock") ||
+      lowerMsg.includes("stock low") ||
+      lowerMsg.includes("stcok low") ||
+      lowerMsg.includes("out of stock") ||
+      lowerMsg.includes("critical stock") ||
+      lowerMsg.includes("reorder")
+    ) {
+      toolsUsed.push("warehouse_inventory_scanner");
+      const lowStock = products.filter(
+        (p) => Number(p.quantity) > 0 && Number(p.quantity) <= Number(p.reorderPoint)
+      );
+      const outOfStock = products.filter((p) => Number(p.quantity) === 0);
+
+      if (outOfStock.length === 0 && lowStock.length === 0) {
+        answer = `All products in your inventory currently have healthy stock levels above their minimum reorder thresholds. (Total SKUs: ${products.length})`;
+      } else {
+        let text = `Here are the inventory items currently on **low stock** or **out of stock**:\n\n`;
+        if (outOfStock.length > 0) {
+          text += `**🚨 Out of Stock (0 units remaining):**\n`;
+          outOfStock.forEach((p) => {
+            text += `• **${p.name}** (\`${p.sku}\`) — 0 in stock (Min Threshold: ${p.reorderPoint} units) | $${Number(p.unitPrice || 0).toFixed(2)}/unit\n`;
+          });
+          text += "\n";
+        }
+        if (lowStock.length > 0) {
+          text += `**⚠️ Low Stock Alert (Below Reorder Point):**\n`;
+          lowStock.forEach((p) => {
+            const deficit = Math.max(0, Number(p.reorderPoint) - Number(p.quantity));
+            text += `• **${p.name}** (\`${p.sku}\`) — **${p.quantity} units left** (Min Threshold: ${p.reorderPoint}, Deficit: -${deficit}) | $${Number(p.unitPrice || 0).toFixed(2)}/unit\n`;
+          });
+        }
+        answer = text.trim();
+      }
+    }
+
+    // 2B. Items Left / What's In Stock / All Inventory
+    else if (
+      lowerMsg.includes("items left") ||
+      lowerMsg.includes("item left") ||
+      lowerMsg.includes("what items") ||
+      lowerMsg.includes("which items") ||
+      lowerMsg.includes("what products") ||
+      lowerMsg.includes("which products") ||
+      lowerMsg.includes("stock left") ||
+      lowerMsg.includes("inventory left") ||
+      lowerMsg.includes("products left") ||
+      lowerMsg.includes("in stock") ||
+      lowerMsg.includes("products in stock") ||
+      lowerMsg.includes("inventory list") ||
+      lowerMsg.includes("product list") ||
+      lowerMsg.includes("all items") ||
+      lowerMsg.includes("all products") ||
+      lowerMsg.includes("product") ||
+      lowerMsg.includes("stock") ||
+      lowerMsg.includes("inventory") ||
+      lowerMsg.includes("sku")
+    ) {
+      toolsUsed.push("warehouse_inventory_scanner");
+      if (!products || products.length === 0) {
+        answer = "There are currently no items in your inventory. You can add items by saying *'add a new stock of [product] [quantity] items'*.";
+      } else {
+        const totalUnits = products.reduce((acc, p) => acc + Number(p.quantity || 0), 0);
+        const totalValuation = products.reduce((acc, p) => acc + (Number(p.quantity || 0) * Number(p.unitPrice || 0)), 0);
+        const lowStockCount = products.filter((p) => Number(p.quantity) > 0 && Number(p.quantity) <= Number(p.reorderPoint)).length;
+        const outCount = products.filter((p) => Number(p.quantity) === 0).length;
+
+        let summary = `You currently have **${products.length} product SKU(s)** in stock (${totalUnits} total units, valuation: **$${totalValuation.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}**):\n\n`;
+
+        products.forEach((p) => {
+          const qty = Number(p.quantity || 0);
+          const reorder = Number(p.reorderPoint || 10);
+          const price = Number(p.unitPrice || 0).toFixed(2);
+          const status = qty === 0 ? "🚨 Out of Stock" : qty <= reorder ? "⚠️ Low Stock" : "✅ Healthy";
+          summary += `• **${p.name}** (\`${p.sku}\`) — **${qty} units left** ($${price}/unit) | Category: ${p.category || "General"} | Status: ${status}\n`;
+        });
+
+        if (lowStockCount > 0 || outCount > 0) {
+          summary += `\n*Note: ${lowStockCount + outCount} item(s) are below minimum reorder thresholds.*`;
+        }
+        answer = summary.trim();
+      }
+    }
+
+    // 2C. Lead Names / CRM Pipeline Query
+    else if (
+      lowerMsg.includes("lead names") ||
+      lowerMsg.includes("lead name") ||
+      lowerMsg.includes("leads list") ||
+      lowerMsg.includes("list leads") ||
+      lowerMsg.includes("who are the leads") ||
+      lowerMsg.includes("show leads") ||
+      lowerMsg.includes("active leads") ||
+      lowerMsg.includes("pipeline leads") ||
+      lowerMsg.includes("crm leads") ||
+      lowerMsg.includes("leads") ||
+      lowerMsg.includes("lead") ||
+      lowerMsg.includes("deal") ||
+      lowerMsg.includes("pipeline")
+    ) {
+      toolsUsed.push("crm_pipeline_aggregator");
+      if (!leads || leads.length === 0) {
+        answer = "There are currently no active leads in your CRM pipeline. You can add one by saying *'create lead [Company Name] [value]'*.";
+      } else {
+        const pipelineTotal = leads.reduce((sum, l) => sum + Number(l.value || 0), 0);
+        const wonCount = leads.filter((l) => l.stage === "Won").length;
+
+        let text = `Here are your current active CRM leads (**${leads.length} leads**, total pipeline value: **$${pipelineTotal.toLocaleString()}**):\n\n`;
+        leads.forEach((l) => {
+          const val = Number(l.value || 0).toLocaleString();
+          const stage = l.stage || "New";
+          const priority = l.priority || "NORMAL";
+          const contact = l.contactEmail || l.email || "No email";
+          text += `• **${l.title || l.name}** — **$${val}** | Stage: *${stage}* | Priority: ${priority} | Contact: \`${contact}\`\n`;
+        });
+
+        const stagesCount = CRM_VALID_STAGES.map((st) => {
+          const c = leads.filter((l) => (l.stage || "").toLowerCase() === st.toLowerCase()).length;
+          return `${st}: ${c}`;
+        }).join(" | ");
+
+        text += `\n**Pipeline Breakdown:** ${stagesCount} (${wonCount} won)`;
+        answer = text.trim();
+      }
+    }
+
+    // 2D. Tasks Query
+    else if (lowerMsg.includes("task") || lowerMsg.includes("todo") || lowerMsg.includes("follow up")) {
+      toolsUsed.push("crm_task_tracker");
+      if (!tasks || tasks.length === 0) {
+        answer = "You have no scheduled tasks. You can create one by saying *'add follow up task [title] on [date]'*.";
+      } else {
+        const pending = tasks.filter((t) => t.status === "PENDING");
+        const completed = tasks.filter((t) => t.status === "COMPLETED");
+
+        let text = `Here are your current tasks (**${tasks.length} total**, ${pending.length} pending, ${completed.length} completed):\n\n`;
+        tasks.forEach((t) => {
+          const statusIcon = t.status === "COMPLETED" ? "✅" : "⏳";
+          const leadInfo = t.leadTitle ? ` (Lead: ${t.leadTitle})` : "";
+          text += `• ${statusIcon} **${t.title}**${leadInfo} — Due: **${t.dueDate || "No date"}** | Priority: ${t.priority || "NORMAL"} | Status: *${t.status}*\n`;
+        });
+        answer = text.trim();
+      }
+    }
+
+    // 2E. Customer Accounts Query
+    else if (lowerMsg.includes("customer") || lowerMsg.includes("client") || lowerMsg.includes("account")) {
+      toolsUsed.push("crm_customer_aggregator");
+      if (!customers || customers.length === 0) {
+        answer = "No customer accounts registered yet.";
+      } else {
+        let text = `Here are your customer accounts (**${customers.length} registered**):\n\n`;
+        customers.forEach((c) => {
+          const spend = Number(c.totalSpend || 0).toLocaleString();
+          text += `• **${c.name}** (#${c.accountNo || "N/A"}) — Industry: *${c.industry || "General"}* | Status: ${c.status || "ACTIVE"} | Spend: $${spend}\n`;
+        });
+        answer = text.trim();
+      }
+    }
+
+    // 2F. Overview / Dashboard Summary Query
+    else {
+      toolsUsed.push("executive_kpi_dashboard");
+      const totalUnits = products.reduce((acc, p) => acc + Number(p.quantity || 0), 0);
+      const totalValuation = products.reduce((acc, p) => acc + (Number(p.quantity || 0) * Number(p.unitPrice || 0)), 0);
+      const pipelineTotal = leads.reduce((sum, l) => sum + Number(l.value || 0), 0);
+      const pendingTasksCount = tasks.filter((t) => t.status === "PENDING").length;
+
+      answer = `**SmartSupply AI Executive Overview:**\n\n` +
+        `• **Inventory:** ${products.length} active SKUs (${totalUnits} total units), valued at **$${totalValuation.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}**\n` +
+        `• **CRM Pipeline:** ${leads.length} active opportunities totaling **$${pipelineTotal.toLocaleString()}**\n` +
+        `• **Operational Tasks:** ${pendingTasksCount} pending follow-up action(s)\n` +
+        `• **Customer Accounts:** ${customers.length} registered accounts\n\n` +
+        `Let me know what you would like to inspect or manage next!`;
+    }
+
+    return {
+      answer,
+      sources,
+      toolsUsed,
+      executionTimeMs: Date.now() - startTime,
+      requiresConfirmation: false,
+      pendingAction: null,
+      executedAction: false,
+      conversationId,
+      executionMode: context.isDemo ? "DEMO" : "LIVE",
+    };
+  }
+
+  // =============================================================
+  // STEP 3: HANDLE ONGOING CONVERSATION WORKFLOW (MISSING INFO FULFILLMENT)
+  // (e.g. User was asked for quantity, product name, lead details, task schedule,
+  // customer info, or deletion targets, and now provides the missing information)
+  // =============================================================
+
+  // 3A. CREATE_PRODUCT: Awaiting Quantity
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "CREATE_PRODUCT" &&
+    currentWorkflow.step === "AWAITING_PRODUCT_QUANTITY" &&
+    !isExplicitReadQuery(lowerMsg)
+  ) {
+    toolsUsed.push("inventory_product_creator");
+    const qtyMatch = message.match(/\b(\d+)\b/);
+    const quantity = qtyMatch ? parseInt(qtyMatch[1], 10) : 10;
+    const partial = currentWorkflow.partialData || {};
+    const prodName = partial.name || "New Product";
+
+    const existing = matchProductFromText(prodName, products);
+    if (existing) {
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "RESTOCK_PRODUCT",
+        title: `Restock Existing Item: ${existing.name}`,
+        summary: `Renew stock for existing product ${existing.name} (${existing.sku}) by +${quantity} units.`,
+        payload: {
+          productId: existing.id,
+          sku: existing.sku,
+          productName: existing.name,
+          quantityDelta: quantity,
+          quantity: quantity,
+          changeType: "IN",
+          reason: "User specified restocking quantity via AI assistant",
+        },
+      });
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "RESTOCK_PRODUCT",
+          step: "AWAITING_CONFIRMATION",
+          productId: existing.id,
+          productName: existing.name,
+        });
+      }
+      answer = `I found existing inventory product **${existing.name}** (\`${existing.sku}\`, current stock: ${existing.quantity} units).\n\n` +
+        `I have prepared the request to add **+${quantity} units** (new stock will be **${existing.quantity + quantity} units**).\n\n` +
+        `Please confirm below before I proceed.`;
+    } else {
+      requiresConfirmation = true;
+      const unitPrice = partial.unitPrice || 29.99;
+      const reorderPoint = partial.reorderPoint || 10;
+      const category = partial.category || "General Hardware";
+      const sku = partial.sku || `SKU-${Date.now() % 1000}`;
+      const payload = {
+        name: prodName,
+        sku,
+        quantity,
+        current_stock: quantity,
+        unitPrice,
+        unit_price: unitPrice,
+        reorderPoint,
+        min_stock_threshold: reorderPoint,
+        category,
+        description: `Stock intake: ${prodName} (${category})`,
+      };
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "CREATE_PRODUCT",
+        title: `Add New Product: ${prodName}`,
+        summary: `Add new inventory item "${prodName}" (${quantity} units at $${unitPrice.toFixed(2)}/unit in ${category}).`,
+        payload,
+      });
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_PRODUCT",
+          step: "AWAITING_CONFIRMATION",
+          data: payload,
+        });
+      }
+      answer = `I have prepared the request to add **${prodName}** to your inventory:\n\n` +
+        `• **Product Name:** ${prodName}\n` +
+        `• **Initial Stock:** ${quantity} units\n` +
+        `• **Generated SKU:** \`${sku}\`\n` +
+        `• **Category:** ${category}\n` +
+        `• **Unit Price:** $${unitPrice.toFixed(2)}\n` +
+        `• **Reorder Threshold:** ${reorderPoint} units\n\n` +
+        `Please confirm below before I add this item to your inventory.`;
+    }
+  }
+
+  // 3B. CREATE_PRODUCT: Awaiting Product Name
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "CREATE_PRODUCT" &&
+    currentWorkflow.step === "AWAITING_PRODUCT_NAME" &&
+    !isExplicitReadQuery(lowerMsg)
+  ) {
+    toolsUsed.push("inventory_product_creator");
+    const extracted = extractProductFromMessage(message);
+    const quantity = currentWorkflow.partialData?.quantity || (extracted.hasExplicitQuantity ? extracted.quantity : 10);
+    const prodName = extracted.hasExplicitName ? extracted.name : message.trim().replace(/[.,!]$/, "");
+
+    const existing = matchProductFromText(prodName, products);
+    if (existing) {
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "RESTOCK_PRODUCT",
+        title: `Restock Existing Item: ${existing.name}`,
+        summary: `Renew stock for existing product ${existing.name} (${existing.sku}) by +${quantity} units.`,
+        payload: {
+          productId: existing.id,
+          sku: existing.sku,
+          productName: existing.name,
+          quantityDelta: quantity,
+          quantity: quantity,
+          changeType: "IN",
+          reason: "User specified restocking quantity via AI assistant",
+        },
+      });
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "RESTOCK_PRODUCT",
+          step: "AWAITING_CONFIRMATION",
+          productId: existing.id,
+          productName: existing.name,
+        });
+      }
+      answer = `I found existing inventory product **${existing.name}** (\`${existing.sku}\`, current stock: ${existing.quantity} units).\n\n` +
+        `I have prepared the request to add **+${quantity} units** (new stock will be **${existing.quantity + quantity} units**).\n\n` +
+        `Please confirm below before I proceed.`;
+    } else {
+      requiresConfirmation = true;
+      const unitPrice = extracted.unitPrice || 29.99;
+      const reorderPoint = extracted.reorderPoint || 10;
+      const category = extracted.category || "General Hardware";
+      const sku = extracted.sku;
+      const payload = {
+        name: prodName,
+        sku,
+        quantity,
+        current_stock: quantity,
+        unitPrice,
+        unit_price: unitPrice,
+        reorderPoint,
+        min_stock_threshold: reorderPoint,
+        category,
+        description: `Stock intake: ${prodName} (${category})`,
+      };
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "CREATE_PRODUCT",
+        title: `Add New Product: ${prodName}`,
+        summary: `Add new inventory item "${prodName}" (${quantity} units at $${unitPrice.toFixed(2)}/unit in ${category}).`,
+        payload,
+      });
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_PRODUCT",
+          step: "AWAITING_CONFIRMATION",
+          data: payload,
+        });
+      }
+      answer = `I have prepared the request to add **${prodName}** to your inventory:\n\n` +
+        `• **Product Name:** ${prodName}\n` +
+        `• **Initial Stock:** ${quantity} units\n` +
+        `• **Generated SKU:** \`${sku}\`\n` +
+        `• **Category:** ${category}\n` +
+        `• **Unit Price:** $${unitPrice.toFixed(2)}\n` +
+        `• **Reorder Threshold:** ${reorderPoint} units\n\n` +
+        `Please confirm below before I add this item to your inventory.`;
+    }
+  }
+
+  // 3C. CREATE_PRODUCT: Awaiting Both Details
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "CREATE_PRODUCT" &&
+    currentWorkflow.step === "AWAITING_PRODUCT_DETAILS" &&
+    !isExplicitReadQuery(lowerMsg)
+  ) {
+    toolsUsed.push("inventory_product_creator");
+    const extracted = extractProductFromMessage(message);
+    const prodName = extracted.hasExplicitName ? extracted.name : message.trim().replace(/[.,!]$/, "");
+    const quantity = extracted.hasExplicitQuantity ? extracted.quantity : 10;
+
+    const existing = matchProductFromText(prodName, products);
+    if (existing) {
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "RESTOCK_PRODUCT",
+        title: `Restock Existing Item: ${existing.name}`,
+        summary: `Renew stock for existing product ${existing.name} (${existing.sku}) by +${quantity} units.`,
+        payload: {
+          productId: existing.id,
+          sku: existing.sku,
+          productName: existing.name,
+          quantityDelta: quantity,
+          quantity: quantity,
+          changeType: "IN",
+          reason: "User specified restocking quantity via AI assistant",
+        },
+      });
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "RESTOCK_PRODUCT",
+          step: "AWAITING_CONFIRMATION",
+          productId: existing.id,
+          productName: existing.name,
+        });
+      }
+      answer = `I found existing inventory product **${existing.name}** (\`${existing.sku}\`, current stock: ${existing.quantity} units).\n\n` +
+        `I have prepared the request to add **+${quantity} units** (new stock will be **${existing.quantity + quantity} units**).\n\n` +
+        `Please confirm below before I proceed.`;
+    } else {
+      requiresConfirmation = true;
+      const unitPrice = extracted.unitPrice || 29.99;
+      const reorderPoint = extracted.reorderPoint || 10;
+      const category = extracted.category || "General Hardware";
+      const sku = extracted.sku;
+      const payload = {
+        name: prodName,
+        sku,
+        quantity,
+        current_stock: quantity,
+        unitPrice,
+        unit_price: unitPrice,
+        reorderPoint,
+        min_stock_threshold: reorderPoint,
+        category,
+        description: `Stock intake: ${prodName} (${category})`,
+      };
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "CREATE_PRODUCT",
+        title: `Add New Product: ${prodName}`,
+        summary: `Add new inventory item "${prodName}" (${quantity} units at $${unitPrice.toFixed(2)}/unit in ${category}).`,
+        payload,
+      });
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_PRODUCT",
+          step: "AWAITING_CONFIRMATION",
+          data: payload,
+        });
+      }
+      answer = `I have prepared the request to add **${prodName}** to your inventory:\n\n` +
+        `• **Product Name:** ${prodName}\n` +
+        `• **Initial Stock:** ${quantity} units\n` +
+        `• **Generated SKU:** \`${sku}\`\n` +
+        `• **Category:** ${category}\n` +
+        `• **Unit Price:** $${unitPrice.toFixed(2)}\n` +
+        `• **Reorder Threshold:** ${reorderPoint} units\n\n` +
+        `Please confirm below before I add this item to your inventory.`;
+    }
+  }
+
+  // 3D. CREATE_LEAD: Awaiting Lead Details
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "CREATE_LEAD" &&
+    currentWorkflow.step === "AWAITING_LEAD_DETAILS" &&
+    !isExplicitReadQuery(lowerMsg)
+  ) {
+    toolsUsed.push("crm_lead_creator");
+    let title = message
+      .replace(/^(?:the\s+name\s+is\s+|company\s+is\s+|lead\s+is\s+|for\s+|prospect\s+is\s+)/i, "")
+      .replace(/(?:with|value|stage|amount|\$).*/i, "")
+      .trim();
+    if (!title || title.length < 2) title = "New Prospect Lead";
+
+    let value = 0;
+    const valueMatch = message.match(/(?:deal\s*size|value|amount|worth|size|\$)\s*[:=]?\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i) ||
+      message.match(/\$([0-9,]+(?:\.[0-9]+)?k?)/i);
+    if (valueMatch) {
+      let raw = valueMatch[1].replace(/,/g, "").toLowerCase();
+      let mult = 1;
+      if (raw.endsWith("k")) { mult = 1000; raw = raw.replace("k", ""); }
+      const p = parseFloat(raw) * mult;
+      if (!isNaN(p)) value = p;
+    }
+
+    const stageInfo = extractStageFromText(message);
+    const stage = (stageInfo && stageInfo.canonical) || "New";
+
+    const payload = {
+      title,
+      name: title,
+      companyName: title,
+      value,
+      stage,
+      priority: "HIGH",
+      notes: "Created via AI Assistant",
+    };
+
+    requiresConfirmation = true;
+    pendingAction = await storeAdapter.createPendingAction(context, {
+      actionType: "CREATE_LEAD",
+      title: `Create Lead: ${title}`,
+      summary: `Register new lead "${title}" ($${value.toLocaleString()}) in stage ${stage}.`,
+      payload,
+    });
+
+    if (conversationId) {
+      await storeAdapter.setConversationState(context, conversationId, {
+        intent: "CREATE_LEAD",
+        step: "AWAITING_CONFIRMATION",
+        lastMentionedLeadTitle: title,
+      });
+    }
+
+    answer = `I have prepared the request to create lead **${title}** ($${value.toLocaleString()} — stage: *${stage}*).\n\nPlease confirm below to add this lead to your pipeline.`;
+  }
+
+  // 3E. CREATE_TASK: Awaiting Task Details
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "CREATE_TASK" &&
+    currentWorkflow.step === "AWAITING_TASK_DETAILS" &&
+    !isExplicitReadQuery(lowerMsg)
+  ) {
+    toolsUsed.push("crm_task_creator");
+    const dateInfo = extractDueDateFromText(message);
+    const dueDate = dateInfo ? dateInfo.dateStr : new Date(Date.now() + 86400000).toISOString().split("T")[0];
+
+    let taskTitle = message
+      .replace(/^(?:please\s+)?(?:can you\s+)?(?:add|create|new|schedule|set up|register|insert)\s+(?:a\s+)?(?:follow\s*-?\s*up\s+)?task\s+(?:to|for|of|named|about)?\s*/i, "")
+      .trim();
+    if (dateInfo) {
+      taskTitle = taskTitle
+        .replace(new RegExp(`(?:schedule(?:d)?\\s+)?(?:on|by|due|for)?\\s*${dateInfo.rawMatched}`, "i"), "")
+        .replace(/(?:schedule(?:d)?\s+on|due\s+on|on\s*$)/i, "")
+        .trim();
+    }
+    taskTitle = taskTitle.replace(/^[,\-:\s]+|[,\-:\s]+$/g, "");
+    if (!taskTitle || taskTitle.length < 3) taskTitle = "Follow-up task";
+    taskTitle = taskTitle.charAt(0).toUpperCase() + taskTitle.slice(1);
+
+    let associatedLead = null;
+    for (const l of leads) {
+      const lTitle = (l.title || l.name || "").toLowerCase();
+      if (lTitle && lowerMsg.includes(lTitle)) {
+        associatedLead = l;
+        break;
+      }
+    }
+
+    const payload = {
+      title: taskTitle,
+      description: taskTitle,
+      status: "PENDING",
+      priority: "HIGH",
+      dueDate,
+      due_date: dueDate,
+      leadId: associatedLead ? associatedLead.id : null,
+      leadTitle: associatedLead ? associatedLead.title : null,
+    };
+
+    requiresConfirmation = true;
+    pendingAction = await storeAdapter.createPendingAction(context, {
+      actionType: "CREATE_TASK",
+      title: `Create Task: ${taskTitle}`,
+      summary: `Create task "${taskTitle}" due on ${dueDate}.`,
+      payload,
+    });
+
+    if (conversationId) {
+      await storeAdapter.setConversationState(context, conversationId, {
+        intent: "CREATE_TASK",
+        step: "AWAITING_CONFIRMATION",
+        data: payload,
+      });
+    }
+
+    answer = `I have prepared the task:\n\n` +
+      `• **Task:** ${taskTitle}\n` +
+      `• **Due Date:** ${dueDate}\n` +
+      `• **Priority:** HIGH\n` +
+      `• **Status:** PENDING\n` +
+      (associatedLead ? `• **Associated Lead:** ${associatedLead.title} (\`${associatedLead.id}\`)\n` : "") +
+      `\nPlease confirm below before I add this task to your CRM.`;
+  }
+
+  // 3F. CREATE_CUSTOMER: Awaiting Customer Details
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "CREATE_CUSTOMER" &&
+    currentWorkflow.step === "AWAITING_CUSTOMER_DETAILS" &&
+    !isExplicitReadQuery(lowerMsg)
+  ) {
+    toolsUsed.push("crm_customer_creator");
+    let customerName = message.replace(/(?:industry|domain|contact|phone|email|\+).*/i, "").trim();
+    customerName = customerName.replace(/^(?:the\s+name\s+is\s+|company\s+is\s+|for\s+)/i, "").trim();
+    if (!customerName) customerName = "New Customer Account";
+
+    let industry = "General";
+    const indMatch = message.match(/(?:industry|domain|sector)\s*(?:is|:|=)?\s*([^,\n;]+)/i);
+    if (indMatch) industry = indMatch[1].trim();
+
+    let primaryContact = "";
+    const contactMatch = message.match(/(?:contact|phone|person)\s*(?:is|:|=)?\s*([^,\n;]+)/i);
+    if (contactMatch) primaryContact = contactMatch[1].trim();
+
+    const payload = {
+      accountNo: (Date.now() % 1000).toString(),
+      name: customerName,
+      company: customerName,
+      industry,
+      contactName: primaryContact || "Primary Contact",
+      email: primaryContact && primaryContact.includes("@") ? primaryContact : "contact@client.com",
+      phone: primaryContact && /^\+?[0-9\-\s()]+$/.test(primaryContact) ? primaryContact : "+1 (555) 019-2831",
+      status: "ACTIVE",
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    requiresConfirmation = true;
+    pendingAction = await storeAdapter.createPendingAction(context, {
+      actionType: "CREATE_CUSTOMER",
+      title: `Create Customer Account: ${payload.name}`,
+      summary: `Register customer account #${payload.accountNo} (${payload.name}) in ${payload.industry}.`,
+      payload,
+    });
+
+    if (conversationId) {
+      await storeAdapter.setConversationState(context, conversationId, {
+        intent: "CREATE_CUSTOMER",
+        step: "AWAITING_CONFIRMATION",
+        data: payload,
+      });
+    }
+
+    answer = `I have prepared the request to create customer account **${payload.name}**:\n\n` +
+      `• **Company / Customer:** ${payload.name}\n` +
+      `• **Account #:** #${payload.accountNo}\n` +
+      `• **Industry:** ${payload.industry}\n` +
+      `• **Primary Contact:** ${payload.phone}\n\n` +
+      `Please confirm below before I proceed with registering this customer account.`;
+  }
+
+  // 3G. DELETE_LEAD: Awaiting Lead Identifier
   else if (
     currentWorkflow &&
     currentWorkflow.intent === "DELETE_LEAD" &&
     currentWorkflow.step === "AWAITING_LEAD_IDENTIFIER" &&
-    !isTaskCreationIntent(lowerMsg, message) &&
-    !isLeadCreationIntent(lowerMsg, message) &&
-    !isQuestionOrInquiry(lowerMsg)
+    !isExplicitReadQuery(lowerMsg)
   ) {
     toolsUsed.push("crm_lead_deleter");
     const matchedLead = matchLeadFromText(message, leads);
@@ -721,12 +1618,101 @@ export async function executeAgentChat(context, { agentId, message, conversation
     }
   }
 
-  // 2B. Awaiting Lead for Task Creation (Multi-turn Example B)
+  // 3H. DELETE_CUSTOMER: Awaiting Customer Identifier
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "DELETE_CUSTOMER" &&
+    currentWorkflow.step === "AWAITING_CUSTOMER_IDENTIFIER" &&
+    !isExplicitReadQuery(lowerMsg)
+  ) {
+    toolsUsed.push("crm_customer_deleter");
+    const matchedCustomer = matchCustomerFromText(message, customers);
+    if (matchedCustomer) {
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "DELETE_CUSTOMER",
+        title: `Delete Customer: ${matchedCustomer.name}`,
+        summary: `Permanently delete customer account #${matchedCustomer.accountNo} (${matchedCustomer.name}).`,
+        payload: {
+          customerId: matchedCustomer.id,
+          accountNo: matchedCustomer.accountNo,
+          customerName: matchedCustomer.name,
+        },
+      });
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, null);
+      }
+      answer = `I have prepared the request to delete customer account **${matchedCustomer.name}** (#${matchedCustomer.accountNo}).\n\nPlease confirm below before I permanently remove it.`;
+    } else {
+      answer = `I could not find a customer matching "${message}". Please specify the company name or account number.`;
+    }
+  }
+
+  // 3I. DELETE_PRODUCT: Awaiting Product Identifier
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "DELETE_PRODUCT" &&
+    currentWorkflow.step === "AWAITING_PRODUCT_IDENTIFIER" &&
+    !isExplicitReadQuery(lowerMsg)
+  ) {
+    toolsUsed.push("inventory_product_deleter");
+    const matchedProduct = matchProductFromText(message, products);
+    if (matchedProduct) {
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "DELETE_PRODUCT",
+        title: `Delete Product: ${matchedProduct.name}`,
+        summary: `Permanently delete ${matchedProduct.name} (${matchedProduct.sku}) from inventory.`,
+        payload: {
+          productId: matchedProduct.id,
+          sku: matchedProduct.sku,
+          productName: matchedProduct.name,
+        },
+      });
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, null);
+      }
+      answer = `I have prepared the request to delete **${matchedProduct.name}** (**${matchedProduct.sku}**).\n\nPlease confirm below before I permanently remove it from inventory.`;
+    } else {
+      answer = `I could not find a product matching "${message}". Please specify the product name or SKU.`;
+    }
+  }
+
+  // 3J. DELETE_TASK: Awaiting Task Identifier
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "DELETE_TASK" &&
+    currentWorkflow.step === "AWAITING_TASK_IDENTIFIER" &&
+    !isExplicitReadQuery(lowerMsg)
+  ) {
+    toolsUsed.push("crm_task_deleter");
+    const matchedTask = matchTaskFromText(message, tasks);
+    if (matchedTask) {
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "DELETE_TASK",
+        title: `Delete Task: ${matchedTask.title}`,
+        summary: `Delete task "${matchedTask.title}" from CRM.`,
+        payload: {
+          taskId: matchedTask.id,
+          taskTitle: matchedTask.title,
+        },
+      });
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, null);
+      }
+      answer = `I have prepared the request to delete task **${matchedTask.title}**.\n\nPlease confirm below to proceed.`;
+    } else {
+      answer = `I could not find a task matching "${message}". Please specify the task title or ID.`;
+    }
+  }
+
+  // 3K. CREATE_TASK: Awaiting Lead Association
   else if (
     currentWorkflow &&
     currentWorkflow.intent === "CREATE_TASK" &&
     currentWorkflow.step === "AWAITING_LEAD" &&
-    !isQuestionOrInquiry(lowerMsg)
+    !isExplicitReadQuery(lowerMsg)
   ) {
     toolsUsed.push("crm_task_creator");
     const matchedLead = matchLeadFromText(message, leads);
@@ -777,12 +1763,12 @@ export async function executeAgentChat(context, { agentId, message, conversation
     }
   }
 
-  // 2C. Awaiting Lead for Moving Stage (Multi-turn)
+  // 3L. MOVE_LEAD: Awaiting Lead
   else if (
     currentWorkflow &&
     currentWorkflow.intent === "MOVE_LEAD" &&
     currentWorkflow.step === "AWAITING_LEAD" &&
-    !isQuestionOrInquiry(lowerMsg)
+    !isExplicitReadQuery(lowerMsg)
   ) {
     toolsUsed.push("crm_lead_stage_updater");
     const matchedLead = matchLeadFromText(message, leads);
@@ -816,12 +1802,12 @@ export async function executeAgentChat(context, { agentId, message, conversation
     }
   }
 
-  // 2D. Awaiting Product for Restock (Multi-turn)
+  // 3M. RESTOCK_PRODUCT: Awaiting Product
   else if (
     currentWorkflow &&
     currentWorkflow.intent === "RESTOCK_PRODUCT" &&
     currentWorkflow.step === "AWAITING_PRODUCT" &&
-    !isQuestionOrInquiry(lowerMsg)
+    !isExplicitReadQuery(lowerMsg)
   ) {
     toolsUsed.push("inventory_restock_orchestrator");
     const matchedProduct = matchProductFromText(message, products);
@@ -873,12 +1859,12 @@ export async function executeAgentChat(context, { agentId, message, conversation
     }
   }
 
-  // 2E. Awaiting Quantity for Restock (Multi-turn)
+  // 3N. RESTOCK_PRODUCT: Awaiting Quantity
   else if (
     currentWorkflow &&
     currentWorkflow.intent === "RESTOCK_PRODUCT" &&
     currentWorkflow.step === "AWAITING_QUANTITY" &&
-    !isQuestionOrInquiry(lowerMsg)
+    !isExplicitReadQuery(lowerMsg)
   ) {
     toolsUsed.push("inventory_restock_orchestrator");
     const qtyMatch = message.match(/\b(\d+)\b/);
@@ -914,21 +1900,26 @@ export async function executeAgentChat(context, { agentId, message, conversation
   }
 
   // =============================================================
-  // STEP 3: DELETE RECORDS (TASK, LEAD, PRODUCT)
+  // STEP 4: DELETE RECORDS (TASK, LEAD, CUSTOMER, PRODUCT)
   // Evaluated BEFORE task/lead creation to avoid create-false-positives on delete commands!
   // e.g. "delete the task Follow up with Marcus Vance on AeroTech quotation"
-  // "delete the lead #L-2357", "delete product Optoelectronic Sensor"
+  // "delete the lead #L-2357", "delete customer Aeropax", "delete product Optoelectronic Sensor"
   // =============================================================
   else if (isDeleteIntent(lowerMsg, message)) {
     const isTaskDelete =
       /\b(?:task|todo|to-do)\b/i.test(message) ||
       (/\bfollow\s*-?\s*up\b/i.test(message) && matchTaskFromText(message, tasks) !== null);
 
+    const isCustomerDelete =
+      !isTaskDelete &&
+      (/\b(?:customer|client|account)\b/i.test(message) || matchCustomerFromText(message, customers) !== null);
+
     const isLeadDelete =
       !isTaskDelete &&
+      !isCustomerDelete &&
       (/\b(?:lead|deal|opportunity|prospect)\b/i.test(message) || extractLeadIdentifierCandidate(message) !== null);
 
-    // 3A. Delete Task
+    // 4A. Delete Task
     if (isTaskDelete) {
       toolsUsed.push("crm_task_deleter");
       const matchedTask = matchTaskFromText(message, tasks);
@@ -949,9 +1940,45 @@ export async function executeAgentChat(context, { agentId, message, conversation
         }
       } else {
         answer = "Which task would you like to delete? Please specify the task title or ID.";
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, {
+            intent: "DELETE_TASK",
+            step: "AWAITING_TASK_IDENTIFIER",
+          });
+        }
       }
     }
-    // 3B. Delete Lead
+    // 4B. Delete Customer
+    else if (isCustomerDelete) {
+      toolsUsed.push("crm_customer_deleter");
+      const matchedCustomer = matchCustomerFromText(message, customers);
+      if (matchedCustomer) {
+        requiresConfirmation = true;
+        pendingAction = await storeAdapter.createPendingAction(context, {
+          actionType: "DELETE_CUSTOMER",
+          title: `Delete Customer: ${matchedCustomer.name}`,
+          summary: `Permanently delete customer account #${matchedCustomer.accountNo} (${matchedCustomer.name}).`,
+          payload: {
+            customerId: matchedCustomer.id,
+            accountNo: matchedCustomer.accountNo,
+            customerName: matchedCustomer.name,
+          },
+        });
+        answer = `I have prepared the request to delete customer account **${matchedCustomer.name}** (#${matchedCustomer.accountNo}).\n\nPlease confirm below before I permanently remove it.`;
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, null);
+        }
+      } else {
+        answer = "Which customer account would you like to delete? Please specify the company name or account number.";
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, {
+            intent: "DELETE_CUSTOMER",
+            step: "AWAITING_CUSTOMER_IDENTIFIER",
+          });
+        }
+      }
+    }
+    // 4C. Delete Lead
     else if (isLeadDelete) {
       toolsUsed.push("crm_lead_deleter");
       const matchedLead = matchLeadFromText(message, leads);
@@ -994,7 +2021,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
         }
       }
     }
-    // 3C. Delete Product
+    // 4D. Delete Product
     else {
       toolsUsed.push("inventory_product_deleter");
       const matchedProduct = matchProductFromText(message, products);
@@ -1011,6 +2038,9 @@ export async function executeAgentChat(context, { agentId, message, conversation
           },
         });
         answer = `I have prepared the request to delete **${matchedProduct.name}** (**${matchedProduct.sku}**).\n\nPlease confirm below before I permanently remove it from inventory.`;
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, null);
+        }
       } else {
         const prodMatch = message.match(/(?:product|item)\s+([a-zA-Z0-9_\-\s]+)/i);
         const nameTried = prodMatch ? prodMatch[1].trim() : null;
@@ -1018,6 +2048,12 @@ export async function executeAgentChat(context, { agentId, message, conversation
           answer = `Product "${nameTried}" was not found in your inventory (it may have already been deleted).`;
         } else {
           answer = "Which item would you like to delete? Please specify the product name or SKU.";
+        }
+        if (conversationId) {
+          await storeAdapter.setConversationState(context, conversationId, {
+            intent: "DELETE_PRODUCT",
+            step: "AWAITING_PRODUCT_IDENTIFIER",
+          });
         }
       }
     }
@@ -1056,13 +2092,16 @@ export async function executeAgentChat(context, { agentId, message, conversation
     // Capitalize first letter
     const taskTitle = titleCandidate.charAt(0).toUpperCase() + titleCandidate.slice(1);
 
-    // 3. Search for any associated lead mentioned in text
+    // 3. Search for any associated lead mentioned in text (word boundary match)
     let associatedLead = null;
     for (const l of leads) {
-      const lTitle = (l.title || l.name || "").toLowerCase();
-      if (lTitle && lowerMsg.includes(lTitle)) {
-        associatedLead = l;
-        break;
+      const lTitle = (l.title || l.name || "").trim();
+      if (lTitle.length >= 3) {
+        const escaped = lTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        if (new RegExp(`\\b${escaped}\\b`, "i").test(message)) {
+          associatedLead = l;
+          break;
+        }
       }
     }
 
@@ -1077,6 +2116,37 @@ export async function executeAgentChat(context, { agentId, message, conversation
           step: "AWAITING_LEAD",
           dueDate,
           taskTitle: "Follow-up meeting",
+        });
+      }
+      return {
+        answer,
+        sources,
+        toolsUsed,
+        executionTimeMs: Date.now() - startTime,
+        requiresConfirmation: false,
+        pendingAction: null,
+        executedAction: false,
+        conversationId,
+        executionMode: context.isDemo ? "DEMO" : "LIVE",
+      };
+    }
+
+    // If task title is generic or missing and no due date was specified
+    const isGenericTask = !dateInfo && (
+      !titleCandidate ||
+      titleCandidate.length < 3 ||
+      /^(?:meeting with the lead|task|follow up|todo|to-do|create a task|add a task)$/i.test(titleCandidate)
+    );
+
+    if (isGenericTask) {
+      requiresConfirmation = false;
+      answer = "What is the title or description of this task, and when is it scheduled for?";
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_TASK",
+          step: "AWAITING_TASK_DETAILS",
+          leadId: associatedLead ? associatedLead.id : null,
+          leadTitle: associatedLead ? associatedLead.title : null,
         });
       }
       return {
@@ -1140,7 +2210,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
     toolsUsed.push("crm_lead_creator");
 
     // Extract title
-    let title = "New Prospect Lead";
+    let title = "";
     const titleMatch = message.match(/(?:lead|deal|opportunity)\s+(?:for\s+|named\s+|called\s+)?([^,\n;]+)/i);
     if (titleMatch) {
       title = titleMatch[1]
@@ -1148,7 +2218,9 @@ export async function executeAgentChat(context, { agentId, message, conversation
         .replace(/^(?:a\s+|an\s+|new\s+)+/i, "")
         .trim();
     }
-    if (!title || title.length < 2) title = "New Prospect Lead";
+    if (!title || title.length < 2) {
+      title = "New Prospect Lead";
+    }
 
     // Extract value safely: preceded by deal size/value/amount/worth/$
     let value = 0;
@@ -1161,6 +2233,30 @@ export async function executeAgentChat(context, { agentId, message, conversation
       if (raw.endsWith("k")) { mult = 1000; raw = raw.replace("k", ""); }
       const p = parseFloat(raw) * mult;
       if (!isNaN(p)) value = p;
+    }
+
+    // If both title was not specified and value is 0
+    const isGenericLead = (!titleMatch || title === "New Prospect Lead" || /^(?:lead|deal|opportunity|new lead|prospect)$/i.test(title)) && value === 0;
+    if (isGenericLead) {
+      requiresConfirmation = false;
+      answer = "What is the company or prospect name for this new lead, and what is the estimated deal value?";
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_LEAD",
+          step: "AWAITING_LEAD_DETAILS",
+        });
+      }
+      return {
+        answer,
+        sources,
+        toolsUsed,
+        executionTimeMs: Date.now() - startTime,
+        requiresConfirmation: false,
+        pendingAction: null,
+        executedAction: false,
+        conversationId,
+        executionMode: context.isDemo ? "DEMO" : "LIVE",
+      };
     }
 
     const stageInfo = extractStageFromText(message);
@@ -1235,6 +2331,29 @@ export async function executeAgentChat(context, { agentId, message, conversation
       customerName = `Customer Account #${accountNo}`;
     } else {
       customerName = "New Customer Account";
+    }
+
+    const isGenericCustomer = (!nameMatch || customerName === "New Customer Account" || /^(?:customer|client|account|new customer)$/i.test(customerName)) && !industry && !primaryContact;
+    if (isGenericCustomer) {
+      requiresConfirmation = false;
+      answer = "What is the company name for this new customer account, and what is their industry or primary contact?";
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_CUSTOMER",
+          step: "AWAITING_CUSTOMER_DETAILS",
+        });
+      }
+      return {
+        answer,
+        sources,
+        toolsUsed,
+        executionTimeMs: Date.now() - startTime,
+        requiresConfirmation: false,
+        pendingAction: null,
+        executedAction: false,
+        conversationId,
+        executionMode: context.isDemo ? "DEMO" : "LIVE",
+      };
     }
 
     const payload = {
@@ -1327,6 +2446,157 @@ export async function executeAgentChat(context, { agentId, message, conversation
       }
 
       answer = `I have prepared the update to move **${matchedLead.title}** from stage *${matchedLead.stage}* to **${stageInfo.canonical}**.\n\nPlease confirm below to proceed with updating this lead.`;
+    }
+  }
+
+  // =============================================================
+  // STEP 6B: CREATE PRODUCT / NEW STOCK INTAKE
+  // e.g. "add a new stock of laptop charges 23 items", "create product Laptop Charger 23 items"
+  // =============================================================
+  else if (isProductCreationIntent(lowerMsg, message)) {
+    toolsUsed.push("inventory_product_creator");
+    const extracted = extractProductFromMessage(message);
+
+    // If both name and quantity are missing
+    if (!extracted.hasExplicitName && !extracted.hasExplicitQuantity) {
+      requiresConfirmation = false;
+      answer = "What is the name of the product you would like to add, and how many units should I register in stock?";
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_PRODUCT",
+          step: "AWAITING_PRODUCT_DETAILS",
+        });
+      }
+      return {
+        answer,
+        sources,
+        toolsUsed,
+        executionTimeMs: Date.now() - startTime,
+        requiresConfirmation: false,
+        pendingAction: null,
+        executedAction: false,
+        conversationId,
+        executionMode: context.isDemo ? "DEMO" : "LIVE",
+      };
+    }
+
+    // If name is known but quantity is missing
+    if (extracted.hasExplicitName && !extracted.hasExplicitQuantity) {
+      requiresConfirmation = false;
+      answer = `How many units of **${extracted.name}** would you like to add to stock?`;
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_PRODUCT",
+          step: "AWAITING_PRODUCT_QUANTITY",
+          partialData: extracted,
+        });
+      }
+      return {
+        answer,
+        sources,
+        toolsUsed,
+        executionTimeMs: Date.now() - startTime,
+        requiresConfirmation: false,
+        pendingAction: null,
+        executedAction: false,
+        conversationId,
+        executionMode: context.isDemo ? "DEMO" : "LIVE",
+      };
+    }
+
+    // If quantity is known but name is missing
+    if (!extracted.hasExplicitName && extracted.hasExplicitQuantity) {
+      requiresConfirmation = false;
+      answer = `What is the name of the product you would like to add (${extracted.quantity} units) to your stock?`;
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_PRODUCT",
+          step: "AWAITING_PRODUCT_NAME",
+          partialData: extracted,
+        });
+      }
+      return {
+        answer,
+        sources,
+        toolsUsed,
+        executionTimeMs: Date.now() - startTime,
+        requiresConfirmation: false,
+        pendingAction: null,
+        executedAction: false,
+        conversationId,
+        executionMode: context.isDemo ? "DEMO" : "LIVE",
+      };
+    }
+
+    // Check if an existing product with this name already exists in inventory
+    const existing = matchProductFromText(extracted.name, products);
+    if (existing) {
+      requiresConfirmation = true;
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "RESTOCK_PRODUCT",
+        title: `Restock Existing Item: ${existing.name}`,
+        summary: `Renew stock for existing product ${existing.name} (${existing.sku}) by +${extracted.quantity} units.`,
+        payload: {
+          productId: existing.id,
+          sku: existing.sku,
+          productName: existing.name,
+          quantityDelta: extracted.quantity,
+          quantity: extracted.quantity,
+          changeType: "IN",
+          reason: "User specified restocking quantity via AI assistant",
+        },
+      });
+
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "RESTOCK_PRODUCT",
+          step: "AWAITING_CONFIRMATION",
+          productId: existing.id,
+          productName: existing.name,
+        });
+      }
+
+      answer = `I found existing inventory product **${existing.name}** (\`${existing.sku}\`, current stock: ${existing.quantity} units).\n\n` +
+        `I have prepared the request to add **+${extracted.quantity} units** (new stock will be **${existing.quantity + extracted.quantity} units**).\n\n` +
+        `Please confirm below before I proceed.`;
+    } else {
+      requiresConfirmation = true;
+      const payload = {
+        name: extracted.name,
+        sku: extracted.sku,
+        quantity: extracted.quantity,
+        current_stock: extracted.quantity,
+        unitPrice: extracted.unitPrice,
+        unit_price: extracted.unitPrice,
+        reorderPoint: extracted.reorderPoint,
+        min_stock_threshold: extracted.reorderPoint,
+        category: extracted.category,
+        description: extracted.description,
+      };
+
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "CREATE_PRODUCT",
+        title: `Add New Product: ${extracted.name}`,
+        summary: `Add new inventory item "${extracted.name}" (${extracted.quantity} units at $${extracted.unitPrice.toFixed(2)}/unit in ${extracted.category}).`,
+        payload,
+      });
+
+      if (conversationId) {
+        await storeAdapter.setConversationState(context, conversationId, {
+          intent: "CREATE_PRODUCT",
+          step: "AWAITING_CONFIRMATION",
+          data: payload,
+        });
+      }
+
+      answer = `I have prepared the request to add **${extracted.name}** to your inventory:\n\n` +
+        `• **Product Name:** ${extracted.name}\n` +
+        `• **Initial Stock:** ${extracted.quantity} units\n` +
+        `• **Generated SKU:** \`${extracted.sku}\`\n` +
+        `• **Category:** ${extracted.category}\n` +
+        `• **Unit Price:** $${extracted.unitPrice.toFixed(2)}\n` +
+        `• **Reorder Threshold:** ${extracted.reorderPoint} units\n\n` +
+        `Please confirm below before I add this item to your inventory.`;
     }
   }
 
