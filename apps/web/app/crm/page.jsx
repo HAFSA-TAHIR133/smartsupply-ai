@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { crmAPI, demoAPI } from "@/lib/api";
 import { useAuthContext } from "@/context/authContext";
+import { fetchWithCache } from "@/lib/clientCache";
 import Card from "@/components/ui/card";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
@@ -194,24 +195,60 @@ export default function CRMPage() {
     status: "PENDING",
   });
 
-  const loadCRMData = async () => {
-    setLoading(true);
+  const loadCRMData = async (forceFresh = false) => {
     try {
+      if (forceFresh) {
+        const [leadsData, custData, tasksData] = await Promise.allSettled([
+          crmAPI.getLeads(),
+          crmAPI.getCustomers(),
+          crmAPI.getTasks(),
+        ]);
+        if (leadsData.status === "fulfilled") {
+          const val = leadsData.value;
+          setLeads(Array.isArray(val) ? val : (Array.isArray(val?.data) ? val.data : []));
+        }
+        if (custData.status === "fulfilled") {
+          const val = custData.value;
+          setCustomers(Array.isArray(val) ? val : (Array.isArray(val?.data) ? val.data : []));
+        }
+        if (tasksData.status === "fulfilled") {
+          const val = tasksData.value;
+          setTasks(Array.isArray(val) ? val : (Array.isArray(val?.data) ? val.data : []));
+        }
+        return;
+      }
+
+      // Cache-first loading for instant (<50ms) page shift
       const [leadsData, custData, tasksData] = await Promise.allSettled([
-        crmAPI.getLeads(),
-        crmAPI.getCustomers(),
-        crmAPI.getTasks(),
+        fetchWithCache("crm:leads", () => crmAPI.getLeads(), {
+          onRevalidated: (fresh) => {
+            const val = Array.isArray(fresh) ? fresh : (Array.isArray(fresh?.data) ? fresh.data : []);
+            setLeads(val);
+          },
+        }),
+        fetchWithCache("crm:customers", () => crmAPI.getCustomers(), {
+          onRevalidated: (fresh) => {
+            const val = Array.isArray(fresh) ? fresh : (Array.isArray(fresh?.data) ? fresh.data : []);
+            setCustomers(val);
+          },
+        }),
+        fetchWithCache("crm:tasks", () => crmAPI.getTasks(), {
+          onRevalidated: (fresh) => {
+            const val = Array.isArray(fresh) ? fresh : (Array.isArray(fresh?.data) ? fresh.data : []);
+            setTasks(val);
+          },
+        }),
       ]);
 
-      if (leadsData.status === "fulfilled") {
+      if (leadsData.status === "fulfilled" && leadsData.value) {
         const val = leadsData.value;
         setLeads(Array.isArray(val) ? val : (Array.isArray(val?.data) ? val.data : []));
       }
-      if (custData.status === "fulfilled") {
+      if (custData.status === "fulfilled" && custData.value) {
         const val = custData.value;
         setCustomers(Array.isArray(val) ? val : (Array.isArray(val?.data) ? val.data : []));
       }
-      if (tasksData.status === "fulfilled") {
+      if (tasksData.status === "fulfilled" && tasksData.value) {
         const val = tasksData.value;
         setTasks(Array.isArray(val) ? val : (Array.isArray(val?.data) ? val.data : []));
       }
@@ -226,7 +263,7 @@ export default function CRMPage() {
     loadCRMData();
 
     const handleDataUpdated = () => {
-      loadCRMData();
+      loadCRMData(true);
     };
 
     if (typeof window !== "undefined") {

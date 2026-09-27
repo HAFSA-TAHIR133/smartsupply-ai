@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { apiRequest } from "@/lib/api";
 import { useAuthContext } from "@/context/authContext";
+import { fetchWithCache } from "@/lib/clientCache";
 import {
   DollarSign,
   Boxes,
@@ -89,11 +90,34 @@ export default function DashboardPage() {
     if (user) {
       loadDashboardData();
     }
+
+    const handleUpdate = () => {
+      loadDashboardData(true);
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("smartsupply:data-updated", handleUpdate);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("smartsupply:data-updated", handleUpdate);
+      }
+    };
   }, [user, isDemo]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (forceFresh = false) => {
     try {
-      const data = await apiRequest("/dashboard/stats");
+      if (forceFresh) {
+        const data = await apiRequest("/dashboard/stats");
+        if (data) setStats(data);
+        return;
+      }
+
+      const data = await fetchWithCache(
+        "dashboard:stats",
+        () => apiRequest("/dashboard/stats"),
+        { onRevalidated: (fresh) => fresh && setStats(fresh) }
+      );
       if (data) {
         setStats(data);
       }

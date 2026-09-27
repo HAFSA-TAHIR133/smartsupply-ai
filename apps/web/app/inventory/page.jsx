@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { inventoryAPI, demoAPI } from "@/lib/api";
 import { useAuthContext } from "@/context/authContext";
+import { fetchWithCache } from "@/lib/clientCache";
 import Card from "@/components/ui/card";
 import Button from "@/components/ui/button";
 import Input from "@/components/ui/input";
@@ -152,18 +153,36 @@ export default function InventoryPage() {
   const [formError, setFormError] = useState("");
   const [resettingDemo, setResettingDemo] = useState(false);
 
-  const loadProducts = async () => {
+  const loadProducts = async (forceFresh = false) => {
     try {
-      setLoading(true);
-      const res = await inventoryAPI.getAll();
-      const productList = Array.isArray(res)
-        ? res
-        : res?.products && Array.isArray(res.products)
-        ? res.products
-        : res?.items && Array.isArray(res.items)
-        ? res.items
-        : [];
+      const parseProducts = (res) =>
+        Array.isArray(res)
+          ? res
+          : res?.products && Array.isArray(res.products)
+          ? res.products
+          : res?.items && Array.isArray(res.items)
+          ? res.items
+          : [];
 
+      if (forceFresh) {
+        const res = await inventoryAPI.getAll();
+        const productList = parseProducts(res);
+        setProducts(productList);
+        return;
+      }
+
+      const res = await fetchWithCache(
+        "inventory:products",
+        () => inventoryAPI.getAll(),
+        {
+          onRevalidated: (fresh) => {
+            const list = parseProducts(fresh);
+            setProducts(list);
+          },
+        }
+      );
+
+      const productList = parseProducts(res);
       setProducts(productList);
 
       if (initialAdjustId && productList.length > 0) {
@@ -186,7 +205,7 @@ export default function InventoryPage() {
     loadProducts();
 
     const handleDataUpdated = () => {
-      loadProducts();
+      loadProducts(true);
     };
 
     if (typeof window !== "undefined") {

@@ -35,6 +35,7 @@ import {
 } from "recharts";
 import { chartsAPI, inventoryAPI } from "@/lib/api";
 import { useAuthContext } from "@/context/authContext";
+import { fetchWithCache } from "@/lib/clientCache";
 
 const PRESET_SOURCES = [
   {
@@ -125,13 +126,44 @@ export default function ChartsPage() {
     if (user) {
       fetchCharts(false);
     }
+
+    const handleDataUpdated = () => {
+      fetchCharts(false, true);
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("smartsupply:data-updated", handleDataUpdated);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("smartsupply:data-updated", handleDataUpdated);
+      }
+    };
   }, [user]);
 
-  const fetchCharts = async (showLoading = false) => {
+  const fetchCharts = async (showLoading = false, forceFresh = false) => {
     if (showLoading) setLoading(true);
     setError(null);
     try {
-      const data = await chartsAPI.getAll();
+      if (forceFresh) {
+        const data = await chartsAPI.getAll();
+        if (Array.isArray(data) && data.length > 0) {
+          setCharts(data);
+        }
+        return;
+      }
+
+      const data = await fetchWithCache(
+        "charts:all",
+        () => chartsAPI.getAll(),
+        {
+          onRevalidated: (fresh) => {
+            if (Array.isArray(fresh) && fresh.length > 0) {
+              setCharts(fresh);
+            }
+          },
+        }
+      );
       if (Array.isArray(data) && data.length > 0) {
         setCharts(data);
       }

@@ -19,7 +19,10 @@ import {
 } from "lucide-react";
 import { useAuthContext } from "@/context/authContext";
 import { AIAssistantDrawer } from "@/components/ai/ai-assistant-drawer";
+import { DemoLockModal } from "@/components/demo/DemoLockModal";
 import { apiRequest } from "@/lib/api";
+import { prefetchRouteData } from "@/lib/clientCache";
+import { getAiCommandCount, DEMO_MAX_AI_ACTIONS } from "@/lib/demo/demoStore";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -39,6 +42,18 @@ export function AppLayout({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [aiCommandsUsed, setAiCommandsUsed] = useState(0);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setAiCommandsUsed(getAiCommandCount());
+      const updateHandler = () => {
+        setAiCommandsUsed(getAiCommandCount());
+      };
+      window.addEventListener("smartsupply:data-updated", updateHandler);
+      return () => window.removeEventListener("smartsupply:data-updated", updateHandler);
+    }
+  }, []);
 
   // Compute clean user display name and avatar letter from user's full name
   const displayName = (() => {
@@ -64,7 +79,7 @@ export function AppLayout({ children }) {
   };
 
   const KNOWN_PROTECTED_ROUTES = ["/", "/inventory", "/charts", "/crm", "/agents"];
-  const isKnownRoute = pathname === "/login" || KNOWN_PROTECTED_ROUTES.includes(pathname);
+  const isKnownRoute = pathname === "/login" || pathname === "/demo" || KNOWN_PROTECTED_ROUTES.includes(pathname);
 
   // Eagerly prefetch known routes so navigation is instant
   useEffect(() => {
@@ -79,7 +94,7 @@ export function AppLayout({ children }) {
 
   // Route protection for known protected routes
   useEffect(() => {
-    if (!loading && !user && isKnownRoute && pathname !== "/login") {
+    if (!loading && !user && isKnownRoute && pathname !== "/login" && pathname !== "/demo") {
       const redirectParam = encodeURIComponent(pathname);
       router.replace(`/login?redirect=${redirectParam}`);
     }
@@ -109,7 +124,7 @@ export function AppLayout({ children }) {
     } catch (e) {}
   };
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname === "/demo") {
     return children;
   }
 
@@ -182,22 +197,47 @@ export function AppLayout({ children }) {
 
           {/* Tenant Badge */}
           <div className="hidden sm:flex items-center gap-2 pl-3 ml-2 border-l border-zinc-800 text-xs">
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800/80 text-zinc-300">
-              <Building2 className="h-3 w-3 text-indigo-400" />
-              <span className="font-medium text-[11px] truncate max-w-[140px]">
-                {isDemo ? "Demo Account" : user?.tenantName || "Enterprise Workspace"}
-              </span>
-            </div>
+            {isDemo ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                <Sparkles className="h-3 w-3 text-amber-400" />
+                <span className="font-semibold text-[11px] tracking-wide">
+                  Isolated Demo Sandbox
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800/80 text-zinc-300">
+                <Building2 className="h-3 w-3 text-indigo-400" />
+                <span className="font-medium text-[11px] truncate max-w-[140px]">
+                  {user?.tenantName || "Enterprise Workspace"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Center System Status */}
         <div className="hidden md:flex items-center gap-2 text-[11px] font-medium text-zinc-400 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800/80">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          <span className="text-zinc-300 font-medium">All Systems Operational</span>
+          {isDemo ? (
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-60"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+              <span className="text-zinc-300 font-medium">Demo Mode (Zero Backend Exposure)</span>
+              <span className="text-zinc-600">|</span>
+              <span className={`font-mono text-[10px] ${aiCommandsUsed >= DEMO_MAX_AI_ACTIONS ? "text-rose-400 font-bold" : "text-amber-400"}`}>
+                AI Actions: {aiCommandsUsed}/{DEMO_MAX_AI_ACTIONS}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-zinc-300 font-medium">All Systems Operational</span>
+            </>
+          )}
         </div>
 
         {/* Right Header Actions */}
@@ -375,6 +415,7 @@ export function AppLayout({ children }) {
                           key={item.href}
                           href={item.href}
                           prefetch={true}
+                          onMouseEnter={() => prefetchRouteData(item.href)}
                           onClick={() => setSidebarDrawerOpen(false)}
                           className={`flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
                             isActive
@@ -453,6 +494,7 @@ export function AppLayout({ children }) {
                         key={item.href}
                         href={item.href}
                         prefetch={true}
+                        onMouseEnter={() => prefetchRouteData(item.href)}
                         onClick={() => setMobileMenuOpen(false)}
                         className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                           pathname === item.href
@@ -495,6 +537,9 @@ export function AppLayout({ children }) {
 
       {/* Slide-Over AI Drawer */}
       <AIAssistantDrawer isOpen={aiDrawerOpen} onClose={() => setAiDrawerOpen(false)} />
+
+      {/* Un-dismissable 10-Action Limit Modal for Demo Mode */}
+      <DemoLockModal />
     </div>
   );
 }

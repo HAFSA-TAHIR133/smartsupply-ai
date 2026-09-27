@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { apiRequest } from "@/lib/api";
+import { getDemoStore } from "@/lib/demo/demoStore";
 
 const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes of inactivity
 
@@ -57,6 +58,21 @@ export function AuthProvider({ children }) {
 
   // Check initial session & inactivity on mount
   useEffect(() => {
+    // Check anonymous demo query parameter or /demo route
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasDemoQuery =
+        urlParams.get("demo") === "true" ||
+        urlParams.get("anonymous_demo") === "1" ||
+        urlParams.get("ref") === "linkedin";
+
+      if (hasDemoQuery || window.location.pathname === "/demo") {
+        startDemo();
+        setLoading(false);
+        return;
+      }
+    }
+
     const isLoggedOut = typeof window !== "undefined" && localStorage.getItem("smartsupply_logged_out") === "true";
     if (isLoggedOut) {
       setUser(null);
@@ -152,6 +168,12 @@ export function AuthProvider({ children }) {
   }, [user, logout]);
 
   const login = async (email, password) => {
+    const cleanEmail = (email || "").toLowerCase().trim();
+    // Static Demo Account Credentials Detection
+    if (cleanEmail === "demo@smartsupply.ai" || cleanEmail === "demo") {
+      return startDemo();
+    }
+
     const data = await apiRequest("/auth/login", {
       method: "POST",
       body: { email, password },
@@ -194,23 +216,35 @@ export function AuthProvider({ children }) {
   };
 
   const startDemo = async () => {
-    // Authenticate through normal backend flow
-    const data = await apiRequest("/auth/demo", { method: "POST" });
-    if (!data?.token || !data?.user) {
-      throw new Error("Failed to authenticate demo account.");
-    }
+    // 1. Initialize completely isolated client-side state in localStorage
+    getDemoStore();
 
-    setUser(data.user);
-    setToken(data.token);
+    // 2. Synthetic client-side session credentials (zero backend DB footprint)
+    const demoUser = {
+      id: "demo-user-1",
+      email: "demo@smartsupply.ai",
+      name: "Alex Reynolds",
+      fullName: "Alex Reynolds",
+      role: "ADMIN",
+      tenantId: "demo-tenant-id",
+      tenantName: "SmartSupply Demo Account",
+    };
+    const demoToken = `demo-session-token-${Date.now()}`;
+
+    setUser(demoUser);
+    setToken(demoToken);
     setIsDemo(true);
 
-    localStorage.removeItem("smartsupply_logged_out");
-    localStorage.setItem("smartsupply_token", data.token);
-    localStorage.setItem("smartsupply_user", JSON.stringify(data.user));
-    localStorage.setItem("smartsupply_tenantId", data.user.tenantId || "demo-tenant-id");
-    localStorage.setItem("smartsupply_isDemo", "true");
-    localStorage.setItem("smartsupply_last_active", Date.now().toString());
-    return data;
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("smartsupply_logged_out");
+      localStorage.setItem("smartsupply_token", demoToken);
+      localStorage.setItem("smartsupply_user", JSON.stringify(demoUser));
+      localStorage.setItem("smartsupply_tenantId", "demo-tenant-id");
+      localStorage.setItem("smartsupply_isDemo", "true");
+      localStorage.setItem("smartsupply_last_active", Date.now().toString());
+    }
+
+    return { token: demoToken, user: demoUser, isDemo: true };
   };
 
   const updateUser = async (updatedFields) => {

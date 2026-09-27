@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { useAuthContext } from "@/context/authContext";
+import { getAiCommandCount, isAiRateLimitExceeded, DEMO_MAX_AI_ACTIONS } from "@/lib/demo/demoStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,6 +51,18 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
   const [actionLoading, setActionLoading] = useState(null);
   const [expandedSources, setExpandedSources] = useState({});
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [aiCount, setAiCount] = useState(0);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setAiCount(getAiCommandCount());
+      const handleDataUpdated = () => {
+        setAiCount(getAiCommandCount());
+      };
+      window.addEventListener("smartsupply:data-updated", handleDataUpdated);
+      return () => window.removeEventListener("smartsupply:data-updated", handleDataUpdated);
+    }
+  }, []);
   
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -254,15 +267,39 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
         return [...prev, botMsg];
       });
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err-${Date.now()}`,
-          sender: "AGENT",
-          content: `⚠️ Error executing agent request: ${err.message}`,
-          sources: [],
-        },
-      ]);
+      if (err.guardrailRejected || err.message?.includes("rejected by Demo Guardrails")) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `guardrail-${Date.now()}`,
+            sender: "AGENT",
+            isGuardrailAlert: true,
+            content: `🛡️ **Action rejected by Demo Guardrails**\n\n${err.reason || "The input violates safety policies, structural prompt injection checks, or database guardrails. No changes were made."}`,
+            sources: [],
+          },
+        ]);
+      } else if (err.rateLimitReached || err.message?.includes("Demo limit reached")) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `ratelimit-${Date.now()}`,
+            sender: "AGENT",
+            isRateLimitAlert: true,
+            content: `🛑 **Demo limit reached. Sign up for a real trial account to continue**\n\nYou have used your 10 free AI operations in this demo session. Real production accounts provide unconstrained autonomous agents, live ERP integration, and multi-tenant databases.`,
+            sources: [],
+          },
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `err-${Date.now()}`,
+            sender: "AGENT",
+            content: `⚠️ Error executing agent request: ${err.message}`,
+            sources: [],
+          },
+        ]);
+      }
     } finally {
       setLoading(false);
     }
@@ -521,42 +558,73 @@ export function AIAssistantDrawer({ isOpen, onClose }) {
               </div>
 
               {/* Quick Prompts */}
-              <div className="px-3 py-2 flex gap-1.5 overflow-x-auto border-t border-zinc-800 bg-zinc-900/40">
-                {[
-                  "Which products need restocking?",
-                  "Show top CRM deals",
-                  "Supplier lead times",
-                ].map((promptText, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setInputMessage(promptText)}
-                    className="shrink-0 text-[10px] py-1 px-2.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
-                  >
-                    {promptText}
-                  </button>
-                ))}
-              </div>
+              {(!isDemo || aiCount < DEMO_MAX_AI_ACTIONS) && (
+                <div className="px-3 py-2 flex gap-1.5 overflow-x-auto border-t border-zinc-800 bg-zinc-900/40">
+                  {[
+                    "Which products need restocking?",
+                    "Show top CRM deals",
+                    "Supplier lead times",
+                  ].map((promptText, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setInputMessage(promptText)}
+                      className="shrink-0 text-[10px] py-1 px-2.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer"
+                    >
+                      {promptText}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-              {/* Drawer Expandable Footer Input Form */}
-              <form onSubmit={handleSendMessage} className="p-3 border-t border-zinc-800 bg-zinc-900 flex items-end gap-2">
-                <textarea
-                  ref={textareaRef}
-                  rows={1}
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={`Ask ${AGENT_OPTIONS.find(a => a.id === selectedAgent)?.name}...`}
-                  disabled={loading}
-                  className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 resize-none overflow-y-auto max-h-40 leading-relaxed transition-all"
-                />
-                <button
-                  type="submit"
-                  disabled={!inputMessage.trim() || loading}
-                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition-colors shrink-0 mb-0.5"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                </button>
-              </form>
+              {/* Drawer Footer: Rate Limit CTA or Input Form */}
+              {isDemo && aiCount >= DEMO_MAX_AI_ACTIONS ? (
+                <div className="p-4 border-t border-zinc-800 bg-zinc-900/95 text-center space-y-2.5">
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-rose-400 font-semibold">
+                    <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>Demo limit reached. Sign up for a real trial account to continue</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed max-w-xs mx-auto">
+                    You have executed 10/10 demo operations. Real production accounts provide unconstrained autonomous agent workflows and live ERP sync.
+                  </p>
+                  <a
+                    href="/login"
+                    className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white rounded-lg text-xs font-semibold shadow-md transition-all cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Sign up for a real trial account to continue</span>
+                  </a>
+                </div>
+              ) : (
+                <>
+                  {isDemo && (
+                    <div className="px-3 py-1 bg-zinc-900/80 border-t border-zinc-800/80 flex items-center justify-between text-[10px] text-zinc-400">
+                      <span>Demo Mode Sandbox</span>
+                      <span className="text-amber-400 font-mono font-medium">
+                        {DEMO_MAX_AI_ACTIONS - aiCount} AI operations remaining
+                      </span>
+                    </div>
+                  )}
+                  <form onSubmit={handleSendMessage} className="p-3 border-t border-zinc-800 bg-zinc-900 flex items-end gap-2">
+                    <textarea
+                      ref={textareaRef}
+                      rows={1}
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={`Ask ${AGENT_OPTIONS.find(a => a.id === selectedAgent)?.name}...`}
+                      disabled={loading}
+                      className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 resize-none overflow-y-auto max-h-40 leading-relaxed transition-all"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!inputMessage.trim() || loading}
+                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition-colors shrink-0 mb-0.5 cursor-pointer"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </button>
+                  </form>
+                </>
+              )}
             </motion.div>
           </div>
 

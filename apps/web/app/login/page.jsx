@@ -545,15 +545,18 @@ function LoginFormContent() {
               {demoLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
-                  <span>Authenticating Demo Account...</span>
+                  <span>Launching Isolated Demo Sandbox...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]" />
-                  <span>Demo Account</span>
+                  <span>Launch Instant Demo Account (Client Sandbox)</span>
                 </>
               )}
             </button>
+            // <p className="text-[10px] text-zinc-500 text-center mt-2">
+            //   Static demo login: <code className="text-indigo-400 font-mono">demo@smartsupply.ai</code> • Zero backend exposure
+            // </p>
           </form>
         </div>
 

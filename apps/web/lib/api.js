@@ -1,6 +1,21 @@
+import { interceptDemoRequest, isDemoSession } from "./demoInterceptor";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export async function apiRequest(endpoint, options = {}) {
+  // 1. FRONTEND DEMO INTERCEPTOR (Zero Backend Network Traffic)
+  if (typeof window !== "undefined" && isDemoSession()) {
+    try {
+      const intercepted = await interceptDemoRequest(endpoint, options);
+      if (intercepted !== null) {
+        return intercepted?.data !== undefined ? intercepted.data : intercepted;
+      }
+    } catch (demoErr) {
+      // Re-throw demo errors (e.g. guardrail rejections, rate limits) cleanly
+      console.warn(`[Demo Interceptor] Handled error on [${options.method || "GET"} ${endpoint}]:`, demoErr.message);
+      throw demoErr;
+    }
+  }
 
   const token = typeof window !== "undefined" ? localStorage.getItem("smartsupply_token") : null;
   const tenantId = typeof window !== "undefined" ? localStorage.getItem("smartsupply_tenantId") : null;
