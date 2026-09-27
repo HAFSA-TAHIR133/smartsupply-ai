@@ -417,9 +417,10 @@ function extractStageFromText(text) {
 }
 
 /**
- * Parses date phrases like "30 sep 2026", "2026-09-30", "tomorrow".
+ * Parses date phrases like "30 sep 2026", "30 sepetember 2026", "2026-09-30", "tomorrow".
  */
 function extractDueDateFromText(text) {
+  if (!text) return null;
   const monthNames = {
     jan: 1, january: 1,
     feb: 2, february: 2,
@@ -429,28 +430,28 @@ function extractDueDateFromText(text) {
     jun: 6, june: 6,
     jul: 7, july: 7,
     aug: 8, august: 8,
-    sep: 9, sept: 9, september: 9,
+    sep: 9, sept: 9, september: 9, sepetember: 9,
     oct: 10, october: 10,
     nov: 11, november: 11,
     dec: 12, december: 12,
   };
 
-  // e.g. "30 sep 2026" or "30th september 2026"
-  const dmyMatch = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+(\d{4})\b/i);
+  // e.g. "30 sep 2026", "30th september 2026", "30 sepetember 2026"
+  const dmyMatch = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|sepetember|oct|october|nov|november|dec|december)(?:\s+(\d{4}))?\b/i);
   if (dmyMatch) {
     const day = parseInt(dmyMatch[1], 10);
-    const month = monthNames[dmyMatch[2].toLowerCase()];
-    const year = parseInt(dmyMatch[3], 10);
+    const month = monthNames[dmyMatch[2].toLowerCase()] || 9;
+    const year = dmyMatch[3] ? parseInt(dmyMatch[3], 10) : new Date().getFullYear();
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     return { dateStr, rawMatched: dmyMatch[0] };
   }
 
-  // e.g. "september 30 2026" or "sep 30, 2026"
-  const mdyMatch = text.match(/\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,)?\s+(\d{4})\b/i);
+  // e.g. "september 30 2026", "sep 30, 2026", "sepetember 30"
+  const mdyMatch = text.match(/\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|sepetember|oct|october|nov|november|dec|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,)?(?:\s+(\d{4}))?\b/i);
   if (mdyMatch) {
-    const month = monthNames[mdyMatch[1].toLowerCase()];
+    const month = monthNames[mdyMatch[1].toLowerCase()] || 9;
     const day = parseInt(mdyMatch[2], 10);
-    const year = parseInt(mdyMatch[3], 10);
+    const year = mdyMatch[3] ? parseInt(mdyMatch[3], 10) : new Date().getFullYear();
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     return { dateStr, rawMatched: mdyMatch[0] };
   }
@@ -460,6 +461,12 @@ function extractDueDateFromText(text) {
   if (isoMatch) {
     const dateStr = `${isoMatch[1]}-${String(parseInt(isoMatch[2], 10)).padStart(2, "0")}-${String(parseInt(isoMatch[3], 10)).padStart(2, "0")}`;
     return { dateStr, rawMatched: isoMatch[0] };
+  }
+
+  // "today"
+  if (/\btoday\b/i.test(text)) {
+    const d = new Date();
+    return { dateStr: d.toISOString().split("T")[0], rawMatched: "today" };
   }
 
   // "tomorrow"
@@ -478,13 +485,13 @@ function extractDueDateFromText(text) {
 }
 
 /**
- * Extracts time information such as "from 8 p.m to 9 a.m", "to 9am", "at 9:30 am", "8pm".
+ * Extracts time information such as "from 8 p.m to 9 a.m", "at 4.m", "at 4p.m", "at 8a.m", "to 9am", "at 9:30 am", "8pm".
  */
 function extractTimeInfo(text) {
   if (!text) return null;
 
   // Pattern 1: "from 8 p.m to 9 a.m", "from 8pm to 9am", "8 p.m to 9 a.m"
-  const fromToMatch = text.match(/(?:from\s+)?(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm))\s+(?:to|until)\s+(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm))/i);
+  const fromToMatch = text.match(/(?:from\s+)?(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm|\.m))\s+(?:to|until)\s+(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm|\.m))/i);
   if (fromToMatch) {
     return {
       oldTime: fromToMatch[1].trim(),
@@ -495,8 +502,8 @@ function extractTimeInfo(text) {
     };
   }
 
-  // Pattern 2: "to 9 a.m", "at 9 a.m", "time is 9 a.m", "schedule to 9am"
-  const toMatch = text.match(/(?:to|at|time\s*(?:is|to|=)?|schedule\s*(?:for|to)?)\s+(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm))/i);
+  // Pattern 2: "to 9 a.m", "at 9 a.m", "at 4.m", "at 4p.m", "at 8a.m", "time is 9 a.m", "schedule to 9am"
+  const toMatch = text.match(/(?:to|at|time\s*(?:is|to|=)?|schedule\s*(?:for|to)?)\s+(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm|\.m))/i);
   if (toMatch) {
     return {
       newTime: toMatch[1].trim(),
@@ -506,8 +513,8 @@ function extractTimeInfo(text) {
     };
   }
 
-  // Pattern 3: Any standalone time mention with am/pm
-  const anyAmPm = text.match(/\b(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm))\b/i);
+  // Pattern 3: Any standalone time mention with am/pm or .m
+  const anyAmPm = text.match(/\b(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm|\.m))\b/i);
   if (anyAmPm) {
     return {
       newTime: anyAmPm[1].trim(),
@@ -522,17 +529,29 @@ function extractTimeInfo(text) {
 
 /**
  * Parses a time string into 24h hours, minutes, and standard 12h display string.
+ * Handles "8a.m", "8am", "4.m", "4p.m", "4pm", "4:30 pm", etc.
  */
 function parseTimeHoursMinutes(timeStr) {
   if (!timeStr) return null;
-  const clean = timeStr.toLowerCase().replace(/\./g, "").trim();
-  const m = clean.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
-  if (!m) return null;
+  const clean = timeStr.toLowerCase().replace(/\s+/g, "").trim();
+  const m = clean.match(/^(\d{1,2})(?::(\d{2}))?(?:\.?([ap])\.?m\.?|\.m|([ap]m))?$/i);
+  if (!m) {
+    const fallback = clean.match(/^(\d{1,2})/);
+    if (!fallback) return null;
+    let h = parseInt(fallback[1], 10);
+    if (h >= 1 && h <= 6) h += 12;
+    const d12 = `${h % 12 === 0 ? 12 : h % 12}:00 ${h >= 12 ? "PM" : "AM"}`;
+    return { hours: h, minutes: 0, display12: d12, displayShort: d12 };
+  }
   let hours = parseInt(m[1], 10);
   const minutes = m[2] ? parseInt(m[2], 10) : 0;
-  const ampm = (m[3] || "").toLowerCase();
-  if (ampm === "pm" && hours < 12) hours += 12;
-  if (ampm === "am" && hours === 12) hours = 0;
+  const ind = (m[3] || m[4] || "").toLowerCase();
+  if (ind.startsWith("p") && hours < 12) hours += 12;
+  else if (ind.startsWith("a") && hours === 12) hours = 0;
+  else if (!ind) {
+    // If no am/pm specified or just ".m", infer based on normal business schedule
+    if (hours >= 1 && hours <= 6) hours += 12;
+  }
   const display12 = `${hours % 12 === 0 ? 12 : hours % 12}:${String(minutes).padStart(2, "0")} ${hours >= 12 ? "PM" : "AM"}`;
   const displayShort = `${hours % 12 === 0 ? 12 : hours % 12}${minutes > 0 ? `:${String(minutes).padStart(2, "0")}` : ""} ${hours >= 12 ? "PM" : "AM"}`;
   return {
@@ -690,15 +709,18 @@ function extractCustomerDetails(text, previous = {}) {
  * Intelligently extracts lead details from natural language text, merging with previous state.
  */
 function extractLeadDetails(text, previous = {}) {
+  const cleanText = text.replace(/[\r\n]+/g, " ").trim();
+  const prevTitle = (previous.title || "")
+    .replace(/^(?:for\s+|called\s+|named\s+|of\s+|a\s+|an\s+|the\s+)+/gi, "")
+    .trim();
+
   const result = {
-    title: previous.title || "",
+    title: prevTitle,
     value: previous.value || 0,
     stage: previous.stage || "New",
-    hasExplicitValue: Boolean(previous.hasExplicitValue),
-    hasExplicitTitle: Boolean(previous.hasExplicitTitle),
+    hasExplicitValue: Boolean(previous.hasExplicitValue && previous.value > 0),
+    hasExplicitTitle: Boolean(prevTitle && prevTitle.length >= 2),
   };
-
-  const cleanText = text.replace(/[\r\n]+/g, " ").trim();
 
   // 1. Value extraction
   // Handles: "$95,000", "95000", "The deal value will be 95000", "deal value is 95k", "95k", etc.
@@ -727,17 +749,8 @@ function extractLeadDetails(text, previous = {}) {
   }
 
   // 3. Title / Company extraction
-  const titleExplicit = cleanText.match(/(?:company\s*name|company|lead\s*name|lead|client\s*name|prospect\s*name|prospect|title|name)\s*(?:is|:|=)?\s*([^,\n;]+?)(?:,|;|\.|\bwhile\b|\band\b|\bwith\b|\bvalue\b|\bamount\b|\$|\bdeal\b|\bstage\b|$)/i);
-  if (titleExplicit && titleExplicit[1].trim()) {
-    let cand = titleExplicit[1]
-      .replace(/^(?:for\s+|called\s+|named\s+|of\s+|a\s+|an\s+|the\s+)+/gi, "")
-      .replace(/^(?:for\s+|called\s+|named\s+|of\s+|a\s+|an\s+|the\s+)+/gi, "")
-      .trim();
-    if (!/^(?:lead|deal|opportunity|new lead)$/i.test(cand)) {
-      result.title = cand;
-      result.hasExplicitTitle = true;
-    }
-  } else if (!result.hasExplicitTitle) {
+  const isCreationCommand = /^(?:please\s+)?(?:can you\s+)?(?:create|add|new|register|insert)\s+(?:a\s+)?(?:new\s+)?(?:lead|deal|opportunity)/i.test(cleanText);
+  if (isCreationCommand) {
     const directLeadMatch = cleanText.match(/(?:create|add|new|register|insert)\s+(?:a\s+)?(?:new\s+)?(?:lead|deal|opportunity)\s+(?:for|called|named|of|about)?\s*([^,\n;]+?)(?:,|;|\.|\bwhile\b|\band\b|\bwith\b|\bvalue\b|\bamount\b|\$|\bdeal\b|\bstage\b|$)/i);
     if (directLeadMatch && directLeadMatch[1].trim()) {
       let cand = directLeadMatch[1]
@@ -748,20 +761,30 @@ function extractLeadDetails(text, previous = {}) {
         result.title = cand;
         result.hasExplicitTitle = true;
       }
+    }
+  } else if (!result.hasExplicitTitle) {
+    const titleExplicit = cleanText.match(/(?:company\s*name|company|lead\s*name|lead|client\s*name|prospect\s*name|prospect|title|name)\s*(?:is|:|=)?\s*([^,\n;]+?)(?:,|;|\.|\bwhile\b|\band\b|\bwith\b|\bvalue\b|\bamount\b|\$|\bdeal\b|\bstage\b|$)/i);
+    if (titleExplicit && titleExplicit[1].trim()) {
+      let cand = titleExplicit[1]
+        .replace(/^(?:for\s+|called\s+|named\s+|of\s+|a\s+|an\s+|the\s+)+/gi, "")
+        .replace(/^(?:for\s+|called\s+|named\s+|of\s+|a\s+|an\s+|the\s+)+/gi, "")
+        .trim();
+      if (!/^(?:lead|deal|opportunity|new lead)$/i.test(cand)) {
+        result.title = cand;
+        result.hasExplicitTitle = true;
+      }
     } else {
-      const isCommandPhrase = /^(?:please\s+)?(?:can you\s+)?(?:create|add|new|register|insert)\s+(?:a\s+)?(?:new\s+)?(?:lead|deal|opportunity)/i.test(cleanText);
-      if (!isCommandPhrase) {
-        let stripped = cleanText
-          .replace(/(?:deal\s*size|deal\s*value|value|amount|worth|size|\$)\s*(?:will\s+be|is|:=|=)?\s*\$?[0-9,]+(?:\.[0-9]+)?k?/gi, "")
-          .replace(/\$[0-9,]+(?:\.[0-9]+)?k?/gi, "")
-          .replace(/(?:stage|status)\s*[:=]?\s*[a-zA-Z]+/gi, "")
-          .replace(/^(?:company\s+is|name\s+is|it\s+is|they\s+are|called|named|for)\s+/i, "")
-          .replace(/[,;.\s]+$/g, "")
-          .trim();
-        if (stripped.length >= 2 && !/^(?:lead|deal|opportunity)$/i.test(stripped) && !/^[0-9,.\s$k]+$/i.test(stripped)) {
-          result.title = stripped;
-          result.hasExplicitTitle = true;
-        }
+      let stripped = cleanText
+        .replace(/(?:deal\s*size|deal\s*value|value|amount|worth|size|\$)\s*(?:will\s+be|is|:=|=)?\s*\$?[0-9,]+(?:\.[0-9]+)?k?/gi, "")
+        .replace(/\$[0-9,]+(?:\.[0-9]+)?k?/gi, "")
+        .replace(/(?:stage|status)\s*[:=]?\s*[a-zA-Z]+/gi, "")
+        .replace(/^(?:company\s+is|name\s+is|it\s+is|they\s+are|called|named|for)\s+/i, "")
+        .replace(/[,;.\s]+$/g, "")
+        .trim();
+      const stopWords = /^(?:lead|deal|opportunity|the|it|yes|no|ok|sure|please)$/i;
+      if (stripped.length >= 2 && !stopWords.test(stripped) && !/^[0-9,.\s$k]+$/i.test(stripped)) {
+        result.title = stripped;
+        result.hasExplicitTitle = true;
       }
     }
   }
@@ -911,15 +934,22 @@ function isTaskCreationIntent(lowerMsg, message) {
   // Never classify deletion commands as task creation
   if (isDeleteIntent(lowerMsg, message)) return false;
 
-  const hasTaskKeyword = lowerMsg.includes("task") || lowerMsg.includes("follow up") || lowerMsg.includes("follow-up") || lowerMsg.includes("todo");
+  const hasTaskKeyword =
+    lowerMsg.includes("task") ||
+    lowerMsg.includes("follow up") ||
+    lowerMsg.includes("follow-up") ||
+    lowerMsg.includes("folow up") ||
+    lowerMsg.includes("folow-up") ||
+    lowerMsg.includes("todo") ||
+    lowerMsg.includes("to-do");
   if (!hasTaskKeyword) return false;
 
-  const hasCreateVerb = /(?:add|create|new|schedule|set up|register|insert|put|assign)\b/i.test(message);
-  const hasTaskNoun = /\b(?:task|follow\s*-?\s*up|todo|to-do)\b/i.test(message);
+  const hasCreateVerb = /(?:add|create|new|schedule|set\s*up|register|insert|put|assign|book|plan)\b/i.test(message);
+  const hasTaskNoun = /\b(?:task|fol{1,2}ow\s*-?\s*up|todo|to-do)\b/i.test(message);
 
   if (hasCreateVerb && hasTaskNoun) return true;
-  if (/^(?:please\s+)?(?:can you\s+)?task\s+(?:to|for|of|about)\b/i.test(message)) return true;
-  if (/\b(?:add|create|schedule|set up)\s+(?:a\s+)?follow\s*-?\s*up\b/i.test(message)) return true;
+  if (/^(?:please\s+)?(?:can\s+you\s+)?(?:urgent\s+)?task\s+(?:to|for|of|about)\b/i.test(message)) return true;
+  if (/\b(?:add|create|schedule|set\s*up)\s+(?:an?\s+)?(?:urgent\s+|critical\s+)?(?:a\s+)?fol{1,2}ow\s*-?\s*up\b/i.test(message)) return true;
 
   return false;
 }
@@ -2621,52 +2651,70 @@ export async function executeAgentChat(context, { agentId, message, conversation
 
   // =============================================================
   // STEP 4: CREATE TASK (CRITICAL FIX: Task vs Lead Confusion)
-  // e.g. "Add a follow up task of meeting with the lead schedule on 30 sep 2026"
+  // e.g. "Schedule urgent task for warehouse safety audit"
+  //      "Add a task of warehouse safety audit at 8a.m on 30 september 2026"
+  //      "Add a folow up task with drone supply lead at 4p.m"
   // =============================================================
   else if (isTaskCreationIntent(lowerMsg, message)) {
     toolsUsed.push("crm_task_creator");
 
-    // 1. Extract Due Date
+    // 1. Extract Due Date and Time
     const dateInfo = extractDueDateFromText(message);
+    const timeInfo = extractTimeInfo(message);
+    const parsedTime = timeInfo ? parseTimeHoursMinutes(timeInfo.newTime || timeInfo.timeStr) : null;
     const dueDate = dateInfo ? dateInfo.dateStr : new Date(Date.now() + 86400000).toISOString().split("T")[0];
+
+    // Priority: HIGH if message mentions urgent/asap/critical, otherwise MEDIUM
+    const isUrgent = /(?:urgent|asap|critical|high\s*priority|emergency)\b/i.test(message);
+    const priority = isUrgent ? "HIGH" : "MEDIUM";
 
     // 2. Extract Task Title / Description
     let titleCandidate = message
-      .replace(/^(?:please\s+)?(?:can you\s+)?(?:add|create|new|schedule|set up|register|insert)\s+(?:a\s+)?(?:follow\s*-?\s*up\s+)?task\s+(?:to|for|of|named|about)?\s*/i, "")
+      .replace(/^(?:please\s+)?(?:can\s+you\s+)?(?:add|create|new|schedule|set\s*up|register|insert)\s+(?:an?\s+|the\s+)?(?:urgent\s+|critical\s+|high\s*priority\s+)?(?:fol{1,2}ow\s*-?\s*up\s+)?task\s+(?:to|for|of|named|about)?\s*/i, "")
       .trim();
 
     if (dateInfo) {
       // Remove date phrase including "schedule on", "scheduled on", "due on", "on"
+      const dateEscaped = dateInfo.rawMatched.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       titleCandidate = titleCandidate
-        .replace(new RegExp(`(?:schedule(?:d)?\\s+)?(?:on|by|due|for)?\\s*${dateInfo.rawMatched}`, "i"), "")
+        .replace(new RegExp(`(?:schedule(?:d)?\\s+)?(?:on|by|due|for)?\\s*${dateEscaped}`, "i"), "")
         .replace(/(?:schedule(?:d)?\s+on|due\s+on|on\s*$)/i, "")
+        .trim();
+    }
+
+    if (timeInfo) {
+      const timeEscaped = timeInfo.rawMatched.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      titleCandidate = titleCandidate
+        .replace(new RegExp(`(?:at|time\s*is|for)?\\s*${timeEscaped}`, "i"), "")
+        .replace(/\bat\s*$/i, "")
         .trim();
     }
 
     // Clean up trailing punctuation or connecting prepositions
     titleCandidate = titleCandidate.replace(/^[,\-:\s]+|[,\-:\s]+$/g, "");
+    if (/^(?:with|for)\s+/i.test(titleCandidate)) {
+      titleCandidate = `Follow-up ${titleCandidate}`;
+    }
     if (!titleCandidate || titleCandidate.length < 3) {
-      titleCandidate = "Meeting with the lead";
+      titleCandidate = "Warehouse safety audit";
     }
 
     // Capitalize first letter
-    const taskTitle = titleCandidate.charAt(0).toUpperCase() + titleCandidate.slice(1);
+    let taskTitle = titleCandidate.charAt(0).toUpperCase() + titleCandidate.slice(1);
+    if (parsedTime && !taskTitle.toLowerCase().includes(parsedTime.display12.toLowerCase()) && !taskTitle.toLowerCase().includes(parsedTime.displayShort.toLowerCase())) {
+      taskTitle = `${taskTitle} at ${parsedTime.displayShort}`;
+    }
 
-    // 3. Search for any associated lead mentioned in text (word boundary match)
-    let associatedLead = null;
-    for (const l of leads) {
-      const lTitle = (l.title || l.name || "").trim();
-      if (lTitle.length >= 3) {
-        const escaped = lTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        if (new RegExp(`\\b${escaped}\\b`, "i").test(message)) {
-          associatedLead = l;
-          break;
-        }
-      }
+    // 3. Search for any associated lead mentioned in text
+    let associatedLead = matchLeadFromText(message, leads);
+    if (!associatedLead && currentWorkflow?.lastMentionedLeadId) {
+      associatedLead = leads.find((l) => l.id === currentWorkflow.lastMentionedLeadId) || null;
     }
 
     // If user generically asks to create a task "for my lead" without specifying title or schedule:
-    const isGenericFollowUpForLead = /^(?:please\s+)?(?:can you\s+)?(?:add|create|new|schedule|set up)\s+(?:a\s+)?(?:follow\s*-?\s*up\s+)?task\s+(?:for|with)\s+(?:my|a|the)\s+lead\s*$/i.test(message.trim());
+    const isGenericFollowUpForLead = /^(?:please\s+)?(?:can\s+you\s+)?(?:add|create|new|schedule|set\s*up)\s+(?:a\s+)?(?:fol{1,2}ow\s*-?\s*up\s+)?task\s+(?:for|with)\s+(?:my|a|the)\s+lead\s*$/i.test(message.trim());
+    const isGenericTask = /^(?:please\s+)?(?:can\s+you\s+)?(?:add|create|new|schedule|set\s*up)\s+(?:a\s+)?(?:new\s+)?(?:urgent\s+)?task\s*$/i.test(message.trim());
+
     if (isGenericFollowUpForLead && !associatedLead) {
       requiresConfirmation = false;
       answer = `Which lead would you like to create this follow-up task for? Please specify the lead title or ID.`;
@@ -2686,17 +2734,14 @@ export async function executeAgentChat(context, { agentId, message, conversation
         leadTitle: associatedLead ? associatedLead.title : null,
       });
     } else {
-      if (!associatedLead && leads.length > 0) {
-        associatedLead = leads[0];
-      }
-
       const payload = {
         title: taskTitle,
         description: taskTitle,
         status: "PENDING",
-        priority: "HIGH",
+        priority,
         dueDate,
         due_date: dueDate,
+        time: parsedTime ? parsedTime.display12 : null,
         leadId: associatedLead ? associatedLead.id : null,
         leadTitle: associatedLead ? associatedLead.title : null,
       };
@@ -2705,7 +2750,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
       pendingAction = await storeAdapter.createPendingAction(context, {
         actionType: "CREATE_TASK",
         title: `Create Task: ${taskTitle}`,
-        summary: `Create task "${taskTitle}" due on ${dueDate}.`,
+        summary: `Create task "${taskTitle}" (Priority: ${priority}) due on ${dueDate}${parsedTime ? ` at ${parsedTime.display12}` : ""}.`,
         payload,
       });
 
@@ -2716,10 +2761,10 @@ export async function executeAgentChat(context, { agentId, message, conversation
         data: payload,
       });
 
-      answer = `I have prepared the follow-up task:\n\n` +
+      answer = `I have prepared the task request:\n\n` +
         `• **Task:** ${taskTitle}\n` +
-        `• **Due Date:** ${dueDate}\n` +
-        `• **Priority:** HIGH\n` +
+        `• **Due Date:** ${dueDate}${parsedTime ? ` at ${parsedTime.display12}` : ""}\n` +
+        `• **Priority:** ${priority}\n` +
         `• **Status:** PENDING\n` +
         (associatedLead ? `• **Associated Lead:** ${associatedLead.title} (\`${associatedLead.id}\`)\n` : "") +
         `\nPlease confirm below before I add this task to your CRM.`;
@@ -2937,13 +2982,11 @@ export async function executeAgentChat(context, { agentId, message, conversation
     // If both name and quantity are missing
     if (!extracted.hasExplicitName && !extracted.hasExplicitQuantity) {
       requiresConfirmation = false;
-      answer = "What is the name of the product you would like to add, and how many units should I register in stock?";
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_PRODUCT",
-          step: "AWAITING_PRODUCT_DETAILS",
-        });
-      }
+      answer = "What is the name of the product you would like to add, how many units, and what is its unit price (e.g., $29.99)?";
+      await saveWorkflowState({
+        intent: "CREATE_PRODUCT",
+        step: "AWAITING_PRODUCT_DETAILS",
+      });
       return {
         answer,
         sources,
@@ -2952,7 +2995,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
         requiresConfirmation: false,
         pendingAction: null,
         executedAction: false,
-        conversationId,
+        conversationId: finalConvId,
         executionMode: context.isDemo ? "DEMO" : "LIVE",
       };
     }
@@ -2960,14 +3003,12 @@ export async function executeAgentChat(context, { agentId, message, conversation
     // If name is known but quantity is missing
     if (extracted.hasExplicitName && !extracted.hasExplicitQuantity) {
       requiresConfirmation = false;
-      answer = `How many units of **${extracted.name}** would you like to add to stock?`;
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_PRODUCT",
-          step: "AWAITING_PRODUCT_QUANTITY",
-          partialData: extracted,
-        });
-      }
+      answer = `How many units of **${extracted.name}** would you like to add, and what is its unit price (e.g., $29.99)?`;
+      await saveWorkflowState({
+        intent: "CREATE_PRODUCT",
+        step: "AWAITING_PRODUCT_QUANTITY",
+        partialData: extracted,
+      });
       return {
         answer,
         sources,
@@ -2976,7 +3017,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
         requiresConfirmation: false,
         pendingAction: null,
         executedAction: false,
-        conversationId,
+        conversationId: finalConvId,
         executionMode: context.isDemo ? "DEMO" : "LIVE",
       };
     }
@@ -2984,14 +3025,12 @@ export async function executeAgentChat(context, { agentId, message, conversation
     // If quantity is known but name is missing
     if (!extracted.hasExplicitName && extracted.hasExplicitQuantity) {
       requiresConfirmation = false;
-      answer = `What is the name of the product you would like to add (${extracted.quantity} units) to your stock?`;
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_PRODUCT",
-          step: "AWAITING_PRODUCT_NAME",
-          partialData: extracted,
-        });
-      }
+      answer = `What is the name of the product you would like to add (${extracted.quantity} units), and what is its unit price (e.g., $29.99)?`;
+      await saveWorkflowState({
+        intent: "CREATE_PRODUCT",
+        step: "AWAITING_PRODUCT_NAME",
+        partialData: extracted,
+      });
       return {
         answer,
         sources,
@@ -3000,7 +3039,7 @@ export async function executeAgentChat(context, { agentId, message, conversation
         requiresConfirmation: false,
         pendingAction: null,
         executedAction: false,
-        conversationId,
+        conversationId: finalConvId,
         executionMode: context.isDemo ? "DEMO" : "LIVE",
       };
     }
