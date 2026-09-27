@@ -108,11 +108,18 @@ async function callLLM(systemPrompt, userMessage) {
 // -------------------------------------------------------------
 
 /**
- * Matches a product from message text by SKU, name, or tokens.
+ * Matches a product from message text by SKU, name, tokens, or conversation context.
  */
-function matchProductFromText(text, products) {
+function matchProductFromText(text, products, currentWorkflow = null) {
   if (!products || products.length === 0) return null;
-  const lower = text.toLowerCase().trim();
+
+  // Normalize common typos in command text:
+  const normalizedText = (text || "")
+    .replace(/\bmotot\b/gi, "motor")
+    .replace(/\bbattey\b/gi, "battery")
+    .replace(/\bbrushles\b/gi, "brushless")
+    .replace(/\bdedict\b/gi, "deduct");
+  const lower = normalizedText.toLowerCase().trim();
 
   // 1. Try exact or partial SKU match
   for (const p of products) {
@@ -125,10 +132,10 @@ function matchProductFromText(text, products) {
   }
 
   // 3. Extract candidate product name from command
-  const prodMatch = text.match(/(?:product|item|stock of|stock for)\s+([a-zA-Z0-9_\-\s]+?)(?:\s+by|\s+to|\s+from|\s+with|\s+units|\s+at|$)/i);
+  const prodMatch = normalizedText.match(/(?:product|item|stock of|stock for|from|to|for|of)\s+([a-zA-Z0-9_\-\s]+?)(?:\s+by|\s+to|\s+from|\s+with|\s+units|\s+stock|\s+at|$)/i);
   if (prodMatch && prodMatch[1]) {
     const cand = prodMatch[1].trim().toLowerCase();
-    if (cand && !["the", "a", "this", "my"].includes(cand)) {
+    if (cand && !["the", "a", "this", "my", "it", "them"].includes(cand)) {
       for (const p of products) {
         const pName = p.name.toLowerCase();
         if (pName.includes(cand) || cand.includes(pName)) return p;
@@ -152,13 +159,26 @@ function matchProductFromText(text, products) {
   }
   if (bestProduct) return bestProduct;
 
+  // 5. Contextual reference check ("it", "from it", "cut out 4 units from it", "this item", "this product")
   if (
-    lower.includes(" it ") ||
-    lower.endsWith(" it") ||
+    lower.includes(" it") ||
+    lower.includes("from it") ||
+    lower.includes("of it") ||
     lower.includes("this product") ||
-    lower.includes("this item")
+    lower.includes("this item") ||
+    lower.includes("the item")
   ) {
+    if (currentWorkflow?.lastMentionedProductId) {
+      const prev = products.find((p) => p.id === currentWorkflow.lastMentionedProductId);
+      if (prev) return prev;
+    }
     return products[0];
+  }
+
+  // 6. If no explicit product named in command and currentWorkflow has lastMentionedProductId:
+  if (currentWorkflow?.lastMentionedProductId) {
+    const prev = products.find((p) => p.id === currentWorkflow.lastMentionedProductId);
+    if (prev) return prev;
   }
 
   return null;
@@ -681,8 +701,14 @@ function extractLeadDetails(text, previous = {}) {
   const cleanText = text.replace(/[\r\n]+/g, " ").trim();
 
   // 1. Value extraction
-  const valueMatch = cleanText.match(/(?:deal\s*size|value|amount|worth|size|\$)\s*[:=]?\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i) ||
-    cleanText.match(/\$([0-9,]+(?:\.[0-9]+)?k?)/i);
+  // Handles: "$95,000", "95000", "The deal value will be 95000", "deal value is 95k", "95k", etc.
+  const valueMatch =
+    cleanText.match(/(?:deal\s*(?:size|value)|value|amount|worth|size|\$)\s*(?:will\s+be|is|should\s+be|to|:=|=)?\s*\$?([0-9,]+(?:\.[0-9]+)?k?)/i) ||
+    cleanText.match(/\$([0-9,]+(?:\.[0-9]+)?k?)/i) ||
+    cleanText.match(/\b([0-9,]+(?:\.[0-9]+)?k?)\s*(?:dollars?|usd|\$)\b/i) ||
+    // Standalone number or number with currency (e.g. "95000", "95k", "$95000", "about 95000")
+    cleanText.match(/(?:^|\b)(?:around|about|estimated|approx|approximate|it\s+is|is)?\s*\$?([0-9]{2,}(?:,[0-9]{3})*(?:\.[0-9]+)?k?)\b/i);
+
   if (valueMatch) {
     let raw = valueMatch[1].replace(/,/g, "").toLowerCase();
     let mult = 1;
@@ -703,24 +729,39 @@ function extractLeadDetails(text, previous = {}) {
   // 3. Title / Company extraction
   const titleExplicit = cleanText.match(/(?:company\s*name|company|lead\s*name|lead|client\s*name|prospect\s*name|prospect|title|name)\s*(?:is|:|=)?\s*([^,\n;]+?)(?:,|;|\.|\bwhile\b|\band\b|\bwith\b|\bvalue\b|\bamount\b|\$|\bdeal\b|\bstage\b|$)/i);
   if (titleExplicit && titleExplicit[1].trim()) {
-    const cand = titleExplicit[1].replace(/^(?:a\s+|an\s+|the\s+)+/i, "").trim();
+    let cand = titleExplicit[1]
+      .replace(/^(?:for\s+|called\s+|named\s+|of\s+|a\s+|an\s+|the\s+)+/gi, "")
+      .replace(/^(?:for\s+|called\s+|named\s+|of\s+|a\s+|an\s+|the\s+)+/gi, "")
+      .trim();
     if (!/^(?:lead|deal|opportunity|new lead)$/i.test(cand)) {
       result.title = cand;
       result.hasExplicitTitle = true;
     }
   } else if (!result.hasExplicitTitle) {
-    const isCommandPhrase = /^(?:please\s+)?(?:can you\s+)?(?:create|add|new|register|insert)\s+(?:a\s+)?(?:new\s+)?(?:lead|deal|opportunity)/i.test(cleanText);
-    if (!isCommandPhrase) {
-      let stripped = cleanText
-        .replace(/(?:deal\s*size|value|amount|worth|size|\$)\s*[:=]?\s*\$?[0-9,]+(?:\.[0-9]+)?k?/gi, "")
-        .replace(/\$[0-9,]+(?:\.[0-9]+)?k?/gi, "")
-        .replace(/(?:stage|status)\s*[:=]?\s*[a-zA-Z]+/gi, "")
-        .replace(/^(?:company\s+is|name\s+is|it\s+is|they\s+are|called|named)\s+/i, "")
-        .replace(/[,;.\s]+$/g, "")
+    const directLeadMatch = cleanText.match(/(?:create|add|new|register|insert)\s+(?:a\s+)?(?:new\s+)?(?:lead|deal|opportunity)\s+(?:for|called|named|of|about)?\s*([^,\n;]+?)(?:,|;|\.|\bwhile\b|\band\b|\bwith\b|\bvalue\b|\bamount\b|\$|\bdeal\b|\bstage\b|$)/i);
+    if (directLeadMatch && directLeadMatch[1].trim()) {
+      let cand = directLeadMatch[1]
+        .replace(/^(?:for\s+|called\s+|named\s+|of\s+|a\s+|an\s+|the\s+)+/gi, "")
+        .replace(/^(?:for\s+|called\s+|named\s+|of\s+|a\s+|an\s+|the\s+)+/gi, "")
         .trim();
-      if (stripped.length >= 2 && !/^(?:lead|deal|opportunity)$/i.test(stripped)) {
-        result.title = stripped;
+      if (cand && !/^(?:lead|deal|opportunity|new lead)$/i.test(cand)) {
+        result.title = cand;
         result.hasExplicitTitle = true;
+      }
+    } else {
+      const isCommandPhrase = /^(?:please\s+)?(?:can you\s+)?(?:create|add|new|register|insert)\s+(?:a\s+)?(?:new\s+)?(?:lead|deal|opportunity)/i.test(cleanText);
+      if (!isCommandPhrase) {
+        let stripped = cleanText
+          .replace(/(?:deal\s*size|deal\s*value|value|amount|worth|size|\$)\s*(?:will\s+be|is|:=|=)?\s*\$?[0-9,]+(?:\.[0-9]+)?k?/gi, "")
+          .replace(/\$[0-9,]+(?:\.[0-9]+)?k?/gi, "")
+          .replace(/(?:stage|status)\s*[:=]?\s*[a-zA-Z]+/gi, "")
+          .replace(/^(?:company\s+is|name\s+is|it\s+is|they\s+are|called|named|for)\s+/i, "")
+          .replace(/[,;.\s]+$/g, "")
+          .trim();
+        if (stripped.length >= 2 && !/^(?:lead|deal|opportunity)$/i.test(stripped) && !/^[0-9,.\s$k]+$/i.test(stripped)) {
+          result.title = stripped;
+          result.hasExplicitTitle = true;
+        }
       }
     }
   }
@@ -821,9 +862,41 @@ function isNegativeCancellation(text) {
 }
 
 /**
+ * Robust check for Stock Adjustment (Inflow/Outflow/Deduction/Reduction) of EXISTING product.
+ */
+function isStockAdjustmentIntent(lowerMsg, message = "") {
+  // Deduct / reduction / outflow terms (including common typos like dedict)
+  if (
+    /\b(?:deduct|dedict|deducting|deduction|reduce|reducing|reduction|cut\s*out|cutoff|cut\s*off|take\s*out|pull\s*out|subtract|minus|less|remove|removing|decrease|decreasing|drop|outflow|ship|shipping|dispense|dispensing|consume|consuming)\b/i.test(message)
+  ) {
+    return true;
+  }
+  // Setting exact units/stock: e.g. "make the units 56", "make units 56", "set stock to 56"
+  if (
+    /\b(?:make|set|change|update)\s+(?:the\s+)?(?:units?|stock|quantity)\s+(?:to|=)?\s*\d+/i.test(message) ||
+    /\bmake\s+(?:the\s+)?units?\s+\d+/i.test(message)
+  ) {
+    return true;
+  }
+  // Standard restock
+  if (
+    /(?:restock|re-stock|replenish)\b/i.test(message) ||
+    /renew(?:\s+the)?\s+stock\b/i.test(message) ||
+    /(?:add|order|increase)\s+stock\b/i.test(message) ||
+    /\b(?:add|restock|order)\s+\d+\s*(?:units?|pcs?|pieces?|items?|boxes?)?\s+(?:to|of|for)\b/i.test(message)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Robust check for Delete intent.
  */
 function isDeleteIntent(lowerMsg, message) {
+  if (isStockAdjustmentIntent(lowerMsg, message)) {
+    return false;
+  }
   return /(?:delete|remove|erase|drop|destroy|cancel)\b/i.test(message);
 }
 
@@ -1084,6 +1157,7 @@ function isQuestionOrInquiry(lowerMsg, message = "") {
     isCustomerCreationIntent(lowerMsg, message) ||
     isDeleteIntent(lowerMsg, message) ||
     isRestockIntent(lowerMsg, message) ||
+    isStockAdjustmentIntent(lowerMsg, message) ||
     lowerMsg.includes("move ") ||
     lowerMsg.includes("advance ") ||
     lowerMsg.includes("change price") ||
@@ -1272,9 +1346,10 @@ export async function executeAgentChat(context, { agentId, message, conversation
           answer = `Done. Customer account **${payload.customerName || payload.name || "account"}** has been deleted.`;
         } else if (actionType === "CREATE_CHART") {
           answer = `Done. Chart **${payload.title || "Custom Analytics"}** has been created.`;
-        } else if (actionType === "RESTOCK_PRODUCT") {
-          const newQty = approvalRes?.result?.product?.quantity ?? "updated";
-          answer = `Done. Restocked **${payload.productName}** by **+${payload.quantityDelta} units**. Current stock is now **${newQty} units**.`;
+        } else if (actionType === "RESTOCK_PRODUCT" || actionType === "ADJUST_STOCK") {
+          const newQty = approvalRes?.result?.product?.quantity ?? payload.newQuantity ?? "updated";
+          const isOut = payload.changeType === "OUT";
+          answer = `Done. ${isOut ? "Deducted" : "Restocked"} **${payload.quantityDelta} units** ${isOut ? "from" : "to"} **${payload.productName}**. Current stock is now **${newQty} units**.`;
         } else if (actionType === "EDIT_PRODUCT") {
           answer = `Done. Product **${payload.productName}** has been updated.`;
         } else {
@@ -1532,17 +1607,28 @@ export async function executeAgentChat(context, { agentId, message, conversation
           reason: "User specified restocking quantity via AI assistant",
         },
       });
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "RESTOCK_PRODUCT",
-          step: "AWAITING_CONFIRMATION",
-          productId: existing.id,
-          productName: existing.name,
-        });
-      }
+      await saveWorkflowState({
+        intent: "RESTOCK_PRODUCT",
+        step: "AWAITING_CONFIRMATION",
+        productId: existing.id,
+        productName: existing.name,
+      });
       answer = `I found existing inventory product **${existing.name}** (\`${existing.sku}\`, current stock: ${existing.quantity} units).\n\n` +
         `I have prepared the request to add **+${quantity} units** (new stock will be **${existing.quantity + quantity} units**).\n\n` +
         `Please confirm below before I proceed.`;
+    } else if (!partial.hasExplicitPrice) {
+      requiresConfirmation = false;
+      answer = `What is the unit price for **${prodName}** (e.g., $29.99)?`;
+      await saveWorkflowState({
+        intent: "CREATE_PRODUCT",
+        step: "AWAITING_PRODUCT_PRICE",
+        partialData: {
+          ...partial,
+          name: prodName,
+          quantity,
+          hasExplicitQuantity: true,
+        },
+      });
     } else {
       requiresConfirmation = true;
       const unitPrice = partial.unitPrice || 29.99;
@@ -1567,13 +1653,11 @@ export async function executeAgentChat(context, { agentId, message, conversation
         summary: `Add new inventory item "${prodName}" (${quantity} units at $${unitPrice.toFixed(2)}/unit in ${category}).`,
         payload,
       });
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_PRODUCT",
-          step: "AWAITING_CONFIRMATION",
-          data: payload,
-        });
-      }
+      await saveWorkflowState({
+        intent: "CREATE_PRODUCT",
+        step: "AWAITING_CONFIRMATION",
+        data: payload,
+      });
       answer = `I have prepared the request to add **${prodName}** to your inventory:\n\n` +
         `• **Product Name:** ${prodName}\n` +
         `• **Initial Stock:** ${quantity} units\n` +
@@ -1614,17 +1698,29 @@ export async function executeAgentChat(context, { agentId, message, conversation
           reason: "User specified restocking quantity via AI assistant",
         },
       });
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "RESTOCK_PRODUCT",
-          step: "AWAITING_CONFIRMATION",
-          productId: existing.id,
-          productName: existing.name,
-        });
-      }
+      await saveWorkflowState({
+        intent: "RESTOCK_PRODUCT",
+        step: "AWAITING_CONFIRMATION",
+        productId: existing.id,
+        productName: existing.name,
+      });
       answer = `I found existing inventory product **${existing.name}** (\`${existing.sku}\`, current stock: ${existing.quantity} units).\n\n` +
         `I have prepared the request to add **+${quantity} units** (new stock will be **${existing.quantity + quantity} units**).\n\n` +
         `Please confirm below before I proceed.`;
+    } else if (!extracted.hasExplicitPrice) {
+      requiresConfirmation = false;
+      answer = `What is the unit price for **${prodName}** (e.g., $29.99)?`;
+      await saveWorkflowState({
+        intent: "CREATE_PRODUCT",
+        step: "AWAITING_PRODUCT_PRICE",
+        partialData: {
+          ...extracted,
+          name: prodName,
+          quantity,
+          hasExplicitName: true,
+          hasExplicitQuantity: true,
+        },
+      });
     } else {
       requiresConfirmation = true;
       const unitPrice = extracted.unitPrice || 29.99;
@@ -1649,13 +1745,11 @@ export async function executeAgentChat(context, { agentId, message, conversation
         summary: `Add new inventory item "${prodName}" (${quantity} units at $${unitPrice.toFixed(2)}/unit in ${category}).`,
         payload,
       });
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_PRODUCT",
-          step: "AWAITING_CONFIRMATION",
-          data: payload,
-        });
-      }
+      await saveWorkflowState({
+        intent: "CREATE_PRODUCT",
+        step: "AWAITING_CONFIRMATION",
+        data: payload,
+      });
       answer = `I have prepared the request to add **${prodName}** to your inventory:\n\n` +
         `• **Product Name:** ${prodName}\n` +
         `• **Initial Stock:** ${quantity} units\n` +
@@ -1696,17 +1790,29 @@ export async function executeAgentChat(context, { agentId, message, conversation
           reason: "User specified restocking quantity via AI assistant",
         },
       });
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "RESTOCK_PRODUCT",
-          step: "AWAITING_CONFIRMATION",
-          productId: existing.id,
-          productName: existing.name,
-        });
-      }
+      await saveWorkflowState({
+        intent: "RESTOCK_PRODUCT",
+        step: "AWAITING_CONFIRMATION",
+        productId: existing.id,
+        productName: existing.name,
+      });
       answer = `I found existing inventory product **${existing.name}** (\`${existing.sku}\`, current stock: ${existing.quantity} units).\n\n` +
         `I have prepared the request to add **+${quantity} units** (new stock will be **${existing.quantity + quantity} units**).\n\n` +
         `Please confirm below before I proceed.`;
+    } else if (!extracted.hasExplicitPrice) {
+      requiresConfirmation = false;
+      answer = `What is the unit price for **${prodName}** (e.g., $29.99)?`;
+      await saveWorkflowState({
+        intent: "CREATE_PRODUCT",
+        step: "AWAITING_PRODUCT_PRICE",
+        partialData: {
+          ...extracted,
+          name: prodName,
+          quantity,
+          hasExplicitName: true,
+          hasExplicitQuantity: true,
+        },
+      });
     } else {
       requiresConfirmation = true;
       const unitPrice = extracted.unitPrice || 29.99;
@@ -1731,13 +1837,11 @@ export async function executeAgentChat(context, { agentId, message, conversation
         summary: `Add new inventory item "${prodName}" (${quantity} units at $${unitPrice.toFixed(2)}/unit in ${category}).`,
         payload,
       });
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_PRODUCT",
-          step: "AWAITING_CONFIRMATION",
-          data: payload,
-        });
-      }
+      await saveWorkflowState({
+        intent: "CREATE_PRODUCT",
+        step: "AWAITING_CONFIRMATION",
+        data: payload,
+      });
       answer = `I have prepared the request to add **${prodName}** to your inventory:\n\n` +
         `• **Product Name:** ${prodName}\n` +
         `• **Initial Stock:** ${quantity} units\n` +
@@ -1747,6 +1851,65 @@ export async function executeAgentChat(context, { agentId, message, conversation
         `• **Reorder Threshold:** ${reorderPoint} units\n\n` +
         `Please confirm below before I add this item to your inventory.`;
     }
+  }
+
+  // 3C2. CREATE_PRODUCT: Awaiting Product Price
+  else if (
+    currentWorkflow &&
+    currentWorkflow.intent === "CREATE_PRODUCT" &&
+    currentWorkflow.step === "AWAITING_PRODUCT_PRICE" &&
+    !isExplicitReadQuery(lowerMsg)
+  ) {
+    toolsUsed.push("inventory_product_creator");
+    const partial = currentWorkflow.partialData || {};
+    const prodName = partial.name || "New Product";
+
+    const priceMatch = message.match(/(?:price|cost|rate|\$)\s*(?:is|will\s+be|:=|=)?\s*\$?([0-9]+(?:\.[0-9]+)?)/i) ||
+      message.match(/\$([0-9]+(?:\.[0-9]+)?)/) ||
+      message.match(/\b([0-9]+(?:\.[0-9]+)?)\s*(?:dollars?|usd|\$)\b/i) ||
+      message.match(/\b([0-9]+(?:\.[0-9]+)?)\b/);
+
+    const unitPrice = priceMatch ? parseFloat(priceMatch[1]) : 29.99;
+    const quantity = partial.quantity || 10;
+    const reorderPoint = partial.reorderPoint || 10;
+    const category = partial.category || "General Hardware";
+    const sku = partial.sku || `SKU-${Date.now() % 1000}`;
+
+    const payload = {
+      name: prodName,
+      sku,
+      quantity,
+      current_stock: quantity,
+      unitPrice,
+      unit_price: unitPrice,
+      reorderPoint,
+      min_stock_threshold: reorderPoint,
+      category,
+      description: `Stock intake: ${prodName} (${category})`,
+    };
+
+    requiresConfirmation = true;
+    pendingAction = await storeAdapter.createPendingAction(context, {
+      actionType: "CREATE_PRODUCT",
+      title: `Add New Product: ${prodName}`,
+      summary: `Add new inventory item "${prodName}" (${quantity} units at $${unitPrice.toFixed(2)}/unit in ${category}).`,
+      payload,
+    });
+
+    await saveWorkflowState({
+      intent: "CREATE_PRODUCT",
+      step: "AWAITING_CONFIRMATION",
+      data: payload,
+    });
+
+    answer = `I have prepared the request to add **${prodName}** to your inventory:\n\n` +
+      `• **Product Name:** ${prodName}\n` +
+      `• **Initial Stock:** ${quantity} units\n` +
+      `• **Generated SKU:** \`${sku}\`\n` +
+      `• **Category:** ${category}\n` +
+      `• **Unit Price:** $${unitPrice.toFixed(2)}\n` +
+      `• **Reorder Threshold:** ${reorderPoint} units\n\n` +
+      `Please confirm below before I add this item to your inventory.`;
   }
 
   // 3D. CREATE_LEAD: Awaiting Lead Details
@@ -1762,33 +1925,27 @@ export async function executeAgentChat(context, { agentId, message, conversation
     if (!extracted.hasExplicitTitle && !extracted.hasExplicitValue) {
       requiresConfirmation = false;
       answer = "What is the company or prospect name for this new lead, and what is the estimated deal value?";
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_LEAD",
-          step: "AWAITING_LEAD_DETAILS",
-          partialData: extracted,
-        });
-      }
+      await saveWorkflowState({
+        intent: "CREATE_LEAD",
+        step: "AWAITING_LEAD_DETAILS",
+        partialData: extracted,
+      });
     } else if (extracted.hasExplicitTitle && !extracted.hasExplicitValue) {
       requiresConfirmation = false;
       answer = `What is the estimated deal value for **${extracted.title}** (e.g. $50,000)?`;
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_LEAD",
-          step: "AWAITING_LEAD_DETAILS",
-          partialData: extracted,
-        });
-      }
+      await saveWorkflowState({
+        intent: "CREATE_LEAD",
+        step: "AWAITING_LEAD_DETAILS",
+        partialData: extracted,
+      });
     } else if (!extracted.hasExplicitTitle && extracted.hasExplicitValue) {
       requiresConfirmation = false;
       answer = `What is the company or prospect name for this $${extracted.value.toLocaleString()} lead?`;
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_LEAD",
-          step: "AWAITING_LEAD_DETAILS",
-          partialData: extracted,
-        });
-      }
+      await saveWorkflowState({
+        intent: "CREATE_LEAD",
+        step: "AWAITING_LEAD_DETAILS",
+        partialData: extracted,
+      });
     } else {
       const title = extracted.title;
       const value = extracted.value;
@@ -1812,14 +1969,12 @@ export async function executeAgentChat(context, { agentId, message, conversation
         payload,
       });
 
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_LEAD",
-          step: "AWAITING_CONFIRMATION",
-          data: payload,
-          lastMentionedLeadTitle: title,
-        });
-      }
+      await saveWorkflowState({
+        intent: "CREATE_LEAD",
+        step: "AWAITING_CONFIRMATION",
+        data: payload,
+        lastMentionedLeadTitle: title,
+      });
 
       answer = `I have prepared the request to create lead **${title}** ($${value.toLocaleString()} — stage: *${stage}*).\n\nPlease confirm below to add this lead to your pipeline.`;
     }
@@ -2184,100 +2339,123 @@ export async function executeAgentChat(context, { agentId, message, conversation
     }
   }
 
-  // 3M. RESTOCK_PRODUCT: Awaiting Product
+  // 3M. RESTOCK_PRODUCT / DEDUCT_PRODUCT / ADJUST_STOCK: Awaiting Product
   else if (
     currentWorkflow &&
-    currentWorkflow.intent === "RESTOCK_PRODUCT" &&
+    (currentWorkflow.intent === "RESTOCK_PRODUCT" || currentWorkflow.intent === "DEDUCT_PRODUCT" || currentWorkflow.intent === "ADJUST_STOCK") &&
     currentWorkflow.step === "AWAITING_PRODUCT" &&
     !isExplicitReadQuery(lowerMsg)
   ) {
-    toolsUsed.push("inventory_restock_orchestrator");
-    const matchedProduct = matchProductFromText(message, products);
+    const isDeduct = currentWorkflow.changeType === "OUT" || currentWorkflow.intent === "DEDUCT_PRODUCT";
+    toolsUsed.push(isDeduct ? "inventory_stock_deductor" : "inventory_restock_orchestrator");
+    const matchedProduct = matchProductFromText(message, products, currentWorkflow);
 
     if (matchedProduct) {
-      const qtyMatch = message.match(/\b(?:by|with|add|plus|\+)\s*(\d+)\b/i) ||
+      const qtyMatch = message.match(/\b(?:by|with|add|deduct|dedict|reduce|cutoff|cut\s*out|take\s*out|plus|\+)\s*(\d+)\b/i) ||
         message.match(/\b(\d+)\s*(?:units?|pieces?|pcs?|items?|boxes?)\b/i) ||
         message.match(/\b(?:quantity|qty|amount)\s*[:=]?\s*(\d+)\b/i) ||
         message.match(/\b(\d+)\b/);
       const hasExplicitQuantity = Boolean(qtyMatch && parseInt(qtyMatch[1], 10) > 0);
 
       if (!hasExplicitQuantity) {
-        answer = `How many units of **${matchedProduct.name}** would you like to restock? Please specify the quantity you want to add.`;
+        answer = `How many units of **${matchedProduct.name}** would you like to ${isDeduct ? "deduct" : "restock"}? Please specify the quantity.`;
         requiresConfirmation = false;
-        if (conversationId) {
-          await storeAdapter.setConversationState(context, conversationId, {
-            intent: "RESTOCK_PRODUCT",
+        if (conversationId || finalConvId) {
+          await saveWorkflowState({
+            intent: isDeduct ? "DEDUCT_PRODUCT" : "RESTOCK_PRODUCT",
             step: "AWAITING_QUANTITY",
             productId: matchedProduct.id,
             productName: matchedProduct.name,
+            changeType: isDeduct ? "OUT" : "IN",
           });
         }
       } else {
         const quantity = parseInt(qtyMatch[1], 10);
+        const currentQty = Number(matchedProduct.quantity || 0);
+        const resultingQty = isDeduct ? Math.max(0, currentQty - quantity) : currentQty + quantity;
         requiresConfirmation = true;
+
         pendingAction = await storeAdapter.createPendingAction(context, {
-          actionType: "RESTOCK_PRODUCT",
-          title: `Restock: ${matchedProduct.name}`,
-          summary: `Renew stock for ${matchedProduct.name} (${matchedProduct.sku}) by +${quantity} units.`,
+          actionType: "ADJUST_STOCK",
+          title: `${isDeduct ? "Deduct Stock" : "Restock"}: ${matchedProduct.name}`,
+          summary: `${isDeduct ? "Deduct" : "Add"} ${quantity} units ${isDeduct ? "from" : "to"} ${matchedProduct.name} (${matchedProduct.sku}). Current: ${currentQty}, New: ${resultingQty}.`,
           payload: {
             productId: matchedProduct.id,
             sku: matchedProduct.sku,
             productName: matchedProduct.name,
             quantityDelta: quantity,
             quantity: quantity,
-            changeType: "IN",
-            reason: "User specified restocking quantity via AI assistant",
+            changeType: isDeduct ? "OUT" : "IN",
+            previousQuantity: currentQty,
+            newQuantity: resultingQty,
+            reason: `User specified ${isDeduct ? "deduction" : "restocking"} quantity via AI assistant`,
           },
         });
 
-        if (conversationId) {
-          await storeAdapter.setConversationState(context, conversationId, null);
-        }
+        await saveWorkflowState({
+          intent: "ADJUST_STOCK",
+          step: "AWAITING_CONFIRMATION",
+          productId: matchedProduct.id,
+          pendingActionId: pendingAction.id,
+          lastMentionedProductId: matchedProduct.id,
+          lastMentionedProductName: matchedProduct.name,
+        });
 
-        answer = `I have prepared the request to renew the stock of **${matchedProduct.name}** (**${matchedProduct.sku}**) by **+${quantity} units** (current stock: ${matchedProduct.quantity} units).\n\nPlease confirm below before I proceed.`;
+        answer = `I have prepared the request to ${isDeduct ? "deduct" : "renew the stock of"} **${quantity} units** ${isDeduct ? "from" : "to"} **${matchedProduct.name}** (**${matchedProduct.sku}**) (current stock: **${currentQty} units**, new stock: **${resultingQty} units**).\n\nPlease confirm below before I proceed.`;
       }
     } else {
-      answer = `I could not find a product matching "${message}". Which product would you like to restock? Please specify the product name or SKU.`;
+      answer = `I could not find a product matching "${message}". Which product would you like to ${isDeduct ? "deduct stock from" : "restock"}? Please specify the product name or SKU.`;
     }
   }
 
-  // 3N. RESTOCK_PRODUCT: Awaiting Quantity
+  // 3N. RESTOCK_PRODUCT / DEDUCT_PRODUCT / ADJUST_STOCK: Awaiting Quantity
   else if (
     currentWorkflow &&
-    currentWorkflow.intent === "RESTOCK_PRODUCT" &&
+    (currentWorkflow.intent === "RESTOCK_PRODUCT" || currentWorkflow.intent === "DEDUCT_PRODUCT" || currentWorkflow.intent === "ADJUST_STOCK") &&
     currentWorkflow.step === "AWAITING_QUANTITY" &&
     !isExplicitReadQuery(lowerMsg)
   ) {
-    toolsUsed.push("inventory_restock_orchestrator");
+    const isDeduct = currentWorkflow.changeType === "OUT" || currentWorkflow.intent === "DEDUCT_PRODUCT";
+    toolsUsed.push(isDeduct ? "inventory_stock_deductor" : "inventory_restock_orchestrator");
     const qtyMatch = message.match(/\b(\d+)\b/);
     const quantity = qtyMatch ? parseInt(qtyMatch[1], 10) : 0;
     const matchedProduct = products.find((p) => p.id === currentWorkflow.productId) ||
-      matchProductFromText(currentWorkflow.productName || "", products);
+      matchProductFromText(currentWorkflow.productName || "", products, currentWorkflow);
 
     if (matchedProduct && quantity > 0) {
+      const currentQty = Number(matchedProduct.quantity || 0);
+      const resultingQty = isDeduct ? Math.max(0, currentQty - quantity) : currentQty + quantity;
       requiresConfirmation = true;
+
       pendingAction = await storeAdapter.createPendingAction(context, {
-        actionType: "RESTOCK_PRODUCT",
-        title: `Restock: ${matchedProduct.name}`,
-        summary: `Renew stock for ${matchedProduct.name} (${matchedProduct.sku}) by +${quantity} units.`,
+        actionType: "ADJUST_STOCK",
+        title: `${isDeduct ? "Deduct Stock" : "Restock"}: ${matchedProduct.name}`,
+        summary: `${isDeduct ? "Deduct" : "Add"} ${quantity} units ${isDeduct ? "from" : "to"} ${matchedProduct.name} (${matchedProduct.sku}). Current: ${currentQty}, New: ${resultingQty}.`,
         payload: {
           productId: matchedProduct.id,
           sku: matchedProduct.sku,
           productName: matchedProduct.name,
           quantityDelta: quantity,
           quantity: quantity,
-          changeType: "IN",
-          reason: "User specified restocking quantity via AI assistant",
+          changeType: isDeduct ? "OUT" : "IN",
+          previousQuantity: currentQty,
+          newQuantity: resultingQty,
+          reason: `User specified ${isDeduct ? "deduction" : "restocking"} quantity via AI assistant`,
         },
       });
 
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, null);
-      }
+      await saveWorkflowState({
+        intent: "ADJUST_STOCK",
+        step: "AWAITING_CONFIRMATION",
+        productId: matchedProduct.id,
+        pendingActionId: pendingAction.id,
+        lastMentionedProductId: matchedProduct.id,
+        lastMentionedProductName: matchedProduct.name,
+      });
 
-      answer = `I have prepared the request to renew the stock of **${matchedProduct.name}** (**${matchedProduct.sku}**) by **+${quantity} units** (current stock: ${matchedProduct.quantity} units).\n\nPlease confirm below before I proceed.`;
+      answer = `I have prepared the request to ${isDeduct ? "deduct" : "renew the stock of"} **${quantity} units** ${isDeduct ? "from" : "to"} **${matchedProduct.name}** (**${matchedProduct.sku}**) (current stock: **${currentQty} units**, new stock: **${resultingQty} units**).\n\nPlease confirm below before I proceed.`;
     } else {
-      answer = `Please specify a valid numeric quantity of units to restock.`;
+      answer = `Please specify a valid numeric quantity of units to ${isDeduct ? "deduct" : "restock"}.`;
     }
   }
 
@@ -2858,6 +3036,25 @@ export async function executeAgentChat(context, { agentId, message, conversation
       answer = `I found existing inventory product **${existing.name}** (\`${existing.sku}\`, current stock: ${existing.quantity} units).\n\n` +
         `I have prepared the request to add **+${extracted.quantity} units** (new stock will be **${existing.quantity + extracted.quantity} units**).\n\n` +
         `Please confirm below before I proceed.`;
+    } else if (!extracted.hasExplicitPrice) {
+      requiresConfirmation = false;
+      answer = `What is the unit price for **${extracted.name}** (e.g., $29.99)?`;
+      await saveWorkflowState({
+        intent: "CREATE_PRODUCT",
+        step: "AWAITING_PRODUCT_PRICE",
+        partialData: extracted,
+      });
+      return {
+        answer,
+        sources,
+        toolsUsed,
+        executionTimeMs: Date.now() - startTime,
+        requiresConfirmation: false,
+        pendingAction: null,
+        executedAction: false,
+        conversationId,
+        executionMode: context.isDemo ? "DEMO" : "LIVE",
+      };
     } else {
       requiresConfirmation = true;
       const payload = {
@@ -2880,13 +3077,11 @@ export async function executeAgentChat(context, { agentId, message, conversation
         payload,
       });
 
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "CREATE_PRODUCT",
-          step: "AWAITING_CONFIRMATION",
-          data: payload,
-        });
-      }
+      await saveWorkflowState({
+        intent: "CREATE_PRODUCT",
+        step: "AWAITING_CONFIRMATION",
+        data: payload,
+      });
 
       answer = `I have prepared the request to add **${extracted.name}** to your inventory:\n\n` +
         `• **Product Name:** ${extracted.name}\n` +
@@ -2900,69 +3095,116 @@ export async function executeAgentChat(context, { agentId, message, conversation
   }
 
   // =============================================================
-  // STEP 7: RESTOCK / RENEW PRODUCT
+  // STEP 7: RESTOCK / ADJUST / DEDUCT PRODUCT STOCK (INFLOW & OUTFLOW)
   // e.g. "renew the stock of Brushless Motor by 20 units"
+  //      "deduct 4 units from motor", "dedict 4 units from motor"
+  //      "reduce 4 units from brushless motor stock"
+  //      "soo cut out the 4 units from it"
+  //      "in 60 units of brushless motot , please cutoff the 4 units and make the units 56"
   // =============================================================
-  else if (isRestockIntent(lowerMsg, message)) {
-    toolsUsed.push("inventory_restock_orchestrator");
-    const matchedProduct = matchProductFromText(message, products);
+  else if (isStockAdjustmentIntent(lowerMsg, message)) {
+    const matchedProduct = matchProductFromText(message, products, currentWorkflow);
 
-    if (!matchedProduct) {
-      answer = "Which product would you like to restock? Please specify the product name or SKU.";
-      requiresConfirmation = false;
-      if (conversationId) {
-        await storeAdapter.setConversationState(context, conversationId, {
-          intent: "RESTOCK_PRODUCT",
-          step: "AWAITING_PRODUCT",
-        });
-      }
-    } else {
-      // Remove product name and SKU from message text to avoid matching model numbers (e.g. v2, 24V, 400W)
-      let textWithoutProduct = message;
+    const isDeduct =
+      /\b(?:deduct|dedict|reduce|reducing|reduction|cut\s*out|cutoff|cut\s*off|take\s*out|pull\s*out|subtract|minus|less|remove|removing|decrease|decreasing|drop|outflow|ship|shipping|dispense|dispensing|consume|consuming)\b/i.test(message) ||
+      lowerMsg.includes("outflow");
+    let changeType = isDeduct ? "OUT" : "IN";
+
+    let quantity = null;
+    let textWithoutProduct = message;
+    if (matchedProduct) {
       if (matchedProduct.name) {
         textWithoutProduct = textWithoutProduct.replace(new RegExp(matchedProduct.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "");
       }
       if (matchedProduct.sku) {
         textWithoutProduct = textWithoutProduct.replace(new RegExp(matchedProduct.sku.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "");
       }
+    }
 
-      const qtyMatch = textWithoutProduct.match(/\b(?:by|with|add|plus|\+)\s*(\d+)\b/i) ||
-        textWithoutProduct.match(/\b(\d+)\s*(?:units?|pieces?|pcs?|items?|boxes?)\b/i) ||
-        textWithoutProduct.match(/\b(?:quantity|qty|amount)\s*[:=]?\s*(\d+)\b/i) ||
-        textWithoutProduct.match(/\b(\d+)\b/);
-      const hasExplicitQuantity = Boolean(qtyMatch && parseInt(qtyMatch[1], 10) > 0);
+    // Pattern 1: target quantity match: "make the units 56", "make units 56", "set stock to 56"
+    const targetMatch = message.match(/(?:make|set|change|update)\s+(?:the\s+)?(?:units?|stock|quantity)\s+(?:to|=)?\s*(\d+)/i) ||
+      message.match(/make\s+(?:the\s+)?units?\s+(\d+)/i);
 
-      if (!hasExplicitQuantity) {
-        answer = `How many units of **${matchedProduct.name}** would you like to restock? Please specify the quantity you want to add.`;
-        requiresConfirmation = false;
-        if (conversationId) {
-          await storeAdapter.setConversationState(context, conversationId, {
-            intent: "RESTOCK_PRODUCT",
-            step: "AWAITING_QUANTITY",
-            productId: matchedProduct.id,
-            productName: matchedProduct.name,
-          });
-        }
+    // Pattern 2: explicit action delta: "dedict 4 units", "deduct the 4 units", "reduce the 4 units", "cutoff the 4 units", "cut out the 4 units", "by 4 units"
+    const deltaMatch = textWithoutProduct.match(/(?:deduct|dedict|reduce|cutoff|cut\s*off|cut\s*out|take\s*out|remove|add|plus|renew|restock|by|with|\-|\+)\s*(?:the)?\s*(\d+)\b/i) ||
+      textWithoutProduct.match(/\b(\d+)\s*(?:units?|pieces?|pcs?|items?|boxes?)\b/i) ||
+      textWithoutProduct.match(/\b(?:quantity|qty|amount)\s*[:=]?\s*(\d+)\b/i);
+
+    if (deltaMatch && parseInt(deltaMatch[1], 10) > 0) {
+      quantity = parseInt(deltaMatch[1], 10);
+    } else if (targetMatch && matchedProduct) {
+      const targetQty = parseInt(targetMatch[1], 10);
+      const currentQty = Number(matchedProduct.quantity || 0);
+      if (targetQty < currentQty) {
+        quantity = currentQty - targetQty;
+        changeType = "OUT";
       } else {
-        const quantity = parseInt(qtyMatch[1], 10);
-        requiresConfirmation = true;
-        pendingAction = await storeAdapter.createPendingAction(context, {
-          actionType: "RESTOCK_PRODUCT",
-          title: `Restock: ${matchedProduct.name}`,
-          summary: `Renew stock for ${matchedProduct.name} (${matchedProduct.sku}) by +${quantity} units.`,
-          payload: {
-            productId: matchedProduct.id,
-            sku: matchedProduct.sku,
-            productName: matchedProduct.name,
-            quantityDelta: quantity,
-            quantity: quantity,
-            changeType: "IN",
-            reason: "User requested restocking via AI assistant",
-          },
-        });
-
-        answer = `I have prepared the request to renew the stock of **${matchedProduct.name}** (**${matchedProduct.sku}**) by **+${quantity} units** (current stock: ${matchedProduct.quantity} units).\n\nPlease confirm below before I proceed.`;
+        quantity = targetQty - currentQty;
+        changeType = "IN";
       }
+    } else {
+      const anyNum = textWithoutProduct.match(/\b(\d+)\b/);
+      if (anyNum && parseInt(anyNum[1], 10) > 0) {
+        quantity = parseInt(anyNum[1], 10);
+      }
+    }
+
+    if (!matchedProduct) {
+      answer = `Which product would you like to ${changeType === "OUT" ? "deduct stock from" : "restock"}? Please specify the product name or SKU.`;
+      requiresConfirmation = false;
+      if (conversationId || finalConvId) {
+        await saveWorkflowState({
+          intent: changeType === "OUT" ? "DEDUCT_PRODUCT" : "RESTOCK_PRODUCT",
+          step: "AWAITING_PRODUCT",
+          changeType,
+        });
+      }
+    } else if (!quantity || quantity <= 0) {
+      answer = `How many units of **${matchedProduct.name}** would you like to ${changeType === "OUT" ? "deduct" : "restock"}? Please specify the quantity.`;
+      requiresConfirmation = false;
+      if (conversationId || finalConvId) {
+        await saveWorkflowState({
+          intent: changeType === "OUT" ? "DEDUCT_PRODUCT" : "RESTOCK_PRODUCT",
+          step: "AWAITING_QUANTITY",
+          productId: matchedProduct.id,
+          productName: matchedProduct.name,
+          changeType,
+        });
+      }
+    } else {
+      const currentQty = Number(matchedProduct.quantity || 0);
+      const resultingQty = changeType === "OUT" ? Math.max(0, currentQty - quantity) : currentQty + quantity;
+      requiresConfirmation = true;
+
+      pendingAction = await storeAdapter.createPendingAction(context, {
+        actionType: "ADJUST_STOCK",
+        title: `${changeType === "OUT" ? "Deduct Stock" : "Restock"}: ${matchedProduct.name}`,
+        summary: `${changeType === "OUT" ? "Deduct" : "Add"} ${quantity} units ${changeType === "OUT" ? "from" : "to"} ${matchedProduct.name} (${matchedProduct.sku}). Current: ${currentQty} units, New: ${resultingQty} units.`,
+        payload: {
+          productId: matchedProduct.id,
+          sku: matchedProduct.sku,
+          productName: matchedProduct.name,
+          quantityDelta: quantity,
+          quantity: quantity,
+          changeType,
+          previousQuantity: currentQty,
+          newQuantity: resultingQty,
+          reason: `User requested stock ${changeType === "OUT" ? "deduction" : "restocking"} via AI assistant`,
+        },
+      });
+
+      await saveWorkflowState({
+        intent: "ADJUST_STOCK",
+        step: "AWAITING_CONFIRMATION",
+        productId: matchedProduct.id,
+        pendingActionId: pendingAction.id,
+        lastMentionedProductId: matchedProduct.id,
+        lastMentionedProductName: matchedProduct.name,
+      });
+
+      toolsUsed.push(changeType === "OUT" ? "inventory_stock_deductor" : "inventory_restock_orchestrator");
+
+      answer = `I have prepared the request to ${changeType === "OUT" ? "deduct" : "renew the stock of"} **${quantity} units** ${changeType === "OUT" ? "from" : "to"} **${matchedProduct.name}** (**${matchedProduct.sku}**) (current stock: **${currentQty} units**, new stock: **${resultingQty} units**).\n\nPlease confirm below before I proceed.`;
     }
   }
 
@@ -3263,6 +3505,12 @@ export async function executeAgentChat(context, { agentId, message, conversation
     );
 
     if (specificProduct) {
+      if (conversationId || finalConvId) {
+        await saveWorkflowState({
+          lastMentionedProductId: specificProduct.id,
+          lastMentionedProductName: specificProduct.name,
+        });
+      }
       answer = `You currently have **${specificProduct.quantity} units** of **${specificProduct.name}** (\`${specificProduct.sku}\`) in stock.\n\n- **Minimum Threshold:** ${specificProduct.reorderPoint} units\n- **Unit Price:** $${Number(specificProduct.unitPrice || 0).toFixed(2)}\n- **Status:** ${Number(specificProduct.quantity) === 0 ? "⚠️ Out of Stock" : Number(specificProduct.quantity) <= Number(specificProduct.reorderPoint) ? "⚠️ Low Stock" : "✅ Healthy"}`;
     } else {
       let summary = `Here is your current inventory overview:\n\n`;

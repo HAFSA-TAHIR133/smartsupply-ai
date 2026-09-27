@@ -554,9 +554,10 @@ function LoginFormContent() {
                 </>
               )}
             </button>
-            // <p className="text-[10px] text-zinc-500 text-center mt-2">
-            //   Static demo login: <code className="text-indigo-400 font-mono">demo@smartsupply.ai</code> • Zero backend exposure
-            // </p>
+            {/* Static demo login footnote */}
+            <p className="text-[10px] text-zinc-500 text-center mt-2">
+              Static demo login: <code className="text-indigo-400 font-mono">demo@smartsupply.ai</code> • Zero backend exposure
+            </p>
           </form>
         </div>
 

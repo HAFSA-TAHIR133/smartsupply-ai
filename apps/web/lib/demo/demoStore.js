@@ -4,7 +4,7 @@
  * zero-backend exposure, immediate UI responsiveness, and complete isolation.
  */
 
-import { DEMO_BASELINE_DATA } from "./demoBaseline";
+import { DEMO_BASELINE_DATA } from "./demoBaseline.js";
 
 const STORAGE_KEY = "smartsupply_demo_db_v1";
 const AI_COUNT_KEY = "smartsupply_demo_ai_count_v1";

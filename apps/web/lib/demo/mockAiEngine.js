@@ -6,7 +6,7 @@
  * without making external network calls or exposing secret LLM keys.
  */
 
-import { checkDemoGuardrails } from "./demoGuardrails";
+import { checkDemoGuardrails } from "./demoGuardrails.js";
 import {
   getDemoStore,
   createDemoCustomer,
@@ -20,7 +20,7 @@ import {
   getAiCommandCount,
   incrementAiCommandCount,
   DEMO_MAX_AI_ACTIONS,
-} from "./demoStore";
+} from "./demoStore.js";
 
 /**
  * Executes a simulated AI agent prompt on the client side.
@@ -106,35 +106,94 @@ export async function executeMockAiAgent(agentId, prompt, conversationId) {
   }
 
   // Intent B: Stock Adjustment / Restock
-  // e.g. "Adjust stock for Brushless Motor", "Restock 50 units of motor", "Add 25 units to titanium bolts"
+  // e.g. "Dedict 4 units from motor", "Reduce 4 units from brushless motor stock", "soo cut out the 4 units from it", "make the units 56"
   const adjustStockMatch =
     lower.includes("stock") ||
     lower.includes("restock") ||
     lower.includes("replenish") ||
     lower.includes("deduct") ||
-    lower.includes("units");
+    lower.includes("dedict") ||
+    lower.includes("reduce") ||
+    lower.includes("cut out") ||
+    lower.includes("cutoff") ||
+    lower.includes("cut off") ||
+    lower.includes("remove") ||
+    lower.includes("take out") ||
+    lower.includes("subtract") ||
+    lower.includes("minus") ||
+    lower.includes("units") ||
+    lower.includes("motor") ||
+    lower.includes("motot");
 
   if (adjustStockMatch) {
     const products = getDemoProducts();
+    const normalizedPrompt = lower
+      .replace(/\bmotot\b/g, "motor")
+      .replace(/\bbattey\b/g, "battery")
+      .replace(/\bbrushles\b/g, "brushless")
+      .replace(/\bdedict\b/g, "deduct");
+
     // Try to find matching product
     let targetProduct = products.find(
-      (p) => lower.includes(p.name.toLowerCase()) || lower.includes(p.sku.toLowerCase())
+      (p) => normalizedPrompt.includes(p.name.toLowerCase()) || normalizedPrompt.includes(p.sku.toLowerCase())
     );
 
     if (!targetProduct) {
-      if (lower.includes("motor")) targetProduct = products.find((p) => p.sku === "MTR-BRSH-024");
-      else if (lower.includes("battery") || lower.includes("polymer")) targetProduct = products.find((p) => p.sku === "BAT-LIPO-4820");
-      else if (lower.includes("sensor")) targetProduct = products.find((p) => p.sku === "SEN-OPTO-005");
-      else if (lower.includes("bolt") || lower.includes("titanium")) targetProduct = products.find((p) => p.sku === "FST-TI-M840");
-      else if (lower.includes("plate") || lower.includes("carbon")) targetProduct = products.find((p) => p.sku === "MAT-CF-5050");
-      else targetProduct = products[0]; // fallback to first item
+      if (normalizedPrompt.includes("motor")) targetProduct = products.find((p) => p.sku === "MTR-BRSH-024") || products[0];
+      else if (normalizedPrompt.includes("battery") || normalizedPrompt.includes("polymer")) targetProduct = products.find((p) => p.sku === "BAT-LIPO-4820");
+      else if (normalizedPrompt.includes("sensor")) targetProduct = products.find((p) => p.sku === "SEN-OPTO-005");
+      else if (normalizedPrompt.includes("bolt") || normalizedPrompt.includes("titanium")) targetProduct = products.find((p) => p.sku === "FST-TI-M840");
+      else if (normalizedPrompt.includes("plate") || normalizedPrompt.includes("carbon")) targetProduct = products.find((p) => p.sku === "MAT-CF-5050");
+      else if (normalizedPrompt.includes(" it") || normalizedPrompt.includes("from it")) {
+        const lastId = typeof window !== "undefined" ? localStorage.getItem("smartsupply_demo_last_product_id") : null;
+        targetProduct = (lastId && products.find((p) => p.id === lastId)) || products[0];
+      } else {
+        targetProduct = products[0];
+      }
     }
 
-    // Extract quantity delta
-    const qtyMatch = cleanPrompt.match(/\b(\d+)\s*(?:units|pcs|items|boxes)?\b/i);
-    const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 25;
-    const isDeduct = lower.includes("deduct") || lower.includes("remove") || lower.includes("out") || lower.includes("ship");
-    const changeType = isDeduct ? "OUT" : "IN";
+    if (targetProduct && typeof window !== "undefined") {
+      try {
+        localStorage.setItem("smartsupply_demo_last_product_id", targetProduct.id);
+      } catch (e) {}
+    }
+
+    const isDeduct =
+      normalizedPrompt.includes("deduct") ||
+      normalizedPrompt.includes("reduce") ||
+      normalizedPrompt.includes("cut out") ||
+      normalizedPrompt.includes("cutoff") ||
+      normalizedPrompt.includes("cut off") ||
+      normalizedPrompt.includes("remove") ||
+      normalizedPrompt.includes("take out") ||
+      normalizedPrompt.includes("subtract") ||
+      normalizedPrompt.includes("minus") ||
+      normalizedPrompt.includes("out") ||
+      normalizedPrompt.includes("ship");
+
+    let changeType = isDeduct ? "OUT" : "IN";
+
+    // Extract quantity delta or target
+    let qty = 4;
+    const targetMatch = cleanPrompt.match(/(?:make|set|change|update)\s+(?:the\s+)?(?:units?|stock|quantity)\s+(?:to|=)?\s*(\d+)/i) ||
+      cleanPrompt.match(/make\s+(?:the\s+)?units?\s+(\d+)/i);
+
+    const deltaMatch = cleanPrompt.match(/(?:deduct|dedict|reduce|cutoff|cut\s*off|cut\s*out|take\s*out|remove|add|plus|renew|restock|by|with|\-|\+)\s*(?:the)?\s*(\d+)\b/i) ||
+      cleanPrompt.match(/\b(\d+)\s*(?:units?|pcs?|pieces?|items?|boxes?)\b/i);
+
+    if (deltaMatch && parseInt(deltaMatch[1], 10) > 0) {
+      qty = parseInt(deltaMatch[1], 10);
+    } else if (targetMatch && targetProduct) {
+      const targetQty = parseInt(targetMatch[1], 10);
+      const currentQty = Number(targetProduct.quantity || 0);
+      if (targetQty < currentQty) {
+        qty = currentQty - targetQty;
+        changeType = "OUT";
+      } else {
+        qty = targetQty - currentQty;
+        changeType = "IN";
+      }
+    }
 
     if (targetProduct) {
       const adjustmentResult = adjustDemoStock(targetProduct.id, {
@@ -196,7 +255,8 @@ export async function executeMockAiAgent(agentId, prompt, conversationId) {
 
     // Lead creation
     const leadTitleMatch = cleanPrompt.match(/(?:create|add|new)\s+(?:a\s+)?lead(?:\s+for|\s+called|\s*:)?\s+["']?([^"',.\n]+)["']?/i);
-    const leadTitle = leadTitleMatch ? leadTitleMatch[1].trim() : "Strategic Expansion Initiative";
+    let leadTitle = leadTitleMatch ? leadTitleMatch[1].replace(/^(?:for\s+|called\s+|named\s+|of\s+|a\s+|an\s+|the\s+)+/gi, "").trim() : "Strategic Expansion Initiative";
+    if (!leadTitle) leadTitle = "Strategic Expansion Initiative";
     const createdLead = createDemoLead({
       title: leadTitle,
       companyName: `${leadTitle} Enterprises`,
